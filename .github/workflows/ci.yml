@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: macos
+        run: xcodegen generate
+
+      - name: Test
+        working-directory: macos
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Astroshots.xcodeproj \
+            -scheme Astroshots \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData-test \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            test
+
+  dmg:
+    name: Package DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Select Xcode
+        run: |
+          # Prefer a full Xcode; macos-15 images ship one under /Applications.
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Build DMG (ad-hoc signed)
+        working-directory: macos
+        env:
+          # Empty → package-dmg.sh uses ad-hoc identity (-). Optional secrets:
+          #   MACOS_CODE_SIGN_IDENTITY, MACOS_DEVELOPMENT_TEAM
+          CODE_SIGN_IDENTITY: ${{ secrets.MACOS_CODE_SIGN_IDENTITY }}
+          DEVELOPMENT_TEAM: ${{ secrets.MACOS_DEVELOPMENT_TEAM }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/package-dmg.sh
+          ./scripts/package-dmg.sh --out "$GITHUB_WORKSPACE/dist/Astroshots.dmg"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astroshots-dmg
+          path: |
+            dist/Astroshots.dmg
+            macos/build/Astroshots-*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summarize
+        run: |
+          set -euo pipefail
+          ls -lh dist/Astroshots.dmg macos/build/Astroshots-*.dmg 2>/dev/null || true
+          echo "### Astroshots DMG" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download the **Astroshots-dmg** artifact from this run." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ad-hoc signed builds: first launch may need right-click → **Open** (Gatekeeper)." >> "$GITHUB_STEP_SUMMARY"

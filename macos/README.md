@@ -77,3 +77,36 @@ Astroshots/
 
 App sandbox is off so FSEvents can watch developer worktrees without a
 bookmark dance. This is intentional for a local tooling app.
+
+## DMG packaging
+
+Local (same script CI uses):
+
+```bash
+./scripts/bootstrap.sh
+./scripts/package-dmg.sh
+# → build/Astroshots.dmg  and  build/Astroshots-<version>-<build>.dmg
+```
+
+### CI
+
+| Workflow | When | Output |
+|----------|------|--------|
+| `.github/workflows/ci.yml` | PRs / pushes | **Astroshots-dmg** artifact (14 days) |
+| `.github/workflows/release-dmg.yml` | tags `v*` | DMG attached to the GitHub Release |
+
+Default signing is **ad-hoc** (`CODE_SIGN_IDENTITY=-`) so no Apple secrets are
+required. First launch of an ad-hoc build on another Mac may need
+right-click → **Open** (Gatekeeper).
+
+### Optional Developer ID (later)
+
+Repo secrets (when you have a Developer ID Application cert):
+
+| Secret | Example |
+|--------|---------|
+| `MACOS_CODE_SIGN_IDENTITY` | `Developer ID Application: ArchAstro Inc (TEAMID)` |
+| `MACOS_DEVELOPMENT_TEAM` | `TEAMID` |
+
+Notarization (staple + `notarytool`) is not wired yet; ad-hoc DMGs are enough
+for internal review.
