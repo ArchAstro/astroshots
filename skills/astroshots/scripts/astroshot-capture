@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+# Write a screenshot into .astroshot/<feature>/ and update manifest.json
+# so the Astroshots Mac app can live-stream it.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  astroshot-capture --feature <name> --slug <slug> [options]
+  astroshot-capture --feature <name> --status pass|fail|running --finalize
+
+Options:
+  --feature NAME          Feature directory under .astroshot/ (required)
+  --slug SLUG             Filename slug (required unless --finalize)
+  --title TEXT            Human title (default: humanized slug)
+  --description TEXT      What the frame proves
+  --url TEXT              Route / UI context
+  --viewport WxH          e.g. 1280x1100
+  --status STATUS         running|pass|fail|idle (default: running)
+  --run-id ID             Override run id (default: feature-timestamp-pid)
+  --root DIR              Repo/worktree root (default: git root or cwd)
+  --source PATH           Copy this image instead of agent-browser
+  --from-agent-browser S  Session name for: agent-browser screenshot --full
+  --full                  Pass --full to agent-browser (default: on)
+  --no-full               Viewport-only screenshot
+  --selector SEL          agent-browser element crop selector
+  --finalize              Only update manifest status (no new PNG)
+  -h, --help              Show help
+
+Examples:
+  astroshot-capture --feature install-wizard --slug configure \
+    --title "Configure" --description "Config step" \
+    --from-agent-browser "browse-firstlanding-wt4"
+
+  astroshot-capture --feature install-wizard --status pass --finalize
+EOF
+}
+
+FEATURE=""
+SLUG=""
+TITLE=""
+DESCRIPTION=""
+URL=""
+VIEWPORT=""
+STATUS="running"
+RUN_ID=""
+ROOT=""
+SOURCE=""
+AB_SESSION=""
+FULL=1
+SELECTOR=""
+FINALIZE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --feature) FEATURE="${2:-}"; shift 2 ;;
+    --slug) SLUG="${2:-}"; shift 2 ;;
+    --title) TITLE="${2:-}"; shift 2 ;;
+    --description) DESCRIPTION="${2:-}"; shift 2 ;;
+    --url) URL="${2:-}"; shift 2 ;;
+    --viewport) VIEWPORT="${2:-}"; shift 2 ;;
+    --status) STATUS="${2:-}"; shift 2 ;;
+    --run-id) RUN_ID="${2:-}"; shift 2 ;;
+    --root) ROOT="${2:-}"; shift 2 ;;
+    --source) SOURCE="${2:-}"; shift 2 ;;
+    --from-agent-browser) AB_SESSION="${2:-}"; shift 2 ;;
+    --full) FULL=1; shift ;;
+    --no-full) FULL=0; shift ;;
+    --selector) SELECTOR="${2:-}"; shift 2 ;;
+    --finalize) FINALIZE=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$FEATURE" ]]; then
+  echo "error: --feature is required" >&2
+  exit 1
+fi
+if [[ ! "$FEATURE" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "error: --feature must be kebab-case [a-z0-9-]+" >&2
+  exit 1
+fi
+case "$STATUS" in
+  running|pass|fail|idle) ;;
+  *)
+    echo "error: --status must be running|pass|fail|idle" >&2
+    exit 1
+    ;;
+esac
+
+if [[ -z "$ROOT" ]]; then
+  if ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    :
+  else
+    ROOT="$(pwd)"
+  fi
+fi
+ROOT="$(cd "$ROOT" && pwd)"
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "error: required command not found: $1" >&2
+    exit 1
+  }
+}
+
+require_cmd jq
+require_cmd python3
+
+DIR="$ROOT/.astroshot/$FEATURE"
+mkdir -p "$DIR"
+MANIFEST="$DIR/manifest.json"
+
+humanize() {
+  python3 -c '
+import re, sys
+s = sys.argv[1].replace("-", " ").replace("_", " ")
+print(" ".join(p[:1].upper() + p[1:] if p else p for p in s.split()))
+' "$1"
+}
+
+if [[ -z "$RUN_ID" ]]; then
+  if [[ -f "$MANIFEST" ]]; then
+    RUN_ID="$(jq -r '.run_id // empty' "$MANIFEST" 2>/dev/null || true)"
+  fi
+fi
+if [[ -z "$RUN_ID" ]]; then
+  RUN_ID="${FEATURE}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+fi
+
+if [[ ! -f "$MANIFEST" ]]; then
+  jq -n \
+    --arg feature "$FEATURE" \
+    --arg run_id "$RUN_ID" \
+    --arg status "$STATUS" \
+    '{
+      version: 1,
+      feature: $feature,
+      run_id: $run_id,
+      status: $status,
+      shots: []
+    }' >"$MANIFEST"
+fi
+
+if [[ "$FINALIZE" == "1" ]]; then
+  tmp="$(mktemp)"
+  jq --arg status "$STATUS" '.status = $status' "$MANIFEST" >"$tmp"
+  mv "$tmp" "$MANIFEST"
+  printf 'finalized %s status=%s\n' "$MANIFEST" "$STATUS"
+  exit 0
+fi
+
+if [[ -z "$SLUG" ]]; then
+  echo "error: --slug is required unless --finalize" >&2
+  exit 1
+fi
+if [[ ! "$SLUG" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "error: --slug must be [a-z0-9_-]+" >&2
+  exit 1
+fi
+
+if [[ -z "$TITLE" ]]; then
+  TITLE="$(humanize "$SLUG")"
+fi
+
+# Next sequence: max existing NNNN-*.png plus one
+next_index() {
+  local max=0 n base
+  shopt -s nullglob
+  for f in "$DIR"/[0-9][0-9][0-9][0-9]-*.png \
+           "$DIR"/[0-9][0-9][0-9][0-9]-*.jpg \
+           "$DIR"/[0-9][0-9][0-9][0-9]-*.jpeg \
+           "$DIR"/[0-9][0-9][0-9][0-9]-*.webp; do
+    base="$(basename "$f")"
+    n="${base%%-*}"
+    if [[ "$n" =~ ^[0-9]+$ ]] && (( 10#$n > max )); then
+      max=$((10#$n))
+    fi
+  done
+  printf '%04d' $((max + 1))
+}
+
+SEQ="$(next_index)"
+FILE="${SEQ}-${SLUG}.png"
+DEST="$DIR/$FILE"
+CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+if [[ -n "$SOURCE" ]]; then
+  [[ -f "$SOURCE" ]] || {
+    echo "error: --source not found: $SOURCE" >&2
+    exit 1
+  }
+  # Preserve extension if not png
+  ext="${SOURCE##*.}"
+  ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
+  case "$ext" in
+    png|jpg|jpeg|webp|gif)
+      FILE="${SEQ}-${SLUG}.${ext}"
+      DEST="$DIR/$FILE"
+      ;;
+  esac
+  cp "$SOURCE" "$DEST"
+elif [[ -n "$AB_SESSION" ]]; then
+  require_cmd agent-browser
+  args=(--session "$AB_SESSION" screenshot)
+  if [[ -n "$SELECTOR" ]]; then
+    args+=("$SELECTOR")
+  elif [[ "$FULL" == "1" ]]; then
+    args+=(--full)
+  fi
+  args+=("$DEST")
+  agent-browser "${args[@]}" >/dev/null
+else
+  echo "error: provide --source PATH or --from-agent-browser SESSION" >&2
+  exit 1
+fi
+
+[[ -f "$DEST" ]] || {
+  echo "error: capture failed; missing $DEST" >&2
+  exit 1
+}
+
+tmp="$(mktemp)"
+jq \
+  --arg status "$STATUS" \
+  --arg run_id "$RUN_ID" \
+  --arg id "$SEQ" \
+  --arg file "$FILE" \
+  --arg slug "$SLUG" \
+  --arg title "$TITLE" \
+  --arg description "$DESCRIPTION" \
+  --arg url "$URL" \
+  --arg viewport "$VIEWPORT" \
+  --arg captured_at "$CAPTURED_AT" \
+  '
+    .status = $status
+    | .run_id = (if (.run_id // "") == "" then $run_id else .run_id end)
+    | .shots = (.shots // [])
+    | .shots += [{
+        id: $id,
+        file: $file,
+        slug: $slug,
+        title: $title,
+        description: $description,
+        captured_at: $captured_at
+      }
+      + (if $url == "" then {} else {url: $url} end)
+      + (if $viewport == "" then {} else {viewport: $viewport} end)]
+  ' "$MANIFEST" >"$tmp"
+mv "$tmp" "$MANIFEST"
+
+printf '%s\n' "$DEST"

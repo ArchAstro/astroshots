@@ -1,0 +1,105 @@
+import Foundation
+
+/// One screenshot frame discovered under `.astroshot/<feature>/`.
+struct Shot: Identifiable, Hashable, Sendable {
+    /// Stable identity: absolute file path.
+    var id: String { path }
+
+    /// Absolute path to the image file.
+    let path: String
+    /// Parent of `.astroshot` (worktree / project root basename used for badges).
+    let worktree: String
+    /// Absolute path of the worktree root (parent of `.astroshot`).
+    let worktreePath: String
+    /// Feature directory name under `.astroshot/`.
+    let feature: String
+    /// Filename (e.g. `0004-configure.png`).
+    let fileName: String
+    /// Parsed sequence id when the name looks like `0004-slug.ext`.
+    let sequence: String?
+    /// Slug from filename or manifest.
+    let slug: String
+    /// Human title from manifest, else slug.
+    let title: String
+    /// Description from manifest, else empty.
+    let description: String
+    /// Optional URL / route from manifest.
+    let url: String?
+    /// Run id from parent manifest when present.
+    let runID: String?
+    /// Feature status from manifest when present.
+    let status: FeatureStatus?
+    /// File modification time (used for ordering + display).
+    let capturedAt: Date
+
+    var isFailure: Bool {
+        status == .fail || slug.localizedCaseInsensitiveContains("fail")
+            || title.localizedCaseInsensitiveContains("fail")
+    }
+
+    /// Short badge label: last path segment, trimmed (`firstlanding-wt4` → `wt4` when possible).
+    var worktreeShort: String {
+        if let range = worktree.range(of: #"wt\d+"#, options: .regularExpression) {
+            return String(worktree[range])
+        }
+        if worktree.count <= 8 { return worktree }
+        return String(worktree.prefix(6))
+    }
+}
+
+enum FeatureStatus: String, Sendable, Hashable {
+    case running
+    case pass
+    case fail
+    case idle
+
+    init?(raw: String?) {
+        guard let raw else { return nil }
+        switch raw.lowercased() {
+        case "running", "run", "in_progress", "in-progress": self = .running
+        case "pass", "passed", "ok", "success": self = .pass
+        case "fail", "failed", "error": self = .fail
+        case "idle", "pending": self = .idle
+        default: return nil
+        }
+    }
+}
+
+enum ShotPath {
+    static let astroshotDirName = ".astroshot"
+    static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "webp", "gif"]
+
+    /// Parse `…/<worktree>/.astroshot/<feature>/<file>` into components.
+    static func parse(imagePath: String) -> (worktreePath: String, worktree: String, feature: String, fileName: String)? {
+        let url = URL(fileURLWithPath: imagePath)
+        let fileName = url.lastPathComponent
+        let ext = url.pathExtension.lowercased()
+        guard imageExtensions.contains(ext) else { return nil }
+
+        let featureURL = url.deletingLastPathComponent()
+        let feature = featureURL.lastPathComponent
+        guard !feature.isEmpty, feature != astroshotDirName else { return nil }
+
+        let astroshotURL = featureURL.deletingLastPathComponent()
+        guard astroshotURL.lastPathComponent == astroshotDirName else { return nil }
+
+        let worktreeURL = astroshotURL.deletingLastPathComponent()
+        let worktree = worktreeURL.lastPathComponent
+        guard !worktree.isEmpty else { return nil }
+
+        return (worktreeURL.path, worktree, feature, fileName)
+    }
+
+    /// Split `0004-configure.png` → (`0004`, `configure`).
+    static func sequenceAndSlug(fileName: String) -> (sequence: String?, slug: String) {
+        let base = (fileName as NSString).deletingPathExtension
+        if let dash = base.firstIndex(of: "-") {
+            let head = String(base[..<dash])
+            let tail = String(base[base.index(after: dash)...])
+            if !head.isEmpty, head.allSatisfy(\.isNumber) {
+                return (head, tail.isEmpty ? head : tail)
+            }
+        }
+        return (nil, base)
+    }
+}

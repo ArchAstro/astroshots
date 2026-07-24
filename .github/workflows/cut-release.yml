@@ -1,0 +1,202 @@
+name: Cut release
+
+# Manually trigger from the Actions tab to:
+#   1. Bump MARKETING_VERSION on a release branch (patch / minor / major)
+#   2. Push tag vX.Y.Z → triggers Release DMG (signed + notarized)
+#   3. Open a PR back to main so main tracks the version bump
+#
+# Same shape as archastro-js / archastro-python release.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to bump
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Explicit version, e.g. 0.2.0 (overrides bump when set)"
+        required: false
+        type: string
+
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cut-release:
+    name: Bump + branch + tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION_INPUT: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          PKG=macos/project.yml
+
+          CUR="$(
+            sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' "$PKG" | head -1
+          )"
+          BUILD="$(
+            sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "\([^"]*\)"/\1/p' "$PKG" | head -1
+          )"
+          [[ -n "$CUR" ]] || { echo "MARKETING_VERSION not found in $PKG" >&2; exit 1; }
+          [[ -n "$BUILD" ]] || BUILD=0
+
+          if [[ -n "${VERSION_INPUT// }" ]]; then
+            NEXT="${VERSION_INPUT#v}"
+          else
+            IFS='.' read -r MAJ MIN PAT <<<"${CUR%%-*}"
+            case "$BUMP" in
+              major) MAJ=$((MAJ + 1)); MIN=0; PAT=0 ;;
+              minor) MIN=$((MIN + 1)); PAT=0 ;;
+              patch) PAT=$((PAT + 1)) ;;
+              *) echo "Invalid bump: $BUMP" >&2; exit 1 ;;
+            esac
+            NEXT="$MAJ.$MIN.$PAT"
+          fi
+
+          if [[ ! "$NEXT" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]]; then
+            echo "Computed version is not valid semver: $NEXT" >&2
+            exit 1
+          fi
+          if [[ "$NEXT" == "$CUR" ]]; then
+            echo "Next version equals current ($CUR); nothing to release" >&2
+            exit 1
+          fi
+          if git rev-parse "v$NEXT" >/dev/null 2>&1; then
+            echo "Tag v$NEXT already exists" >&2
+            exit 1
+          fi
+
+          NEXT_BUILD=$((BUILD + 1))
+          TAG="v$NEXT"
+          BRANCH="release/$TAG"
+
+          {
+            echo "current=$CUR"
+            echo "next=$NEXT"
+            echo "next_build=$NEXT_BUILD"
+            echo "tag=$TAG"
+            echo "branch=$BRANCH"
+          } >>"$GITHUB_OUTPUT"
+
+          {
+            echo "### Cut release"
+            echo ""
+            echo "- Marketing: \`$CUR\` → \`$NEXT\`"
+            echo "- Build: \`$BUILD\` → \`$NEXT_BUILD\`"
+            echo "- Branch: \`$BRANCH\`"
+            echo "- Tag: \`$TAG\` (triggers **Release DMG**)"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Bump project.yml on release branch
+        env:
+          CUR: ${{ steps.bump.outputs.current }}
+          NEXT: ${{ steps.bump.outputs.next }}
+          NEXT_BUILD: ${{ steps.bump.outputs.next_build }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PKG=macos/project.yml
+
+          git checkout -b "$BRANCH"
+
+          python3 - <<'PY'
+          import os, pathlib, re
+          path = pathlib.Path("macos/project.yml")
+          text = path.read_text()
+          cur, nxt, build = os.environ["CUR"], os.environ["NEXT"], os.environ["NEXT_BUILD"]
+          text2, n1 = re.subn(
+              r'(MARKETING_VERSION:\s*")' + re.escape(cur) + r'(")',
+              r"\g<1>" + nxt + r"\2",
+              text,
+              count=1,
+          )
+          if n1 != 1:
+              raise SystemExit(f"failed to replace MARKETING_VERSION {cur!r}")
+          text3, n2 = re.subn(
+              r'(CURRENT_PROJECT_VERSION:\s*")\d+(")',
+              r"\g<1>" + build + r"\2",
+              text2,
+              count=1,
+          )
+          if n2 != 1:
+              raise SystemExit("failed to replace CURRENT_PROJECT_VERSION")
+          path.write_text(text3)
+          PY
+
+          git add macos/project.yml
+          git commit -m "release: Astroshots $TAG"
+          git push origin "$BRANCH"
+
+      - name: Create + push tag
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git tag -a "$TAG" -m "Astroshots $TAG"
+          git push origin "$TAG"
+
+      - name: Open PR back to main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          CUR: ${{ steps.bump.outputs.current }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          body=$(cat <<EOF
+          Automated release branch cut by **Cut release**.
+
+          | | |
+          |--|--|
+          | Version | \`$CUR\` → \`$NEXT\` |
+          | Tag | \`$TAG\` |
+          | DMG | **Release DMG** workflow (triggered by the tag) |
+
+          Once checks pass, merge so \`main\` tracks the shipped version.
+          EOF
+          )
+          pr_url=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "release: Astroshots $TAG" \
+            --body "$body")
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "Opened $pr_url" >> "$GITHUB_STEP_SUMMARY"
+          echo "PR: $pr_url"
+
+          # Prefer auto-merge if branch protection requires checks; otherwise
+          # leave the PR open for a human (main may have no protection yet).
+          if gh pr merge "$pr_url" --squash --delete-branch 2>/dev/null; then
+            echo "Merged $pr_url"
+          else
+            echo "Left PR open (merge when ready): $pr_url"
+            gh pr merge "$pr_url" --auto --squash 2>/dev/null || true
+          fi
