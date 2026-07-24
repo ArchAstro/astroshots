@@ -1,294 +1,237 @@
-# Signing & notarization (Gatekeeper-clean DMGs)
+# Signing setup (one list, top to bottom)
 
-Astroshots CI produces a **Developer ID signed + notarized** DMG so users can
-double-click install without right-click → Open.
+Do **each step in order**. Don’t skip ahead. When a step says “run this,” run it before the next step.
 
-This guide is end-to-end: Apple side, then `gh secret set` commands for the
-`ArchAstro/astroshots` repo.
-
-**Prereqs on your Mac**
-
-```bash
-# GitHub CLI logged into an account that can set secrets on ArchAstro/astroshots
-gh auth status
-gh repo view ArchAstro/astroshots >/dev/null
-
-# Optional: pin the repo for shorter commands
-export GH_REPO=ArchAstro/astroshots
-```
+Repo: `ArchAstro/astroshots`
 
 ---
 
-## Step 0 — Team ID
-
-1. Open [Membership details](https://developer.apple.com/account#MembershipDetailsCard).
-2. Copy **Team ID** (10 characters, e.g. `ABCDE12345`).
-
-Set it (replace the value):
+### 1. Open a terminal and set the repo
 
 ```bash
-export TEAM_ID='ABCDE12345'   # your Team ID
 export GH_REPO=ArchAstro/astroshots
+gh auth status
+```
+
+You should be logged in as someone who can edit secrets on that repo. If not: `gh auth login`.
+
+---
+
+### 2. Get your Team ID
+
+1. Open: https://developer.apple.com/account#MembershipDetailsCard  
+2. Copy **Team ID** (10 characters).
+
+```bash
+export TEAM_ID='PASTE_TEAM_ID_HERE'
 
 gh secret set MACOS_DEVELOPMENT_TEAM --repo "$GH_REPO" --body "$TEAM_ID"
 ```
 
-Optional mirror used by notarization if you don’t use the API key path later:
+---
 
-```bash
-gh secret set APPLE_TEAM_ID --repo "$GH_REPO" --body "$TEAM_ID"
-```
+### 3. Make a Certificate Signing Request (CSR)
+
+1. Open **Keychain Access** (Spotlight → Keychain Access).  
+2. Menu: **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority…**  
+3. **User Email** = your Apple ID email.  
+4. **Common Name** = `Astroshots Developer ID`.  
+5. Select **Saved to disk**.  
+6. Save the file (Desktop is fine). Leave CA email blank.
+
+No terminal command for this step.
 
 ---
 
-## Step 1 — Developer ID Application certificate
+### 4. Create the Developer ID Application certificate
 
-### 1a. Certificate Signing Request (CSR)
+1. Open: https://developer.apple.com/account/resources/certificates/list  
+2. Click **+**.  
+3. Choose **Developer ID Application** → Continue.  
+4. Upload the CSR from step 3 → Continue.  
+5. **Download** the `.cer` file.  
+6. **Double-click** the `.cer` so it installs in Keychain.
 
-1. Open **Keychain Access**.
-2. **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority…**
-3. Email = your Apple ID; Common Name = e.g. `Astroshots Developer ID`.
-4. **Saved to disk** → save `CertificateSigningRequest.certSigningRequest`.
+---
 
-### 1b. Request the cert from Apple
-
-1. [Certificates list](https://developer.apple.com/account/resources/certificates/list) → **+**.
-2. **Developer ID Application** → Continue.
-3. Upload the CSR → download the `.cer`.
-
-### 1c. Install + confirm identity
+### 5. Copy the signing identity and save it as a secret
 
 ```bash
-# Double-click the .cer first, then:
 security find-identity -v -p codesigning | grep "Developer ID Application"
 ```
 
-You want a line like:
+You should see a line like:
 
 ```text
-1) AABBCCDD… "Developer ID Application: Your Name (ABCDE12345)"
+1) AABBCC… "Developer ID Application: Your Name (ABCDE12345)"
 ```
 
-Copy the string **inside the quotes** (include the team id in parentheses).
+Copy **everything inside the quotes** (including the team id in parentheses).
 
 ```bash
-# Paste your exact identity:
-export CODE_SIGN_IDENTITY='Developer ID Application: Your Name (ABCDE12345)'
+export CODE_SIGN_IDENTITY='PASTE_THE_QUOTED_IDENTITY_HERE'
 
 gh secret set MACOS_CODE_SIGN_IDENTITY --repo "$GH_REPO" --body "$CODE_SIGN_IDENTITY"
 ```
 
+If `grep` printed nothing: the cert isn’t installed or the private key is missing — redo steps 3–4 on **this** Mac.
+
 ---
 
-## Step 2 — Export `.p12` for CI
+### 6. Export a .p12 file
 
-1. **Keychain Access → My Certificates**.
-2. Select **Developer ID Application: … (TEAMID)** (ensure the private key is nested under it).
-3. Right-click → **Export…** → format **.p12**.
-4. Save e.g. `~/Desktop/DeveloperID-Astroshots.p12`.
-5. Set a strong export password (password manager).
+1. **Keychain Access → My Certificates** (login keychain).  
+2. Find **Developer ID Application: …** (expand it — private key should be underneath).  
+3. Right-click the certificate → **Export…**.  
+4. Format: **Personal Information Exchange (.p12)**.  
+5. Save as: `~/Desktop/DeveloperID-Astroshots.p12`.  
+6. Set a **password** for the file. Remember it (password manager).  
+7. Allow Keychain access if macOS asks.
 
-Then:
+---
+
+### 7. Upload the .p12 to GitHub
 
 ```bash
 export P12_PATH="$HOME/Desktop/DeveloperID-Astroshots.p12"
-# You will be prompted for the p12 password twice if you use --body from stdin carefully;
-# easiest is interactive for the password secret:
 
-# 1) Certificate blob
 base64 -i "$P12_PATH" | gh secret set MACOS_CERTIFICATE_P12_BASE64 --repo "$GH_REPO"
-
-# 2) Certificate password (interactive — paste password, Enter, Ctrl-D)
-gh secret set MACOS_CERTIFICATE_PASSWORD --repo "$GH_REPO"
 ```
 
-Non-interactive password (only if your shell history is safe / you use a throwaway shell):
+Then set the password (type/paste password, press Enter, then **Ctrl-D**):
 
 ```bash
-# Prefer the interactive form above.
-printf '%s' 'YOUR_P12_PASSWORD' | gh secret set MACOS_CERTIFICATE_PASSWORD --repo "$GH_REPO"
+gh secret set MACOS_CERTIFICATE_PASSWORD --repo "$GH_REPO"
 ```
 
 ---
 
-## Step 3 — App Store Connect API key (notarization)
+### 8. Create an App Store Connect API key
 
-1. [App Store Connect → Users and Access → Integrations → App Store Connect API](https://appstoreconnect.apple.com/access/integrations/api).
-2. Note **Issuer ID** (top of the page).
-3. **Generate API Key** → name e.g. `Astroshots CI` → Access **Developer** (or Admin).
-4. Copy **Key ID**.
-5. **Download** `AuthKey_XXXXXXXXXX.p8` (once only).
+1. Open: https://appstoreconnect.apple.com/access/integrations/api  
+2. At the top, copy **Issuer ID** (a UUID).  
+3. Click **Generate API Key** / **+**.  
+4. Name: `Astroshots CI`.  
+5. Access: **Developer** (or Admin).  
+6. Generate.  
+7. Copy **Key ID**.  
+8. **Download** the `AuthKey_XXXX.p8` file (you only get one chance — keep it).
+
+---
+
+### 9. Upload the API key secrets
+
+Fix the three values, then run all three commands:
 
 ```bash
-export API_KEY_PATH="$HOME/Downloads/AuthKey_XXXXXXXXXX.p8"  # fix filename
-export API_KEY_ID='XXXXXXXXXX'                               # Key ID
-export API_ISSUER_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' # Issuer ID
+export API_KEY_PATH="$HOME/Downloads/AuthKey_XXXXXXXXXX.p8"
+export API_KEY_ID='PASTE_KEY_ID'
+export API_ISSUER_ID='PASTE_ISSUER_UUID'
 
 gh secret set APPLE_API_KEY_ID --repo "$GH_REPO" --body "$API_KEY_ID"
 gh secret set APPLE_API_ISSUER_ID --repo "$GH_REPO" --body "$API_ISSUER_ID"
 base64 -i "$API_KEY_PATH" | gh secret set APPLE_API_KEY_BASE64 --repo "$GH_REPO"
 ```
 
-### Alternative: Apple ID + app-specific password
-
-Skip the three `APPLE_API_*` secrets and instead:
-
-1. [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → **App-Specific Passwords** → generate one.
-2. Run:
-
-```bash
-gh secret set APPLE_ID --repo "$GH_REPO" --body 'you@example.com'
-gh secret set APPLE_APP_SPECIFIC_PASSWORD --repo "$GH_REPO"   # interactive paste
-gh secret set APPLE_TEAM_ID --repo "$GH_REPO" --body "$TEAM_ID"
-```
-
-If both API key and Apple ID secrets exist, **API key wins** in `package-dmg.sh`.
-
 ---
 
-## Step 4 — Verify secrets are present
+### 10. Confirm every secret exists
 
 ```bash
-export GH_REPO=ArchAstro/astroshots
-
 gh secret list --repo "$GH_REPO"
 ```
 
-You should see at least:
+You need **all** of these names:
 
-```text
-MACOS_CERTIFICATE_P12_BASE64
-MACOS_CERTIFICATE_PASSWORD
-MACOS_CODE_SIGN_IDENTITY
-MACOS_DEVELOPMENT_TEAM
-APPLE_API_KEY_ID
-APPLE_API_ISSUER_ID
-APPLE_API_KEY_BASE64
-```
+- `MACOS_DEVELOPMENT_TEAM`
+- `MACOS_CODE_SIGN_IDENTITY`
+- `MACOS_CERTIFICATE_P12_BASE64`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `APPLE_API_KEY_ID`
+- `APPLE_API_ISSUER_ID`
+- `APPLE_API_KEY_BASE64`
 
-(`gh secret list` shows **names only**, not values.)
-
-One-shot checklist:
+Quick check:
 
 ```bash
-export GH_REPO=ArchAstro/astroshots
 need=(
+  MACOS_DEVELOPMENT_TEAM
+  MACOS_CODE_SIGN_IDENTITY
   MACOS_CERTIFICATE_P12_BASE64
   MACOS_CERTIFICATE_PASSWORD
-  MACOS_CODE_SIGN_IDENTITY
-  MACOS_DEVELOPMENT_TEAM
   APPLE_API_KEY_ID
   APPLE_API_ISSUER_ID
   APPLE_API_KEY_BASE64
 )
 have="$(gh secret list --repo "$GH_REPO" --json name --jq '.[].name')"
 for s in "${need[@]}"; do
-  if printf '%s\n' "$have" | grep -qx "$s"; then
-    echo "OK  $s"
-  else
-    echo "MISS $s"
+  if printf '%s\n' "$have" | grep -qx "$s"; then echo "OK  $s"
+  else echo "MISS $s"
   fi
 done
 ```
 
+Every line should say **OK**. If any say **MISS**, go back to that step.
+
 ---
 
-## Step 5 — Re-run CI / local smoke
-
-### Re-run the PR DMG job
+### 11. Re-run CI so it builds a signed DMG
 
 ```bash
-# Latest PR on the repo
-gh pr checks 1 --repo ArchAstro/astroshots
-
-# Re-run failed jobs on the latest workflow run for the PR branch
-gh run list --repo ArchAstro/astroshots --branch feat/v0-macos-app-and-skills --limit 5
-
-# Replace RUN_ID from the list:
-gh run rerun RUN_ID --repo ArchAstro/astroshots --failed
-
-# Or trigger a fresh push:
-# git commit --allow-empty -m "chore: re-run signed DMG CI" && git push
+gh run list --repo "$GH_REPO" --branch feat/v0-macos-app-and-skills --limit 5
 ```
 
-Download the artifact when green:
+Copy a **run ID** from the list (the number), then:
 
 ```bash
-gh run download RUN_ID --repo ArchAstro/astroshots -n Astroshots-dmg -D /tmp/astroshots-dmg
+gh run rerun PASTE_RUN_ID --repo "$GH_REPO" --failed
+```
+
+Watch it:
+
+```bash
+gh run watch PASTE_RUN_ID --repo "$GH_REPO"
+```
+
+When green, download the DMG:
+
+```bash
+gh run download PASTE_RUN_ID --repo "$GH_REPO" -n Astroshots-dmg -D /tmp/astroshots-dmg
 open /tmp/astroshots-dmg
 ```
 
-### Local release build (same credentials on your Mac)
+---
+
+### 12. (Optional) Build the same way on your Mac
+
+Only if you want a local notarized DMG. Reuse the same values from earlier steps:
 
 ```bash
-export CODE_SIGN_IDENTITY='Developer ID Application: Your Name (ABCDE12345)'
-export DEVELOPMENT_TEAM='ABCDE12345'
-export APPLE_API_KEY_PATH="$HOME/Downloads/AuthKey_XXXXXXXXXX.p8"
-export APPLE_API_KEY_ID='XXXXXXXXXX'
-export APPLE_API_ISSUER_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+export CODE_SIGN_IDENTITY='PASTE_THE_SAME_IDENTITY_AS_STEP_5'
+export DEVELOPMENT_TEAM="$TEAM_ID"
+export APPLE_API_KEY_PATH="$API_KEY_PATH"
+export APPLE_API_KEY_ID="$API_KEY_ID"
+export APPLE_API_ISSUER_ID="$API_ISSUER_ID"
 
-cd macos
+cd ~/archastro/astroshots/macos   # or your clone path
 ./scripts/package-dmg.sh
-# → build/Astroshots.dmg  (signed + notarized + stapled)
-```
-
-Ad-hoc only (Gatekeeper will warn):
-
-```bash
-./scripts/package-dmg.sh --adhoc
+open build/Astroshots.dmg
 ```
 
 ---
 
-## Copy-paste: full `gh secret set` block
+## If something breaks
 
-After you have files + values ready, fill the `export` lines and run:
-
-```bash
-export GH_REPO=ArchAstro/astroshots
-
-export TEAM_ID='ABCDE12345'
-export CODE_SIGN_IDENTITY='Developer ID Application: Your Name (ABCDE12345)'
-export P12_PATH="$HOME/Desktop/DeveloperID-Astroshots.p12"
-export API_KEY_PATH="$HOME/Downloads/AuthKey_XXXXXXXXXX.p8"
-export API_KEY_ID='XXXXXXXXXX'
-export API_ISSUER_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-
-gh secret set MACOS_DEVELOPMENT_TEAM --repo "$GH_REPO" --body "$TEAM_ID"
-gh secret set MACOS_CODE_SIGN_IDENTITY --repo "$GH_REPO" --body "$CODE_SIGN_IDENTITY"
-base64 -i "$P12_PATH" | gh secret set MACOS_CERTIFICATE_P12_BASE64 --repo "$GH_REPO"
-gh secret set MACOS_CERTIFICATE_PASSWORD --repo "$GH_REPO"   # paste password, Enter, Ctrl-D
-
-gh secret set APPLE_API_KEY_ID --repo "$GH_REPO" --body "$API_KEY_ID"
-gh secret set APPLE_API_ISSUER_ID --repo "$GH_REPO" --body "$API_ISSUER_ID"
-base64 -i "$API_KEY_PATH" | gh secret set APPLE_API_KEY_BASE64 --repo "$GH_REPO"
-
-gh secret list --repo "$GH_REPO"
-```
+| What you see | What to do |
+|--------------|------------|
+| No “Developer ID Application” in certificates | Paid Apple Developer team; right role on the account |
+| Step 5 `grep` empty | Cert not installed or CSR wasn’t made on this Mac — redo 3–4 |
+| `gh secret set` denied | `gh auth login` with a user that has admin on `ArchAstro/astroshots` |
+| CI still fails packaging | Run the check in step 10; re-run step 11 |
+| Notary invalid | Wrong cert type or identity string — step 5 identity must match the p12 in step 6 |
 
 ---
 
-## CI flow (what the secrets enable)
+## What this is for
 
-1. Import `.p12` into a temporary keychain (`macos/scripts/ci-import-certificate.sh`)
-2. `package-dmg.sh` builds Release, signs app (hardened runtime + timestamp) + DMG
-3. `notarytool submit --wait` → `stapler staple`
-4. Upload **Astroshots-dmg** artifact; on `v*` tags, attach to the GitHub Release
-
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---------|-----|
-| `No identity found` | Identity must match Keychain exactly; cert type must be **Developer ID Application** |
-| `errSecInternalComponent` | Re-export p12; re-run import script |
-| Notary `Invalid` | `xcrun notarytool log <submission-id> --key …` |
-| Staple fails | Notarization not `Accepted` yet |
-| `gh secret set` permission denied | `gh auth status` — need write access to `ArchAstro/astroshots` |
-| Still Gatekeeper after download | Confirm staple: `xcrun stapler validate Astroshots.dmg` |
-
-## Bundle id
-
-`ai.archastro.Astroshots` — no App ID is required for Developer ID distribution
-(only for Mac App Store). Notarization uses team credentials regardless.
+CI imports the `.p12`, builds Astroshots, **Developer ID signs** it, builds a DMG, **notarizes** with the API key, **staples** the ticket, and uploads artifact **Astroshots-dmg**. That install should open without right-click → Open.
