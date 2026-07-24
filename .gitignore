@@ -1,0 +1,24 @@
+# Runtime capture output (harnesses write these locally)
+.astroshot/
+
+# macOS / Xcode
+.DS_Store
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Build
+build/
+.swiftpm/
+Package.resolved
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
