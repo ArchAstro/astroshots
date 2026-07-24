@@ -253,3 +253,7 @@ Astroshots will never see them.
 - Design mock: `docs/mocks/astroshots-menubar.html`
 - App README: `macos/README.md`
 - Capture script: `skills/astroshots/scripts/astroshot-capture`
+- **agent-browser** skill — drive the browser CLI  
+  `npx skills add ArchAstro/astroshots --skill agent-browser -g -y`
+- **browser-ui-harness** skill — Bash harness layout & UI testing practices  
+  `npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y`
