@@ -1,0 +1,64 @@
+name: Astroshots
+options:
+  bundleIdPrefix: ai.archastro
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+
+targets:
+  Astroshots:
+    type: application
+    platform: macOS
+    sources:
+      - Astroshots
+    entitlements:
+      path: Astroshots/Astroshots.entitlements
+    info:
+      path: Astroshots/Info.plist
+      properties:
+        CFBundleDisplayName: Astroshots
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHumanReadableCopyright: "Copyright © 2026 ArchAstro Inc."
+        # Menu-bar app: no Dock icon.
+        LSUIElement: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.archastro.Astroshots
+
+  AstroshotsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - AstroshotsTests
+    dependencies:
+      - target: Astroshots
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Astroshots:
+    build:
+      targets:
+        Astroshots: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AstroshotsTests
