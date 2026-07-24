@@ -130,14 +130,25 @@ astroshot-capture --feature install-wizard --slug configure \
 
 The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skills/astroshots/scripts/astroshot-capture`](skills/astroshots/scripts/astroshot-capture).
 
-### Agent skill
+### Agent skills
 
-Install with the [skills](https://github.com/vercel-labs/skills) CLI:
+Install with the [skills](https://github.com/vercel-labs/skills) CLI.
+
+| Skill | What it teaches |
+|-------|-----------------|
+| **astroshots** | Write live screenshot streams under `.astroshot/` |
+| **agent-browser** | Install & drive the agent-browser CLI |
+| **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
 
 **Global** (all your projects — recommended):
 
 ```bash
 npx skills add ArchAstro/astroshots --skill astroshots -g -y
+npx skills add ArchAstro/astroshots --skill agent-browser -g -y
+npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
+
+# or all skills from this repo:
+npx skills add ArchAstro/astroshots --skill '*' -g -y
 ```
 
 **This git project only** (run from the project root; no `-g`):
@@ -145,23 +156,18 @@ npx skills add ArchAstro/astroshots --skill astroshots -g -y
 ```bash
 cd /path/to/your/project
 npx skills add ArchAstro/astroshots --skill astroshots -y
+npx skills add ArchAstro/astroshots --skill agent-browser -y
+npx skills add ArchAstro/astroshots --skill browser-ui-harness -y
 ```
 
-Optional: target agents (`-a`), or all of them:
+Optional: target agents with `-a claude-code -a cursor` or `-a '*'`.
 
 ```bash
-npx skills add ArchAstro/astroshots --skill astroshots -g -y -a claude-code -a cursor -a codex
-npx skills add ArchAstro/astroshots --skill astroshots -g -y -a '*'
+npx skills update -g -y    # global updates
+npx skills update -y       # this project
 ```
 
-Update:
-
-```bash
-npx skills update astroshots -g -y          # global
-npx skills update astroshots -y            # this project
-```
-
-Skill source in this repo: [`skills/astroshots/`](skills/astroshots/).
+Skill sources: [`skills/`](skills/).
 
 ---
 
