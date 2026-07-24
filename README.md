@@ -1,78 +1,154 @@
 # Astroshots
 
-Menu-bar macOS app that live-watches harness screenshots under `.astroshot/`,
-flashes new frames as desktop overlays, and streams every worktree in one list.
+**Watch your test screenshots as they land.**
 
-## Status
+Astroshots is a macOS menu-bar app for anyone who captures UI during browser tests, harness runs, or manual QA. Point your tools at a simple folder layout — frames stream in live, flash over your desktop, and stay in one history across every project you work in.
 
-**v0.1 app is buildable.** Mock is the design source of truth.
+---
 
-| Artifact | Path |
-|----------|------|
-| Native macOS app | [`macos/`](macos/) |
-| Interactive mock | [`docs/mocks/astroshots-menubar.html`](docs/mocks/astroshots-menubar.html) |
-| Sibling UX reference | `../agent-rooms` |
-| Harness reference | `../firstlanding-wt1/services/agent_network/test-harness/agent-browser` |
+## Why Astroshots
+
+| Problem | What Astroshots does |
+|---------|----------------------|
+| Screenshots buried in `/tmp` or CI artifacts | Live stream as soon as a PNG is written |
+| Jumping between worktrees to find shots | One tray, every project under your watch folder |
+| “Did that step look right?” mid-run | Desktop overlay above all windows |
+| Manual folder digging after a suite | Newest-first history with titles from a small manifest |
+
+No worktree picker. No account. No cloud. Just files on disk and a camera icon in the menu bar.
+
+---
+
+## Install
+
+### From a release (recommended)
+
+1. Download the latest **Astroshots.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
+2. Open the DMG and drag **Astroshots** into **Applications**.
+3. Launch Astroshots — it lives in the **menu bar** (no Dock icon).
+4. Click the camera icon → gear → set your **watch root** if you want something other than the default.
+
+Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
+
+### From source
+
+macOS 14+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ```bash
-cd macos
+git clone https://github.com/ArchAstro/astroshots.git
+cd astroshots/macos
 ./scripts/bootstrap.sh
-open Astroshots.xcodeproj
-# or:
-xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platform=macOS' build
+open Astroshots.xcodeproj   # ⌘R
 ```
 
-## Product shape
+Details: [`macos/README.md`](macos/README.md).
 
-- **Two surfaces**: desktop overlay (automatic) + menu-bar stream (on demand).
-- **Multi-worktree by default**: recursive watch on `~/archastro` (configurable). No worktree picker.
-- **Tray**: stream → click for detail → gear for settings. Pin keeps a floating window.
+---
 
-## Harness write contract
+## How it works
 
-```
-<worktree>/.astroshot/<feature>/
-  manifest.json
+1. **Watch** — Astroshots recursively watches a folder you choose (default `~/archastro`) for `.astroshot/` trees.
+2. **Write** — Your harness, agent, or script drops PNGs (and an optional `manifest.json`) under that layout.
+3. **See** — New frames flash on the desktop; open the tray for the full stream. Click a row for detail.
+
+### Write layout
+
+```text
+<project>/.astroshot/<feature>/
+  manifest.json          # optional, recommended
   0001-signed-in.png
   0002-configure.png
 ```
 
-See [`macos/README.md`](macos/README.md) for the full manifest shape. Today’s
-agent-browser harness still writes under `/tmp/archagents-browser-smoke/…`;
-pointing it at `.astroshot/` is the next harness change.
+Example `manifest.json`:
 
-## Skills (for coding agents)
-
-Install once so Claude / Grok / monorepo agents load the write contract:
-
-```bash
-./skills/install.sh
+```json
+{
+  "version": 1,
+  "feature": "install-wizard",
+  "run_id": "install-wizard-…",
+  "status": "running",
+  "shots": [
+    {
+      "id": "0002",
+      "file": "0002-configure.png",
+      "slug": "configure",
+      "title": "Configure",
+      "description": "Configuration screen for the resource.",
+      "url": "/solutions · dialog"
+    }
+  ]
+}
 ```
 
-| Skill | Purpose |
-|-------|---------|
-| `astroshots` | Write `.astroshot/<feature>/` frames, run the app, wire harnesses |
+Project name is inferred from the folder that contains `.astroshot`. Feature is the directory name under it.
 
-Helper on PATH after install:
+---
 
-```bash
-export PATH="$HOME/archastro/astroshots/bin:$PATH"
-astroshot-capture --feature my-journey --slug step --source ./shot.png
-```
+## Capture helper
 
-## CI / release
-
-| Workflow | When | What |
-|----------|------|------|
-| **CI** | PRs / pushes | Unit tests only |
-| **Cut release** | Manual (`workflow_dispatch`) | patch/minor/major → `release/vX.Y.Z` branch + tag + PR to main |
-| **Release DMG** | tags `v*` | Developer ID sign + notarize → GitHub Release |
-
-Cut a release (Actions tab → **Cut release** → pick bump), or:
+Ship screenshots into the layout without hand-editing manifests:
 
 ```bash
-gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
-# Creates release/vX.Y.Z, tags vX.Y.Z (starts Release DMG), opens PR to main
+# From a clone of this repo
+export PATH="$PWD/bin:$PATH"
+
+astroshot-capture --feature install-wizard --slug configure \
+  --title "Configure" \
+  --description "Configuration screen visible." \
+  --source ./shot.png
+
+astroshot-capture --feature install-wizard --status pass --finalize
 ```
 
-One-time Apple/GitHub setup: [`docs/SIGNING.md`](docs/SIGNING.md).
+Or capture from an `agent-browser` CLI session:
+
+```bash
+astroshot-capture --feature install-wizard --slug configure \
+  --from-agent-browser "$SESSION"
+```
+
+The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skills/astroshots/scripts/astroshot-capture`](skills/astroshots/scripts/astroshot-capture).
+
+### Agent skill
+
+Coding agents can load the full contract from [`skills/astroshots/`](skills/astroshots/):
+
+```bash
+./skills/install.sh    # links into ~/.claude/skills and ~/.grok/skills
+```
+
+---
+
+## Product tour
+
+| Surface | Job |
+|---------|-----|
+| **Desktop overlay** | New frame above all windows; Open / dismiss |
+| **Stream** | Newest-first list across all projects under the watch root |
+| **Detail** | Full frame + path, feature, URL, time |
+| **Settings** | Watch root, overlay toggles |
+
+Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](docs/mocks/astroshots-menubar.html).
+
+---
+
+## Releases
+
+| How | What you get |
+|-----|----------------|
+| [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed, notarized **DMG** |
+| Tag `v*` | CI builds that DMG automatically |
+
+Maintainers: cut a version with **Actions → Cut release** (patch / minor / major). Signing secrets: [`docs/SIGNING.md`](docs/SIGNING.md).
+
+---
+
+## Requirements
+
+- macOS 14 or later  
+- A folder of projects to watch (configure in-app)  
+- Tools that can write PNG files (any language, any harness)
+
+---
+
