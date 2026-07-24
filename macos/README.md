@@ -101,5 +101,5 @@ Dev-only (Gatekeeper will warn): `./scripts/package-dmg.sh --adhoc`
 
 | Workflow | When | Output |
 |----------|------|--------|
-| `.github/workflows/ci.yml` | PRs / pushes (same-repo) | **Astroshots-dmg** artifact |
-| `.github/workflows/release-dmg.yml` | tags `v*` | DMG on the GitHub Release |
+| `.github/workflows/ci.yml` | PRs / pushes | Tests only (no DMG) |
+| `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized DMG on the GitHub Release |

@@ -175,30 +175,32 @@ Every line should say **OK**. If any say **MISS**, go back to that step.
 
 ---
 
-### 11. Re-run CI so it builds a signed DMG
+### 11. Build a signed DMG (tags only — not PRs)
+
+CI on PRs only runs **tests**. A Gatekeeper-clean DMG is built when you push a version tag:
 
 ```bash
-gh run list --repo "$GH_REPO" --branch feat/v0-macos-app-and-skills --limit 5
+# After the PR is on main (or from a release commit):
+git checkout main && git pull
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-Copy a **run ID** from the list (the number), then:
+Watch the **Release DMG** workflow:
 
 ```bash
-gh run rerun PASTE_RUN_ID --repo "$GH_REPO" --failed
-```
-
-Watch it:
-
-```bash
+gh run list --repo "$GH_REPO" --workflow "Release DMG" --limit 3
 gh run watch PASTE_RUN_ID --repo "$GH_REPO"
 ```
 
-When green, download the DMG:
+When green, the DMG is on the GitHub Release and as artifact **Astroshots-dmg**:
 
 ```bash
-gh run download PASTE_RUN_ID --repo "$GH_REPO" -n Astroshots-dmg -D /tmp/astroshots-dmg
+gh release download v0.1.0 --repo "$GH_REPO" -p '*.dmg' -D /tmp/astroshots-dmg
 open /tmp/astroshots-dmg
 ```
+
+Manual re-run for an existing tag: Actions → **Release DMG** → **Run workflow** → enter tag.
 
 ---
 
@@ -234,4 +236,6 @@ open build/Astroshots.dmg
 
 ## What this is for
 
-CI imports the `.p12`, builds Astroshots, **Developer ID signs** it, builds a DMG, **notarizes** with the API key, **staples** the ticket, and uploads artifact **Astroshots-dmg**. That install should open without right-click → Open.
+On **version tags** (`v*`), the **Release DMG** workflow imports the `.p12`, builds Astroshots, **Developer ID signs** it, builds a DMG, **notarizes** with the API key, **staples** the ticket, and attaches it to the GitHub Release. That install should open without right-click → Open.
+
+PRs only run unit tests (no notarization).

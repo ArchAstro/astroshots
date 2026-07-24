@@ -62,8 +62,14 @@ astroshot-capture --feature my-journey --slug step --source ./shot.png
 
 ## CI / DMG
 
-GitHub Actions builds a **Developer ID signed + notarized** DMG (no Gatekeeper
-right-click dance) and uploads **Astroshots-dmg**. Tag `v*` to attach it to a
-Release.
+| Workflow | When | What |
+|----------|------|------|
+| **CI** | PRs / pushes | Unit tests only |
+| **Release DMG** | tags `v*` | Developer ID sign + notarize → GitHub Release |
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+# → Release DMG workflow attaches Astroshots.dmg to the release
+```
 
 One-time Apple/GitHub setup: [`docs/SIGNING.md`](docs/SIGNING.md).
