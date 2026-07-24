@@ -19,12 +19,21 @@ Canonical repo: [ArchAstro/astroshots](https://github.com/ArchAstro/astroshots).
 
 ### Install this skill
 
+**Global** (user-level, all projects):
+
 ```bash
 npx skills add ArchAstro/astroshots --skill astroshots -g -y
 ```
 
-Project-local: omit `-g`. Specific agents: `-a claude-code -a cursor` (or `-a '*'`).
-Update: `npx skills update astroshots -g -y`.
+**This git project only** (from the project root — omit `-g`):
+
+```bash
+cd /path/to/your/project
+npx skills add ArchAstro/astroshots --skill astroshots -y
+```
+
+Optional agents: `-a claude-code -a cursor` or `-a '*'`.  
+Update: `npx skills update astroshots -g -y` (global) or `npx skills update astroshots -y` (project).
 
 | Surface | Job |
 |---------|-----|

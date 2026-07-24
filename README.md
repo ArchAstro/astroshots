@@ -132,24 +132,33 @@ The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skill
 
 ### Agent skill
 
-Install the Astroshots skill for your coding agents with the [skills](https://github.com/vercel-labs/skills) CLI:
+Install with the [skills](https://github.com/vercel-labs/skills) CLI:
+
+**Global** (all your projects — recommended):
 
 ```bash
 npx skills add ArchAstro/astroshots --skill astroshots -g -y
 ```
 
-That installs globally (`-g`) for your user. Omit `-g` to install into the current project only. Target specific agents with `-a`:
+**This git project only** (run from the project root; no `-g`):
+
+```bash
+cd /path/to/your/project
+npx skills add ArchAstro/astroshots --skill astroshots -y
+```
+
+Optional: target agents (`-a`), or all of them:
 
 ```bash
 npx skills add ArchAstro/astroshots --skill astroshots -g -y -a claude-code -a cursor -a codex
-# or all agents:
 npx skills add ArchAstro/astroshots --skill astroshots -g -y -a '*'
 ```
 
-Update later:
+Update:
 
 ```bash
-npx skills update astroshots -g -y
+npx skills update astroshots -g -y          # global
+npx skills update astroshots -y            # this project
 ```
 
 Skill source in this repo: [`skills/astroshots/`](skills/astroshots/).
