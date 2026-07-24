@@ -15,17 +15,25 @@ Astroshots is a **menu-bar Mac app** that watches the filesystem for screenshots
 under `.astroshot/` and shows them live (tray stream + desktop overlay). Agents
 and harnesses **write frames**; humans **watch**.
 
-Canonical repo: `~/archastro/astroshots` (this skill ships with it).
+Canonical repo: [ArchAstro/astroshots](https://github.com/ArchAstro/astroshots).
+
+### Install this skill
+
+```bash
+npx skills add ArchAstro/astroshots --skill astroshots -g -y
+```
+
+Project-local: omit `-g`. Specific agents: `-a claude-code -a cursor` (or `-a '*'`).
+Update: `npx skills update astroshots -g -y`.
 
 | Surface | Job |
 |---------|-----|
 | Desktop overlay | New frame flashes above all windows |
-| Menu-bar tray | Unified newest-first stream across all worktrees |
+| Menu-bar tray | Unified newest-first stream across projects under the watch root |
 | Detail | Click a row; back returns to stream |
 | Settings (gear) | Watch root, overlay on/off |
 
-There is **no worktree picker**. Worktree is a badge on each row. Default watch
-root is `~/archastro` (recursive).
+No project picker — project is a badge on each row. Configure the watch root in-app.
 
 ---
 
@@ -33,13 +41,12 @@ root is `~/archastro` (recursive).
 
 | Situation | Do this |
 |-----------|---------|
-| Manual or agent browser walk of a feature | Capture into `.astroshot/<feature>/` so Calvin can watch |
-| agent-browser smoke / harness journey | Write each step with `astroshot-capture` (or the contract below) |
+| Manual or agent browser walk of a feature | Capture into `.astroshot/<feature>/` for live review |
+| Harness / smoke journey | Write each step with `astroshot-capture` (or the contract below) |
 | “Is Astroshots running / empty?” | Check app + watch root + that files are under `.astroshot/` |
-| Docs / catalog PNGs for the product site | Use the **screenshot** skill (`react-shot` / docs path) — not Astroshots |
+| Shipping docs site PNGs | Not this skill — use your docs screenshot pipeline |
 
-**Astroshots is for live test/review streams.** Ship-ready docs assets still go
-through `.claude/skills/screenshot/SKILL.md`.
+**Astroshots is for live test/review streams**, not catalog asset production.
 
 ---
 
@@ -175,10 +182,7 @@ agent-browser --session "$SESSION" screenshot --full "$PATH_PNG"
 # then update manifest.json (prefer the helper)
 ```
 
-For the **agent_network smoke harness** (`services/agent_network/test-harness/agent-browser/`),
-mirror `smoke_capture` so it also writes under `$REPO_ROOT/.astroshot/$case_name/`
-(in addition to or instead of `/tmp/archagents-browser-smoke/...`). Feature name
-= case name (`install-wizard`).
+Prefer `astroshot-capture` so the manifest stays in sync.
 
 ---
 
