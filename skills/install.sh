@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# Install Astroshots skills into local agent skill directories.
+# Optional local installer. Preferred:
+#   npx skills add ArchAstro/astroshots --skill astroshots -g -y
+#
+# This script only re-links from a local clone of this repository.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/skills/astroshots"
+echo "Note: preferred install is: npx skills add ArchAstro/astroshots --skill astroshots -g -y"
+echo ""
 
 install_link() {
   local dest="$1"

@@ -102,19 +102,26 @@ new PNGs via FSEvents (brief settle delay for partial writes).
 
 ## Preferred capture helper
 
-Use the script next to this skill (works from any cwd):
+After install, the skill directory includes `scripts/astroshot-capture`. Resolve it
+from the installed skill path (typical locations):
 
 ```bash
-SKILL_DIR="$(…path to this skill directory…)"
-# If installed as a monorepo skill:
-# SKILL_DIR="$(git rev-parse --show-toplevel)/.claude/skills/astroshots"
+# Global install (skills CLI)
+CAPTURE="$(ls -d \
+  ~/.agents/skills/astroshots/scripts/astroshot-capture \
+  ~/.claude/skills/astroshots/scripts/astroshot-capture \
+  ~/.codex/skills/astroshots/scripts/astroshot-capture \
+  2>/dev/null | head -1)"
 
+# Or from a clone of this repo:
+# CAPTURE=./bin/astroshot-capture
+```
+
+```bash
 FEATURE="install-wizard"
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-OUT="$REPO_ROOT/.astroshot/$FEATURE"
 
 # After agent-browser is on the right page:
-"$SKILL_DIR/scripts/astroshot-capture" \
+"$CAPTURE" \
   --feature "$FEATURE" \
   --slug configure \
   --title "Configure" \
@@ -127,24 +134,24 @@ OUT="$REPO_ROOT/.astroshot/$FEATURE"
 Without agent-browser (copy an existing PNG):
 
 ```bash
-"$SKILL_DIR/scripts/astroshot-capture" \
+"$CAPTURE" \
   --feature "$FEATURE" \
   --slug signed-in \
   --title "Signed in" \
   --description "Session authenticated." \
-  --source /tmp/shot.png
+  --source ./shot.png
 ```
 
 Mark the run finished:
 
 ```bash
-"$SKILL_DIR/scripts/astroshot-capture" --feature "$FEATURE" --status pass --finalize
+"$CAPTURE" --feature "$FEATURE" --status pass --finalize
 # or --status fail
 ```
 
 The helper:
 
-- Creates `.astroshot/<feature>/`
+- Creates `.astroshot/<feature>/` under the git/worktree root
 - Writes `NNNN-slug.png`
 - Merges the shot into `manifest.json`
 - Prints the absolute path (so you can log it)
@@ -178,28 +185,22 @@ mirror `smoke_capture` so it also writes under `$REPO_ROOT/.astroshot/$case_name
 ## Running the Mac app
 
 ```bash
-ASTROSHOTS_REPO="${ASTROSHOTS_REPO:-$HOME/archastro/astroshots}"
-cd "$ASTROSHOTS_REPO/macos"
+# From a clone of https://github.com/ArchAstro/astroshots
+cd macos
 ./scripts/bootstrap.sh          # needs xcodegen
 open Astroshots.xcodeproj       # ⌘R
-# or:
-xcodebuild -project Astroshots.xcodeproj -scheme Astroshots \
-  -destination 'platform=macOS' build
 ```
 
-Built app (Debug):  
-`~/Library/Developer/Xcode/DerivedData/Astroshots-*/Build/Products/Debug/Astroshots.app`
+Or install a signed build from [Releases](https://github.com/ArchAstro/astroshots/releases).
 
-- **Watch root** defaults to `~/archastro` — change under tray → gear if needed.
-- App is `LSUIElement` (menu bar only; no Dock icon).
-- Sandbox is off so FSEvents can see developer worktrees.
+- Set **watch root** under tray → gear if needed.
+- App is menu bar only (no Dock icon).
 
 ### Sanity check that a write will appear
 
 ```bash
-# From a worktree under the watch root:
+# From a project under the watch root:
 mkdir -p .astroshot/smoke-check
-# any small PNG:
 cp /path/to/any.png .astroshot/smoke-check/0001-ping.png
 # Overlay should flash if Astroshots is running and overlay is enabled.
 ```
@@ -235,7 +236,7 @@ Astroshots will never see them.
 
 ## Related
 
-- Design mock: `docs/mocks/astroshots-menubar.html` in the Astroshots repo
+- Repo: https://github.com/ArchAstro/astroshots
+- Design mock: `docs/mocks/astroshots-menubar.html`
 - App README: `macos/README.md`
-- Docs / product PNGs (not live stream): `.claude/skills/screenshot/SKILL.md`
-- Browser driving: `.claude/skills/agent-browser/SKILL.md`
+- Capture script: `skills/astroshots/scripts/astroshot-capture`

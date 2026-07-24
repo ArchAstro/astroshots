@@ -46,24 +46,36 @@ astroshot-capture --root "$REPO_ROOT" --feature "$case_name" --status pass --fin
 # or fail
 ```
 
-Ship `astroshot-capture` on `PATH`, or set:
+Install the skill (and helper) first:
 
 ```bash
-export ASTROSHOT_CAPTURE="$HOME/archastro/astroshots/skills/astroshots/scripts/astroshot-capture"
+npx skills add ArchAstro/astroshots --skill astroshots -g -y
+```
+
+Then point harnesses at the installed script (or copy it onto `PATH`):
+
+```bash
+export ASTROSHOT_CAPTURE="$(ls -d \
+  ~/.agents/skills/astroshots/scripts/astroshot-capture \
+  ~/.claude/skills/astroshots/scripts/astroshot-capture \
+  2>/dev/null | head -1)"
 ```
 
 ## Generic Bash harness
 
 ```bash
+npx skills add ArchAstro/astroshots --skill astroshots -g -y
+
 FEATURE=my-journey
-export PATH="$HOME/archastro/astroshots/skills/astroshots/scripts:$PATH"
+CAPTURE="$(ls -d ~/.agents/skills/astroshots/scripts/astroshot-capture \
+  ~/.claude/skills/astroshots/scripts/astroshot-capture 2>/dev/null | head -1)"
 
 # each step after UI is ready:
-astroshot-capture --feature "$FEATURE" --slug step-name \
+"$CAPTURE" --feature "$FEATURE" --slug step-name \
   --title "Step name" --description "What we proved" \
   --from-agent-browser "$SESSION"
 
-astroshot-capture --feature "$FEATURE" --status pass --finalize
+"$CAPTURE" --feature "$FEATURE" --status pass --finalize
 ```
 
 ## Where NOT to write

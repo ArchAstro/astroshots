@@ -132,11 +132,27 @@ The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skill
 
 ### Agent skill
 
-Coding agents can load the full contract from [`skills/astroshots/`](skills/astroshots/):
+Install the Astroshots skill for your coding agents with the [skills](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
-./skills/install.sh    # links into ~/.claude/skills and ~/.grok/skills
+npx skills add ArchAstro/astroshots --skill astroshots -g -y
 ```
+
+That installs globally (`-g`) for your user. Omit `-g` to install into the current project only. Target specific agents with `-a`:
+
+```bash
+npx skills add ArchAstro/astroshots --skill astroshots -g -y -a claude-code -a cursor -a codex
+# or all agents:
+npx skills add ArchAstro/astroshots --skill astroshots -g -y -a '*'
+```
+
+Update later:
+
+```bash
+npx skills update astroshots -g -y
+```
+
+Skill source in this repo: [`skills/astroshots/`](skills/astroshots/).
 
 ---
 
