@@ -1,0 +1,532 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		17BFA74EE76E1E71A5627F33 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */; };
+		342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */; };
+		51D0FFA42C1196281E94E2F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 369606653B9FD1E6FBE4B43D /* Assets.xcassets */; };
+		59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */; };
+		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
+		8F2395DC60D12581FB418608 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9976B5034C36AABFDFD4B2C8 /* AppState.swift */; };
+		96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */; };
+		A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */; };
+		B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDC12CB9342C5E685FD8A25 /* DetailView.swift */; };
+		BB6D913C2F3291617685815E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A6D30FE0070BBC23546100 /* OverlayController.swift */; };
+		CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823B8B4248FDCBE1985DECAE /* Shot.swift */; };
+		D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5089282794B5A6E6B3636886 /* ShotPathTests.swift */; };
+		DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA84FE9C55670A027F3776D /* SettingsPane.swift */; };
+		E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009EED7A72CCCCF8A86260D /* Preferences.swift */; };
+		F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */; };
+		F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84934BBEECF7545EB5C02073 /* Theme.swift */; };
+		F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5679FA304E48ED78A5B24170 /* StreamView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		55F28DA80619982BD45C994B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 18E7F59D13CE9229F896D161 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 219204DD11537497ABA9688C;
+			remoteInfo = Astroshots;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		02F094E7A3E11CE16C3E5ADB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayView.swift; sourceTree = "<group>"; };
+		254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2788CCB47877372A7EF96688 /* Manifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manifest.swift; sourceTree = "<group>"; };
+		3009EED7A72CCCCF8A86260D /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		3080B7658C295EC23288CB79 /* Astroshots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astroshots.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		369606653B9FD1E6FBE4B43D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		41A6D30FE0070BBC23546100 /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
+		5089282794B5A6E6B3636886 /* ShotPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotPathTests.swift; sourceTree = "<group>"; };
+		5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotsApp.swift; sourceTree = "<group>"; };
+		5679FA304E48ED78A5B24170 /* StreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamView.swift; sourceTree = "<group>"; };
+		823B8B4248FDCBE1985DECAE /* Shot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shot.swift; sourceTree = "<group>"; };
+		84934BBEECF7545EB5C02073 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		8F2AB8506FCE8107DD28D547 /* Astroshots.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Astroshots.entitlements; sourceTree = "<group>"; };
+		976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotWatcher.swift; sourceTree = "<group>"; };
+		9976B5034C36AABFDFD4B2C8 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManifestParserTests.swift; sourceTree = "<group>"; };
+		B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotThumbnail.swift; sourceTree = "<group>"; };
+		DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayView.swift; sourceTree = "<group>"; };
+		DBA84FE9C55670A027F3776D /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
+		DFDC12CB9342C5E685FD8A25 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		000A3F0641125A6FD698DF05 /* AstroshotsTests */ = {
+			isa = PBXGroup;
+			children = (
+				A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */,
+				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
+			);
+			path = AstroshotsTests;
+			sourceTree = "<group>";
+		};
+		2B19A32613D44C204DEB1A63 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9976B5034C36AABFDFD4B2C8 /* AppState.swift */,
+				3009EED7A72CCCCF8A86260D /* Preferences.swift */,
+				84934BBEECF7545EB5C02073 /* Theme.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		30E9B046A7FDE2DDD329A8B0 /* Tray */ = {
+			isa = PBXGroup;
+			children = (
+				DFDC12CB9342C5E685FD8A25 /* DetailView.swift */,
+				DBA84FE9C55670A027F3776D /* SettingsPane.swift */,
+				B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */,
+				5679FA304E48ED78A5B24170 /* StreamView.swift */,
+				0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */,
+			);
+			path = Tray;
+			sourceTree = "<group>";
+		};
+		4D65A7C0651E7AC4CBD0D13E /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2788CCB47877372A7EF96688 /* Manifest.swift */,
+				823B8B4248FDCBE1985DECAE /* Shot.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		5FC54A5F1FB9F1DA40AB87D5 /* Overlay */ = {
+			isa = PBXGroup;
+			children = (
+				41A6D30FE0070BBC23546100 /* OverlayController.swift */,
+				DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */,
+			);
+			path = Overlay;
+			sourceTree = "<group>";
+		};
+		985C787322D9CC2C5AAA3F9D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3080B7658C295EC23288CB79 /* Astroshots.app */,
+				254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D4EF0F79F6F530148E78A7AA /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */,
+			);
+			path = Watch;
+			sourceTree = "<group>";
+		};
+		D5CEAF8F149110D109A6B5F5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				369606653B9FD1E6FBE4B43D /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		DE6CFFA16895E75CF05C030A = {
+			isa = PBXGroup;
+			children = (
+				F4F44AB72B63B09B2653B846 /* Astroshots */,
+				000A3F0641125A6FD698DF05 /* AstroshotsTests */,
+				985C787322D9CC2C5AAA3F9D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F4F44AB72B63B09B2653B846 /* Astroshots */ = {
+			isa = PBXGroup;
+			children = (
+				8F2AB8506FCE8107DD28D547 /* Astroshots.entitlements */,
+				5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */,
+				02F094E7A3E11CE16C3E5ADB /* Info.plist */,
+				2B19A32613D44C204DEB1A63 /* App */,
+				F68AAD29ECBDB3454F5A3B2D /* Features */,
+				4D65A7C0651E7AC4CBD0D13E /* Models */,
+				D5CEAF8F149110D109A6B5F5 /* Resources */,
+				D4EF0F79F6F530148E78A7AA /* Watch */,
+			);
+			path = Astroshots;
+			sourceTree = "<group>";
+		};
+		F68AAD29ECBDB3454F5A3B2D /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				5FC54A5F1FB9F1DA40AB87D5 /* Overlay */,
+				30E9B046A7FDE2DDD329A8B0 /* Tray */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		219204DD11537497ABA9688C /* Astroshots */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 593EDCF0FD4E9910CA235132 /* Build configuration list for PBXNativeTarget "Astroshots" */;
+			buildPhases = (
+				9ABEBE60DAF1B176397C10A5 /* Sources */,
+				E7D85EB4582EB0AF1584D80F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Astroshots;
+			packageProductDependencies = (
+			);
+			productName = Astroshots;
+			productReference = 3080B7658C295EC23288CB79 /* Astroshots.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C2F68E7A0A32998682E92BAF /* AstroshotsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F80C8BCCD36ACA794C1841BA /* Build configuration list for PBXNativeTarget "AstroshotsTests" */;
+			buildPhases = (
+				17C983AD60222159889B1ED5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF69AFFDC9383EE280A3C014 /* PBXTargetDependency */,
+			);
+			name = AstroshotsTests;
+			packageProductDependencies = (
+			);
+			productName = AstroshotsTests;
+			productReference = 254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		18E7F59D13CE9229F896D161 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					219204DD11537497ABA9688C = {
+						ProvisioningStyle = Automatic;
+					};
+					C2F68E7A0A32998682E92BAF = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E24FE1352630C3556097D042 /* Build configuration list for PBXProject "Astroshots" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DE6CFFA16895E75CF05C030A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 985C787322D9CC2C5AAA3F9D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				219204DD11537497ABA9688C /* Astroshots */,
+				C2F68E7A0A32998682E92BAF /* AstroshotsTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E7D85EB4582EB0AF1584D80F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				51D0FFA42C1196281E94E2F5 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		17C983AD60222159889B1ED5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */,
+				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ABEBE60DAF1B176397C10A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8F2395DC60D12581FB418608 /* AppState.swift in Sources */,
+				96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */,
+				59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */,
+				B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */,
+				6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */,
+				BB6D913C2F3291617685815E /* OverlayController.swift in Sources */,
+				17BFA74EE76E1E71A5627F33 /* OverlayView.swift in Sources */,
+				E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */,
+				DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */,
+				CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */,
+				A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */,
+				F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */,
+				F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */,
+				342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		EF69AFFDC9383EE280A3C014 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 219204DD11537497ABA9688C /* Astroshots */;
+			targetProxy = 55F28DA80619982BD45C994B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		02151A118DCB6D83AAF47CDE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Astroshots/Astroshots.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Astroshots/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.archastro.Astroshots;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		48B5766DEED36B70016C87D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.archastro.AstroshotsTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Astroshots.app/Contents/MacOS/Astroshots";
+			};
+			name = Release;
+		};
+		57D63B265E35D263CF30925F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Astroshots/Astroshots.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Astroshots/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.archastro.Astroshots;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		727AF5C2D608B141AD45775D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		7BE14EA869A5824ED0032802 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.archastro.AstroshotsTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Astroshots.app/Contents/MacOS/Astroshots";
+			};
+			name = Debug;
+		};
+		F20A6E956143E3DDCB67BA3B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		593EDCF0FD4E9910CA235132 /* Build configuration list for PBXNativeTarget "Astroshots" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				57D63B265E35D263CF30925F /* Debug */,
+				02151A118DCB6D83AAF47CDE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E24FE1352630C3556097D042 /* Build configuration list for PBXProject "Astroshots" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20A6E956143E3DDCB67BA3B /* Debug */,
+				727AF5C2D608B141AD45775D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F80C8BCCD36ACA794C1841BA /* Build configuration list for PBXNativeTarget "AstroshotsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7BE14EA869A5824ED0032802 /* Debug */,
+				48B5766DEED36B70016C87D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 18E7F59D13CE9229F896D161 /* Project object */;
+}

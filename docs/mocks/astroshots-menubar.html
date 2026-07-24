@@ -1,0 +1,1375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Astroshots · macOS menu bar mock (simplified)</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #171716;
+      --ink-2: #3f3e3a;
+      --muted: #77736d;
+      --muted-2: #6f6b65;
+      --line: rgba(49, 46, 41, .12);
+      --line-strong: rgba(49, 46, 41, .18);
+      --paper: rgba(250, 249, 246, .975);
+      --surface: #f1efea;
+      --purple: #6257d9;
+      --purple-soft: #efedff;
+      --green: #148266;
+      --green-soft: #e7f5f0;
+      --amber: #a96414;
+      --amber-soft: #fbf0dc;
+      --red: #b54848;
+      --red-soft: #f9e8e7;
+      --blue: #376e9c;
+      --blue-soft: #e7f0f8;
+      --shadow: 0 34px 90px rgba(24, 20, 15, .24), 0 4px 18px rgba(24, 20, 15, .12);
+      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      --mono: "SFMono-Regular", Menlo, Monaco, monospace;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; }
+    body {
+      min-width: 1100px;
+      min-height: 760px;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      background:
+        radial-gradient(circle at 78% 10%, rgba(255,255,255,.78), transparent 28%),
+        radial-gradient(circle at 12% 88%, rgba(190,168,145,.78), transparent 34%),
+        radial-gradient(circle at 88% 78%, rgba(90,118,132,.72), transparent 36%),
+        linear-gradient(140deg, #c9b8a4 0%, #8fa0a4 46%, #4e5f6c 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .18;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+    button { font: inherit; color: inherit; cursor: default; }
+
+    /* ── Menu bar ── */
+    .menu-bar {
+      position: relative;
+      z-index: 40;
+      height: 31px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(21, 20, 19, .9);
+      background: rgba(240, 237, 231, .73);
+      border-bottom: 1px solid rgba(255,255,255,.52);
+      box-shadow: 0 1px 0 rgba(0,0,0,.08);
+      backdrop-filter: blur(28px) saturate(1.35);
+      -webkit-backdrop-filter: blur(28px) saturate(1.35);
+      user-select: none;
+    }
+    .apple { font-size: 16px; }
+    .app-name { font-weight: 700; }
+    .menu-spacer { flex: 1; }
+    .menu-clock { min-width: 112px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .tray-trigger {
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 -6px;
+      padding: 0 7px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      position: relative;
+    }
+    .tray-trigger:hover,
+    .tray-trigger[aria-expanded="true"] {
+      color: #fff;
+      background: rgba(32, 31, 29, .76);
+    }
+    .tray-trigger.live-pulse::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #20a37f;
+      box-shadow: 0 0 0 0 rgba(32, 163, 127, .55);
+      animation: pulse-dot 1.8s ease-out infinite;
+    }
+    @keyframes pulse-dot {
+      0% { box-shadow: 0 0 0 0 rgba(32, 163, 127, .5); }
+      70% { box-shadow: 0 0 0 8px rgba(32, 163, 127, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(32, 163, 127, 0); }
+    }
+    .tray-mark { width: 16px; height: 16px; display: block; }
+    .tray-count {
+      min-width: 17px;
+      height: 17px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 750;
+      background: #cf4f4d;
+      border-radius: 999px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.4);
+    }
+    .tray-count[hidden] { display: none; }
+
+    /* ── Desktop copy + notes ── */
+    .desktop-copy {
+      position: fixed;
+      left: 42px;
+      bottom: 38px;
+      max-width: 380px;
+      color: rgba(255,255,255,.9);
+      text-shadow: 0 2px 20px rgba(20,26,31,.34);
+      z-index: 2;
+    }
+    .desktop-copy .eyebrow {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      opacity: .72;
+    }
+    .desktop-copy h1 {
+      margin: 0;
+      font: 710 36px/1.04 var(--display);
+      letter-spacing: -.045em;
+    }
+    .desktop-copy p {
+      margin: 12px 0 0;
+      font-size: 14px;
+      line-height: 1.48;
+      opacity: .8;
+    }
+
+    .mock-notes {
+      position: fixed;
+      z-index: 5;
+      top: 56px;
+      left: 28px;
+      width: 280px;
+      padding: 14px;
+      color: rgba(255,255,255,.92);
+      font-size: 11px;
+      line-height: 1.5;
+      background: rgba(28, 32, 35, .38);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 14px;
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      box-shadow: 0 18px 50px rgba(30,35,38,.16);
+    }
+    .mock-notes h2 { margin: 0 0 6px; font: 700 13px var(--display); }
+    .mock-notes p { margin: 0 0 10px; opacity: .78; }
+    .scene-list { display: grid; gap: 5px; margin: 0 0 12px; }
+    .scene-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 9px;
+      color: rgba(255,255,255,.9);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: left;
+      background: rgba(255,255,255,.06);
+    }
+    .scene-btn:hover { background: rgba(255,255,255,.12); }
+    .scene-btn.active {
+      background: rgba(255,255,255,.18);
+      border-color: rgba(255,255,255,.28);
+    }
+    .scene-btn kbd {
+      margin-left: auto;
+      font: 600 9px var(--mono);
+      opacity: .55;
+    }
+    .mock-notes ul { margin: 0; padding-left: 16px; opacity: .82; }
+    .mock-notes li + li { margin-top: 4px; }
+    .mock-notes code {
+      font: 600 10px var(--mono);
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgba(0,0,0,.22);
+    }
+    .contract {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,.12);
+    }
+    .contract pre {
+      margin: 6px 0 0;
+      padding: 8px 9px;
+      font: 500 9.5px/1.45 var(--mono);
+      white-space: pre-wrap;
+      color: rgba(255,255,255,.82);
+      background: rgba(0,0,0,.22);
+      border-radius: 8px;
+    }
+
+    /* ── Desktop overlay ── */
+    .overlay-stack {
+      position: fixed;
+      z-index: 50;
+      top: 52px;
+      right: 28px;
+      width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .overlay-stack > * { pointer-events: auto; }
+
+    .shot-overlay {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+      background: rgba(22, 21, 19, .88);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      box-shadow: 0 28px 70px rgba(12, 10, 8, .42), 0 2px 10px rgba(12, 10, 8, .2);
+      backdrop-filter: blur(28px) saturate(1.2);
+      -webkit-backdrop-filter: blur(28px) saturate(1.2);
+      color: #f4f1ea;
+      transform-origin: 92% 0%;
+      animation: overlay-in .42s var(--ease-out) both;
+    }
+    .shot-overlay.leaving { animation: overlay-out .28s ease forwards; }
+    .shot-overlay.stacked { opacity: .92; transform: scale(.97); }
+    @keyframes overlay-in {
+      from { opacity: 0; transform: translateY(-14px) scale(.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes overlay-out {
+      to { opacity: 0; transform: translateY(-8px) scale(.97); }
+    }
+    .overlay-head {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 12px 8px;
+    }
+    .overlay-meta { min-width: 0; flex: 1; }
+    .overlay-project {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+    .overlay-title {
+      display: block;
+      margin-top: 1px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .overlay-close {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 7px;
+      color: rgba(255,255,255,.55);
+      background: transparent;
+    }
+    .overlay-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .overlay-frame {
+      margin: 0 10px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.1);
+      background: #1a1a18;
+      aspect-ratio: 16 / 10;
+      position: relative;
+    }
+    .overlay-progress {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 2px;
+      background: rgba(255,255,255,.08);
+    }
+    .overlay-progress > span {
+      display: block;
+      height: 100%;
+      transform-origin: left;
+      background: linear-gradient(90deg, #7d73e8, #20a37f);
+      animation: progress-drain 5.5s linear forwards;
+    }
+    @keyframes progress-drain {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
+    .overlay-foot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px 11px;
+    }
+    .overlay-desc {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.4;
+      color: rgba(244,241,234,.72);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .overlay-action {
+      padding: 5px 10px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--ink);
+      font-size: 10px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    /* ── Tray ── */
+    .popover {
+      position: fixed;
+      z-index: 30;
+      top: 42px;
+      right: 92px;
+      width: 400px;
+      height: 640px;
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+      transform-origin: 86% -8px;
+      transition: opacity .18s ease, transform .22s var(--ease-out);
+    }
+    .popover[hidden] { display: none; }
+    .popover.entering { opacity: 0; transform: translateY(-9px) scale(.975); }
+    .popover.detached { top: 72px; right: 48px; }
+    .popover.detached::before { display: none; }
+    .popover::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: -8px;
+      right: 72px;
+      width: 18px;
+      height: 18px;
+      transform: rotate(45deg);
+      background: rgba(250,249,246,.97);
+      border-top: 1px solid rgba(49,46,41,.14);
+      border-left: 1px solid rgba(49,46,41,.14);
+      border-radius: 4px 0 0;
+    }
+
+    .panel {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--paper);
+      border: 1px solid rgba(54,50,45,.16);
+      border-radius: 17px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(42px) saturate(1.18);
+      -webkit-backdrop-filter: blur(42px) saturate(1.18);
+    }
+
+    .drag-strip {
+      height: 12px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .drag-grip {
+      width: 34px;
+      height: 3px;
+      border-radius: 4px;
+      background: rgba(83,79,72,.18);
+      opacity: 0;
+    }
+    .detached .drag-grip { opacity: 1; }
+
+    .panel-head {
+      flex: 0 0 auto;
+      padding: 2px 12px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .head-row {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .brand-orb {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      background: linear-gradient(145deg, #1f6a55, #2f9d7d);
+      border-radius: 7px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .brand-name {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -.012em;
+    }
+    .live-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .live-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #20a37f;
+      box-shadow: 0 0 0 3px rgba(32,163,127,.11);
+    }
+    .live-chip.idle { color: var(--muted); }
+    .live-chip.idle .live-dot { background: #b0aaa2; box-shadow: none; }
+    .head-spacer { flex: 1; }
+    .icon-button {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 7px;
+      color: #595650;
+      background: transparent;
+    }
+    .icon-button:hover { background: rgba(33,31,28,.075); }
+    .icon-button.active { color: var(--purple); background: var(--purple-soft); }
+    .icon-button svg { width: 15px; height: 15px; }
+
+    /* Main content: stream OR detail OR settings */
+    .stage {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .pane {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(8px);
+      transition: opacity .18s ease, transform .22s var(--ease-out);
+    }
+    .pane.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    .pane.exit-left {
+      transform: translateX(-10px);
+    }
+    .scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .scroll::-webkit-scrollbar { display: none; }
+
+    /* Stream list */
+    .stream-scroll { padding: 6px 10px 14px; }
+
+    .shot-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 10px;
+      width: 100%;
+      padding: 8px;
+      margin: 0;
+      border: 0;
+      border-radius: 11px;
+      text-align: left;
+      background: transparent;
+      transition: background .12s ease;
+    }
+    .shot-row:hover { background: rgba(33,31,28,.045); }
+    .shot-row + .shot-row { margin-top: 1px; }
+
+    .shot-thumb {
+      height: 56px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #1c1b19;
+    }
+    .shot-body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }
+    .shot-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .shot-title {
+      min-width: 0;
+      flex: 1;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: -.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .shot-time {
+      flex: 0 0 auto;
+      font: 500 9px var(--mono);
+      color: var(--muted-2);
+    }
+    .shot-sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .wt {
+      flex: 0 0 auto;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font: 700 9px var(--mono);
+    }
+    .wt.wt4 { color: #1a6b56; background: var(--green-soft); }
+    .wt.wt1 { color: #4a4490; background: var(--purple-soft); }
+    .wt.wt5 { color: #376e9c; background: var(--blue-soft); }
+    .fail-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      flex: 0 0 auto;
+    }
+
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 28px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty .icon {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .empty h3 {
+      margin: 0 0 5px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 720;
+    }
+    .empty p {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.45;
+      max-width: 240px;
+    }
+    .empty .action {
+      margin-top: 14px;
+      padding: 7px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 680;
+      background: #fff;
+    }
+
+    /* Detail pane */
+    .detail-bar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 650;
+      background: transparent;
+    }
+    .back-btn:hover { background: var(--surface); }
+    .detail-bar .spacer { flex: 1; }
+    .detail-scroll { padding: 0 0 16px; }
+    .detail-hero {
+      margin: 12px 12px 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #141413;
+      aspect-ratio: 16 / 10;
+      position: relative;
+    }
+    .detail-nav {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      pointer-events: none;
+    }
+    .detail-nav button {
+      pointer-events: auto;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(20,18,16,.55);
+      opacity: 0;
+      transition: opacity .15s ease;
+    }
+    .detail-hero:hover .detail-nav button { opacity: 1; }
+    .detail-info { padding: 12px 14px 0; }
+    .detail-info h3 {
+      margin: 0 0 4px;
+      font: 720 15px/1.25 var(--display);
+      letter-spacing: -.02em;
+    }
+    .detail-info .lede {
+      margin: 0 0 12px;
+      color: var(--ink-2);
+      font-size: 11px;
+      line-height: 1.48;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 6px 10px;
+      padding: 10px 11px;
+      background: rgba(255,255,255,.7);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      font-size: 10px;
+    }
+    .kv dt { color: var(--muted-2); font-weight: 650; }
+    .kv dd {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 9.5px;
+      word-break: break-all;
+    }
+
+    /* Settings pane */
+    .settings-scroll { padding: 12px 12px 16px; }
+    .setting-card {
+      margin-bottom: 10px;
+      padding: 12px;
+      background: rgba(255,255,255,.8);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .setting-card h3 {
+      margin: 0 0 3px;
+      font-size: 12px;
+      font-weight: 720;
+    }
+    .setting-card p {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-top: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .toggle {
+      width: 34px;
+      height: 20px;
+      border-radius: 999px;
+      border: 0;
+      background: #d4d0c8;
+      position: relative;
+    }
+    .toggle.on { background: var(--green); }
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.18);
+      transition: transform .15s var(--ease-out);
+    }
+    .toggle.on::after { transform: translateX(14px); }
+    .root-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: var(--surface);
+      border-radius: 8px;
+      font: 500 10px var(--mono);
+      color: var(--ink-2);
+    }
+    .root-row .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #20a37f;
+      flex: 0 0 auto;
+    }
+
+    /* Fake screenshots */
+    .fake-shot {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #f4f2ed;
+    }
+    .fake-shot .chrome {
+      height: 12%;
+      min-height: 12px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 0 6px;
+      background: #ebe8e2;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .fake-shot .dot {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: #d0cbc2;
+    }
+    .fake-shot .urlbar {
+      flex: 1;
+      height: 50%;
+      margin-left: 4px;
+      border-radius: 3px;
+      background: #fff;
+      opacity: .7;
+    }
+    .fake-shot .body {
+      position: absolute;
+      inset: 12% 0 0;
+      display: grid;
+      grid-template-columns: 18% 1fr;
+    }
+    .fake-shot .rail {
+      background: #e8e4dc;
+      border-right: 1px solid rgba(0,0,0,.05);
+      padding: 8% 10%;
+    }
+    .fake-shot .rail span {
+      display: block;
+      height: 6%;
+      margin-bottom: 12%;
+      border-radius: 2px;
+      background: rgba(0,0,0,.08);
+    }
+    .fake-shot .main { padding: 6% 5%; }
+    .fake-shot .hero {
+      height: 14%;
+      width: 42%;
+      border-radius: 4px;
+      background: rgba(0,0,0,.1);
+      margin-bottom: 5%;
+    }
+    .fake-shot .card {
+      height: 36%;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid rgba(0,0,0,.06);
+      margin-bottom: 4%;
+    }
+    .fake-shot .modal-dim {
+      position: absolute;
+      inset: 12% 0 0;
+      background: rgba(30,28,24,.35);
+      display: grid;
+      place-items: center;
+    }
+    .fake-shot .modal {
+      width: 54%;
+      height: 58%;
+      border-radius: 8px;
+      background: #faf9f6;
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 10px 24px rgba(0,0,0,.16);
+    }
+    .fake-shot.t-green .hero { background: rgba(20,130,102,.25); }
+    .fake-shot.t-purple .hero { background: rgba(98,87,217,.28); }
+    .fake-shot.t-amber .hero { background: rgba(169,100,20,.28); }
+    .fake-shot.t-fail .modal { border-color: rgba(181,72,72,.35); }
+
+    .toast {
+      position: fixed;
+      z-index: 60;
+      left: 50%;
+      bottom: 28px;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 620;
+      background: rgba(32,30,27,.9);
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 9px;
+      box-shadow: 0 12px 35px rgba(0,0,0,.24);
+      transform: translate(-50%, 12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        transition-duration: .001ms !important;
+      }
+      .tray-trigger.live-pulse::after { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="menu-bar" aria-label="macOS menu bar">
+    <span class="apple"></span>
+    <span class="app-name">Finder</span>
+    <span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Window</span><span>Help</span>
+    <span class="menu-spacer"></span>
+    <button class="tray-trigger live-pulse" id="trayTrigger" aria-expanded="false" aria-controls="popover" title="Astroshots">
+      <svg class="tray-mark" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.5" y="4.5" width="15" height="11" rx="2.2" stroke="currentColor" stroke-width="1.45"/>
+        <circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M14.6 6.4h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span class="tray-count" id="trayCount">3</span>
+    </button>
+    <span class="menu-clock" id="clock">Fri Jul 24&nbsp;&nbsp;2:10 PM</span>
+  </header>
+
+  <aside class="mock-notes">
+    <h2>Simplified UX</h2>
+    <p>Two surfaces only: desktop flash, and one stream. Detail is a drill-in. Settings is a gear.</p>
+    <div class="scene-list">
+      <button class="scene-btn active" data-scene="overlay" type="button">Desktop overlay <kbd>1</kbd></button>
+      <button class="scene-btn" data-scene="stream" type="button">Tray · stream <kbd>2</kbd></button>
+      <button class="scene-btn" data-scene="detail" type="button">Tray · detail <kbd>3</kbd></button>
+      <button class="scene-btn" data-scene="empty" type="button">Empty <kbd>4</kbd></button>
+      <button class="scene-btn" data-scene="settings" type="button">Settings <kbd>5</kbd></button>
+    </div>
+    <ul>
+      <li>No Live / Stream / Frame tabs</li>
+      <li>No worktree picker — badges only</li>
+      <li><strong>F</strong> simulates a write from any tree</li>
+    </ul>
+    <div class="contract">
+      <strong style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.7">Write path</strong>
+      <pre>.astroshot/&lt;feature&gt;/
+  manifest.json
+  0001-….png</pre>
+    </div>
+  </aside>
+
+  <div class="desktop-copy" aria-hidden="true">
+    <p class="eyebrow">Astroshots</p>
+    <h1>Screenshots<br />as they land.</h1>
+    <p>Watch every worktree. Flash new frames. Open the tray when you want history.</p>
+  </div>
+
+  <div class="overlay-stack" id="overlayStack" aria-live="polite"></div>
+
+  <section class="popover" id="popover" hidden aria-label="Astroshots tray">
+    <div class="panel">
+      <div class="drag-strip"><span class="drag-grip"></span></div>
+
+      <header class="panel-head">
+        <div class="head-row">
+          <div class="brand">
+            <span class="brand-orb" aria-hidden="true">◆</span>
+            <span class="brand-name">Astroshots</span>
+          </div>
+          <span class="live-chip" id="liveChip"><span class="live-dot"></span><span id="liveLabel">live</span></span>
+          <span class="head-spacer"></span>
+          <button class="icon-button" id="fireButton" title="Simulate write" aria-label="Fire shot">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2v8.2m0 0 3-3m-3 3-3-3M4.5 14.5h11" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="icon-button" id="settingsButton" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M8.2 3.4h3.6l.4 1.6a5.5 5.5 0 0 1 1.2.7l1.6-.5 1.8 3.1-1.3 1.1c.1.4.1.8 0 1.2l1.3 1.1-1.8 3.1-1.6-.5a5.5 5.5 0 0 1-1.2.7l-.4 1.6H8.2l-.4-1.6a5.5 5.5 0 0 1-1.2-.7l-1.6.5L3.2 12l1.3-1.1a5 5 0 0 1 0-1.2L3.2 8.6l1.8-3.1 1.6.5c.4-.3.8-.5 1.2-.7l.4-1.6Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="10" cy="10" r="2" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+          <button class="icon-button" id="detachButton" title="Keep visible">
+            <svg viewBox="0 0 20 20" fill="none"><path d="m7 3 6 6m-7.7-.7 6.4 6.4M12.2 2.8l5 5-3.1 1.4-3 6.2-1.4-5.7-5.7-1.4 6.2-3 2-2.9Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="m4 16 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+          <button class="icon-button" id="closeButton" title="Close">
+            <svg viewBox="0 0 20 20" fill="none"><path d="m6 6 8 8m0-8-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="stage">
+        <!-- STREAM (home) -->
+        <div class="pane active" id="pane-stream">
+          <div class="scroll stream-scroll" id="streamList"></div>
+        </div>
+
+        <!-- DETAIL (drill-in) -->
+        <div class="pane" id="pane-detail">
+          <div class="detail-bar">
+            <button class="back-btn" id="backButton" type="button">‹ Stream</button>
+            <span class="spacer"></span>
+            <button class="icon-button" id="prevShot" title="Previous" aria-label="Previous">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M12 5 7 10l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-button" id="nextShot" title="Next" aria-label="Next">
+              <svg viewBox="0 0 20 20" fill="none"><path d="m8 5 5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="scroll detail-scroll">
+            <div class="detail-hero">
+              <div class="fake-shot t-purple" id="detailShot"></div>
+              <div class="detail-nav">
+                <button type="button" id="prevShot2" aria-label="Previous">‹</button>
+                <button type="button" id="nextShot2" aria-label="Next">›</button>
+              </div>
+            </div>
+            <div class="detail-info">
+              <h3 id="detailTitle">—</h3>
+              <p class="lede" id="detailDesc"></p>
+              <dl class="kv">
+                <dt>Tree</dt><dd id="detailWorktree"></dd>
+                <dt>Feature</dt><dd id="detailFeature"></dd>
+                <dt>File</dt><dd id="detailFile"></dd>
+                <dt>Time</dt><dd id="detailTime"></dd>
+                <dt>URL</dt><dd id="detailUrl"></dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS (gear) -->
+        <div class="pane" id="pane-settings">
+          <div class="detail-bar">
+            <button class="back-btn" id="settingsBack" type="button">‹ Stream</button>
+          </div>
+          <div class="scroll settings-scroll">
+            <div class="setting-card">
+              <h3>Desktop flash</h3>
+              <p>New frames from any worktree appear above all windows.</p>
+              <div class="toggle-row">Show overlay <button class="toggle on" type="button" data-toggle="overlay" aria-pressed="true"></button></div>
+              <div class="toggle-row">Auto-dismiss <button class="toggle on" type="button" data-toggle="autodismiss" aria-pressed="true"></button></div>
+            </div>
+            <div class="setting-card">
+              <h3>Watch root</h3>
+              <p>One recursive root. Every worktree under it streams in — no picker.</p>
+              <div class="root-row"><span class="dot"></span>~/archastro/**</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMPTY -->
+        <div class="pane" id="pane-empty">
+          <div class="empty">
+            <div class="icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4.5" width="15" height="11" rx="2.2" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.35"/></svg>
+            </div>
+            <h3>Waiting for frames</h3>
+            <p>When any worktree writes to <code style="font:600 10px var(--mono)">.astroshot/</code>, shots land here and on the desktop.</p>
+            <button class="action" type="button" id="emptyFire">Simulate write</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    function paintFakeShot(el, theme = "t-purple", modal = false) {
+      el.className = "fake-shot " + theme;
+      el.innerHTML = `
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="urlbar"></span></div>
+        <div class="body">
+          <div class="rail"><span></span><span></span><span></span><span></span></div>
+          <div class="main"><div class="hero"></div><div class="card"></div><div class="card"></div></div>
+        </div>
+        ${modal ? `<div class="modal-dim"><div class="modal"></div></div>` : ""}
+      `;
+    }
+
+    // Flat list of shots from many worktrees. That's the whole model.
+    const SHOTS = [
+      { key: "wt4/install-wizard/0006", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0006", slug: "created-network", title: "Created network", desc: "Completion opens the newly created network.", time: "13:31:01", theme: "t-green", modal: false, url: "/networks/tem_…", fail: false },
+      { key: "wt4/install-wizard/0005", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0005", slug: "complete", title: "All set", desc: "Completion confirms the installed agent and destination.", time: "13:30:52", theme: "t-green", modal: true, url: "/solutions · dialog", fail: false },
+      { key: "wt4/install-wizard/0004", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0004", slug: "new-network-with-org-access", title: "New network + ACL", desc: "Destination network and partner org ACL selected.", time: "13:30:41", theme: "t-amber", modal: true, url: "/solutions · dialog", fail: false },
+      { key: "wt5/code-search/0002", worktree: "firstlanding-wt5", wt: "wt5", wtClass: "wt5", feature: "code-search-smoke", id: "0002", slug: "results", title: "Search results", desc: "First results for the smoke query.", time: "13:28:22", theme: "t-green", modal: false, url: "/code?q=…", fail: false },
+      { key: "wt5/code-search/0001", worktree: "firstlanding-wt5", wt: "wt5", wtClass: "wt5", feature: "code-search-smoke", id: "0001", slug: "search-empty", title: "Search empty", desc: "Code search landing, empty query.", time: "13:28:04", theme: "t-purple", modal: false, url: "/code", fail: false },
+      { key: "wt4/install-wizard/0003", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0003", slug: "destination-default", title: "Destination", desc: "Destination and ACL choices before install.", time: "13:30:31", theme: "t-purple", modal: true, url: "/solutions · dialog", fail: false },
+      { key: "wt4/install-wizard/0002", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0002", slug: "configure", title: "Configure", desc: "Configuration screen for the resource being installed.", time: "13:30:24", theme: "t-purple", modal: true, url: "/solutions · dialog", fail: false },
+      { key: "wt4/install-wizard/0001", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0001", slug: "signed-in", title: "Signed in", desc: "Fresh session via local magic-link mailbox.", time: "13:30:18", theme: "t-green", modal: false, url: "/solutions", fail: false },
+      { key: "wt1/billing/0004", worktree: "firstlanding-wt1", wt: "wt1", wtClass: "wt1", feature: "billing-home", id: "0004", slug: "invoice-list", title: "Invoices", desc: "Invoice list shows the new subscription line.", time: "12:10:34", theme: "t-green", modal: false, url: "/settings/billing", fail: false },
+      { key: "wt1/billing/0003", worktree: "firstlanding-wt1", wt: "wt1", wtClass: "wt1", feature: "billing-home", id: "0003", slug: "portal-billing", title: "Portal billing", desc: "Developer portal billing after subscribe.", time: "12:10:28", theme: "t-green", modal: false, url: "/settings/billing", fail: false },
+      { key: "wt4/acl/0003", worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "destination-acl", id: "0003", slug: "failure-toast", title: "Failure", desc: "Partner org could not read the installed agent.", time: "11:02:41", theme: "t-fail", modal: true, url: "/solutions · dialog", fail: true },
+    ];
+
+    const EXTRAS = [
+      { worktree: "firstlanding-wt5", wt: "wt5", wtClass: "wt5", feature: "code-search-smoke", id: "0003", slug: "file-open", title: "File open", desc: "Result row opens a file in the editor.", theme: "t-amber", modal: false, url: "/code?file=…", fail: false },
+      { worktree: "firstlanding-wt4", wt: "wt4", wtClass: "wt4", feature: "install-wizard", id: "0007", slug: "partner-api-ok", title: "Partner API ok", desc: "Partner bearer access returned the installed agent.", theme: "t-green", modal: false, url: "api · /agents/:id", fail: false },
+      { worktree: "firstlanding-wt1", wt: "wt1", wtClass: "wt1", feature: "billing-home", id: "0005", slug: "receipt", title: "Receipt", desc: "Receipt panel after plan change.", theme: "t-green", modal: true, url: "/settings/billing", fail: false },
+    ];
+
+    let selectedKey = SHOTS[2].key;
+    let extraIdx = 0;
+    let overlayEnabled = true;
+    let emptyMode = false;
+
+    function sortedShots() {
+      return SHOTS.slice().sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
+    }
+
+    function findShot(key) {
+      return SHOTS.find((s) => s.key === key) || sortedShots()[0];
+    }
+
+    function showPane(name) {
+      ["stream", "detail", "settings", "empty"].forEach((p) => {
+        document.getElementById(`pane-${p}`).classList.toggle("active", p === name);
+      });
+      document.getElementById("settingsButton").classList.toggle("active", name === "settings");
+    }
+
+    function renderStream() {
+      const list = document.getElementById("streamList");
+      if (emptyMode) {
+        list.innerHTML = "";
+        return;
+      }
+      const rows = sortedShots();
+      list.innerHTML = rows.map((s) => `
+        <button class="shot-row" type="button" data-key="${s.key}">
+          <div class="shot-thumb"><div class="fake-shot" data-theme="${s.theme}" data-modal="${s.modal}"></div></div>
+          <div class="shot-body">
+            <div class="shot-top">
+              <span class="wt ${s.wtClass}">${s.wt}</span>
+              ${s.fail ? '<span class="fail-dot" title="fail"></span>' : ""}
+              <span class="shot-title">${s.feature} · ${s.title}</span>
+              <span class="shot-time">${s.time}</span>
+            </div>
+            <p class="shot-sub">${s.desc}</p>
+          </div>
+        </button>
+      `).join("");
+      list.querySelectorAll(".fake-shot").forEach((n) => paintFakeShot(n, n.dataset.theme, n.dataset.modal === "true"));
+      list.querySelectorAll(".shot-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          selectedKey = row.dataset.key;
+          renderDetail();
+          showPane("detail");
+        });
+      });
+    }
+
+    function renderDetail() {
+      const s = findShot(selectedKey);
+      paintFakeShot(document.getElementById("detailShot"), s.theme, s.modal);
+      document.getElementById("detailTitle").textContent = `${s.id} · ${s.slug}`;
+      document.getElementById("detailDesc").textContent = s.desc;
+      document.getElementById("detailWorktree").textContent = s.worktree;
+      document.getElementById("detailFeature").textContent = s.feature;
+      document.getElementById("detailFile").textContent = `${s.id}-${s.slug}.png`;
+      document.getElementById("detailTime").textContent = `2026-07-24T${s.time}Z`;
+      document.getElementById("detailUrl").textContent = s.url;
+    }
+
+    function stepDetail(delta) {
+      const rows = sortedShots();
+      const i = rows.findIndex((s) => s.key === selectedKey);
+      const next = rows[i + delta];
+      if (!next) return;
+      selectedKey = next.key;
+      renderDetail();
+    }
+
+    function showOverlay(shot) {
+      if (!overlayEnabled) return;
+      const stack = document.getElementById("overlayStack");
+      const card = document.createElement("div");
+      card.className = "shot-overlay";
+      card.innerHTML = `
+        <div class="overlay-head">
+          <span class="overlay-meta">
+            <span class="overlay-project">${shot.wt} · ${shot.feature}</span>
+            <span class="overlay-title">${shot.id} · ${shot.title}</span>
+          </span>
+          <button class="overlay-close" type="button" aria-label="Dismiss">✕</button>
+        </div>
+        <div class="overlay-frame">
+          <div class="fake-shot" data-theme="${shot.theme}" data-modal="${shot.modal}"></div>
+          <div class="overlay-progress"><span></span></div>
+        </div>
+        <div class="overlay-foot">
+          <p class="overlay-desc">${shot.desc}</p>
+          <button class="overlay-action" type="button">Open</button>
+        </div>
+      `;
+      paintFakeShot(card.querySelector(".fake-shot"), shot.theme, shot.modal);
+      const dismiss = () => {
+        card.classList.add("leaving");
+        setTimeout(() => card.remove(), 280);
+      };
+      card.querySelector(".overlay-close").addEventListener("click", dismiss);
+      card.querySelector(".overlay-action").addEventListener("click", () => {
+        selectedKey = shot.key;
+        emptyMode = false;
+        openTray();
+        renderDetail();
+        showPane("detail");
+        dismiss();
+      });
+      [...stack.children].forEach((c) => c.classList.add("stacked"));
+      stack.prepend(card);
+      while (stack.children.length > 3) stack.lastElementChild.remove();
+      setTimeout(dismiss, 5500);
+      bumpBadge();
+    }
+
+    function bumpBadge() {
+      const badge = document.getElementById("trayCount");
+      badge.hidden = false;
+      badge.textContent = String(Number(badge.textContent || "0") + 1);
+      document.getElementById("trayTrigger").classList.add("live-pulse");
+    }
+
+    function fireNewShot() {
+      emptyMode = false;
+      const next = EXTRAS[extraIdx % EXTRAS.length];
+      extraIdx++;
+      const time = new Date().toISOString().slice(11, 19);
+      const shot = {
+        ...next,
+        key: `${next.wt}/${next.feature}/${next.id}-${extraIdx}`,
+        time,
+      };
+      SHOTS.unshift(shot);
+      selectedKey = shot.key;
+      showOverlay(shot);
+      renderStream();
+      renderDetail();
+      toast(`${shot.wt}/${shot.feature}/${shot.id}-${shot.slug}.png`);
+      if (document.getElementById("pane-empty").classList.contains("active") ||
+          document.getElementById("pane-stream").classList.contains("active")) {
+        showPane("stream");
+      }
+    }
+
+    const trayTrigger = document.getElementById("trayTrigger");
+    const popover = document.getElementById("popover");
+
+    function openTray() {
+      popover.hidden = false;
+      popover.classList.add("entering");
+      requestAnimationFrame(() => popover.classList.remove("entering"));
+      trayTrigger.setAttribute("aria-expanded", "true");
+      document.getElementById("trayCount").hidden = true;
+    }
+    function closeTray() {
+      popover.hidden = true;
+      trayTrigger.setAttribute("aria-expanded", "false");
+    }
+
+    trayTrigger.addEventListener("click", () => {
+      if (popover.hidden) {
+        openTray();
+        if (emptyMode) showPane("empty");
+        else showPane("stream");
+      } else closeTray();
+    });
+    document.getElementById("closeButton").addEventListener("click", closeTray);
+    document.getElementById("detachButton").addEventListener("click", () => {
+      const on = popover.classList.toggle("detached");
+      document.getElementById("detachButton").classList.toggle("active", on);
+    });
+    document.getElementById("fireButton").addEventListener("click", fireNewShot);
+    document.getElementById("emptyFire").addEventListener("click", fireNewShot);
+    document.getElementById("backButton").addEventListener("click", () => showPane("stream"));
+    document.getElementById("settingsBack").addEventListener("click", () => showPane(emptyMode ? "empty" : "stream"));
+    document.getElementById("settingsButton").addEventListener("click", () => {
+      if (document.getElementById("pane-settings").classList.contains("active")) {
+        showPane(emptyMode ? "empty" : "stream");
+      } else {
+        showPane("settings");
+      }
+    });
+    document.getElementById("prevShot").addEventListener("click", () => stepDetail(1));
+    document.getElementById("nextShot").addEventListener("click", () => stepDetail(-1));
+    document.getElementById("prevShot2").addEventListener("click", () => stepDetail(1));
+    document.getElementById("nextShot2").addEventListener("click", () => stepDetail(-1));
+
+    document.querySelectorAll(".toggle").forEach((t) => {
+      t.addEventListener("click", () => {
+        const on = t.classList.toggle("on");
+        t.setAttribute("aria-pressed", String(on));
+        if (t.dataset.toggle === "overlay") overlayEnabled = on;
+      });
+    });
+
+    function setScene(name) {
+      document.querySelectorAll(".scene-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.scene === name);
+      });
+      const stack = document.getElementById("overlayStack");
+      emptyMode = false;
+      document.getElementById("liveChip").classList.remove("idle");
+      document.getElementById("liveLabel").textContent = "live";
+      document.getElementById("trayTrigger").classList.add("live-pulse");
+
+      if (name === "overlay") {
+        closeTray();
+        stack.innerHTML = "";
+        showOverlay(SHOTS.find((s) => s.key === "wt4/install-wizard/0004"));
+        setTimeout(() => showOverlay(SHOTS.find((s) => s.key === "wt5/code-search/0002")), 700);
+        setTimeout(() => showOverlay(SHOTS.find((s) => s.key === "wt1/billing/0004")), 1400);
+      } else if (name === "empty") {
+        emptyMode = true;
+        openTray();
+        showPane("empty");
+        document.getElementById("liveChip").classList.add("idle");
+        document.getElementById("liveLabel").textContent = "idle";
+        document.getElementById("trayTrigger").classList.remove("live-pulse");
+        document.getElementById("trayCount").hidden = true;
+      } else {
+        openTray();
+        if (name === "stream") showPane("stream");
+        if (name === "detail") {
+          selectedKey = "wt4/install-wizard/0004";
+          renderDetail();
+          showPane("detail");
+        }
+        if (name === "settings") showPane("settings");
+      }
+      renderStream();
+    }
+
+    document.querySelectorAll(".scene-btn").forEach((btn) => {
+      btn.addEventListener("click", () => setScene(btn.dataset.scene));
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.target.matches("input, textarea")) return;
+      const map = { "1": "overlay", "2": "stream", "3": "detail", "4": "empty", "5": "settings" };
+      if (map[e.key]) setScene(map[e.key]);
+      if (e.key === "f" || e.key === "F") fireNewShot();
+      if (e.key === "Escape" && !popover.hidden) {
+        if (document.getElementById("pane-detail").classList.contains("active") ||
+            document.getElementById("pane-settings").classList.contains("active")) {
+          showPane(emptyMode ? "empty" : "stream");
+        } else closeTray();
+      }
+    });
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => t.classList.remove("show"), 1600);
+    }
+
+    function tickClock() {
+      const d = new Date();
+      const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, "0");
+      const ampm = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+      document.getElementById("clock").innerHTML =
+        `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}&nbsp;&nbsp;${h}:${m} ${ampm}`;
+    }
+
+    renderStream();
+    renderDetail();
+    tickClock();
+    setInterval(tickClock, 30000);
+    setScene("overlay");
+  </script>
+</body>
+</html>
