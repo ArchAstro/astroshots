@@ -78,35 +78,28 @@ Astroshots/
 App sandbox is off so FSEvents can watch developer worktrees without a
 bookmark dance. This is intentional for a local tooling app.
 
-## DMG packaging
+## DMG packaging (Gatekeeper-clean)
 
-Local (same script CI uses):
+CI and local releases **Developer ID sign + notarize** the DMG so users can
+double-click install without right-click → Open.
+
+**Setup secrets once:** see [`docs/SIGNING.md`](../docs/SIGNING.md).
 
 ```bash
+export CODE_SIGN_IDENTITY="Developer ID Application: … (TEAMID)"
+export DEVELOPMENT_TEAM=TEAMID
+export APPLE_API_KEY_PATH=~/Downloads/AuthKey_XXX.p8
+export APPLE_API_KEY_ID=…
+export APPLE_API_ISSUER_ID=…
+
 ./scripts/bootstrap.sh
 ./scripts/package-dmg.sh
-# → build/Astroshots.dmg  and  build/Astroshots-<version>-<build>.dmg
+# → build/Astroshots.dmg  (signed, notarized, stapled)
 ```
 
-### CI
+Dev-only (Gatekeeper will warn): `./scripts/package-dmg.sh --adhoc`
 
 | Workflow | When | Output |
 |----------|------|--------|
-| `.github/workflows/ci.yml` | PRs / pushes | **Astroshots-dmg** artifact (14 days) |
-| `.github/workflows/release-dmg.yml` | tags `v*` | DMG attached to the GitHub Release |
-
-Default signing is **ad-hoc** (`CODE_SIGN_IDENTITY=-`) so no Apple secrets are
-required. First launch of an ad-hoc build on another Mac may need
-right-click → **Open** (Gatekeeper).
-
-### Optional Developer ID (later)
-
-Repo secrets (when you have a Developer ID Application cert):
-
-| Secret | Example |
-|--------|---------|
-| `MACOS_CODE_SIGN_IDENTITY` | `Developer ID Application: ArchAstro Inc (TEAMID)` |
-| `MACOS_DEVELOPMENT_TEAM` | `TEAMID` |
-
-Notarization (staple + `notarytool`) is not wired yet; ad-hoc DMGs are enough
-for internal review.
+| `.github/workflows/ci.yml` | PRs / pushes (same-repo) | **Astroshots-dmg** artifact |
+| `.github/workflows/release-dmg.yml` | tags `v*` | DMG on the GitHub Release |

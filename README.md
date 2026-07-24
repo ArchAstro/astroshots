@@ -62,12 +62,8 @@ astroshot-capture --feature my-journey --slug step --source ./shot.png
 
 ## CI / DMG
 
-GitHub Actions builds a **drag-to-Applications DMG** on every PR/push and
-uploads it as the **Astroshots-dmg** artifact. Tag `v*` to attach a DMG to a
-GitHub Release.
+GitHub Actions builds a **Developer ID signed + notarized** DMG (no Gatekeeper
+right-click dance) and uploads **Astroshots-dmg**. Tag `v*` to attach it to a
+Release.
 
-```bash
-cd macos && ./scripts/package-dmg.sh   # same script as CI
-```
-
-Ad-hoc signed by default (no Apple cert secrets). See [`macos/README.md`](macos/README.md).
+One-time Apple/GitHub setup: [`docs/SIGNING.md`](docs/SIGNING.md).

@@ -1,13 +1,12 @@
 name: Release DMG
 
-# Attach a DMG to a GitHub Release when you push a version tag (v0.1.0).
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to attach the DMG to (optional; leave empty for a plain artifact)"
+        description: "Existing tag to attach the DMG to (optional)"
         required: false
         default: ""
 
@@ -17,9 +16,9 @@ concurrency:
 
 jobs:
   release-dmg:
-    name: Build & attach DMG
+    name: Signed notarized DMG
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -33,16 +32,30 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
-      - name: Build DMG
+      - name: Import Developer ID certificate
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x macos/scripts/ci-import-certificate.sh
+          ./macos/scripts/ci-import-certificate.sh
+
+      - name: Build, sign, notarize DMG
         working-directory: macos
         env:
           CODE_SIGN_IDENTITY: ${{ secrets.MACOS_CODE_SIGN_IDENTITY }}
           DEVELOPMENT_TEAM: ${{ secrets.MACOS_DEVELOPMENT_TEAM }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           chmod +x scripts/package-dmg.sh
           ./scripts/package-dmg.sh --out "$GITHUB_WORKSPACE/dist/Astroshots.dmg"
-          # Versioned copy produced next to the stable name under macos/build/
           if compgen -G "build/Astroshots-*.dmg" > /dev/null; then
             cp build/Astroshots-*.dmg "$GITHUB_WORKSPACE/dist/"
           fi
@@ -62,7 +75,6 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          # Create the release if this is a new tag push and none exists yet.
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --title "Astroshots $TAG" \
