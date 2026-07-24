@@ -60,16 +60,19 @@ export PATH="$HOME/archastro/astroshots/bin:$PATH"
 astroshot-capture --feature my-journey --slug step --source ./shot.png
 ```
 
-## CI / DMG
+## CI / release
 
 | Workflow | When | What |
 |----------|------|------|
 | **CI** | PRs / pushes | Unit tests only |
+| **Cut release** | Manual (`workflow_dispatch`) | patch/minor/major → `release/vX.Y.Z` branch + tag + PR to main |
 | **Release DMG** | tags `v*` | Developer ID sign + notarize → GitHub Release |
 
+Cut a release (Actions tab → **Cut release** → pick bump), or:
+
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
-# → Release DMG workflow attaches Astroshots.dmg to the release
+gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
+# Creates release/vX.Y.Z, tags vX.Y.Z (starts Release DMG), opens PR to main
 ```
 
 One-time Apple/GitHub setup: [`docs/SIGNING.md`](docs/SIGNING.md).

@@ -102,4 +102,9 @@ Dev-only (Gatekeeper will warn): `./scripts/package-dmg.sh --adhoc`
 | Workflow | When | Output |
 |----------|------|--------|
 | `.github/workflows/ci.yml` | PRs / pushes | Tests only (no DMG) |
+| `.github/workflows/cut-release.yml` | Manual: patch / minor / major | `release/vX.Y.Z` branch + tag + PR to main |
 | `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized DMG on the GitHub Release |
+
+```bash
+gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
+```

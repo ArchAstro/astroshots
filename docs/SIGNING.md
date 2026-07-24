@@ -175,32 +175,33 @@ Every line should say **OK**. If any say **MISS**, go back to that step.
 
 ---
 
-### 11. Build a signed DMG (tags only — not PRs)
+### 11. Cut a release + signed DMG (not on every PR)
 
-CI on PRs only runs **tests**. A Gatekeeper-clean DMG is built when you push a version tag:
+PRs only run **tests**. To ship:
+
+1. Merge your feature PR to `main`.
+2. Actions → **Cut release** → choose **patch** / **minor** / **major** (or set an explicit version).
+
+That workflow:
+
+- Bumps `MARKETING_VERSION` in `macos/project.yml`
+- Pushes branch `release/vX.Y.Z` and tag `vX.Y.Z`
+- Opens a PR back to `main`
+- Tag push starts **Release DMG** (sign + notarize → GitHub Release)
 
 ```bash
-# After the PR is on main (or from a release commit):
-git checkout main && git pull
-git tag v0.1.0
-git push origin v0.1.0
-```
+gh workflow run "Cut release" --repo "$GH_REPO" -f bump=patch
+# or: -f bump=minor | -f bump=major
+# or: -f version=1.0.0
 
-Watch the **Release DMG** workflow:
-
-```bash
 gh run list --repo "$GH_REPO" --workflow "Release DMG" --limit 3
 gh run watch PASTE_RUN_ID --repo "$GH_REPO"
-```
 
-When green, the DMG is on the GitHub Release and as artifact **Astroshots-dmg**:
-
-```bash
-gh release download v0.1.0 --repo "$GH_REPO" -p '*.dmg' -D /tmp/astroshots-dmg
+gh release download vX.Y.Z --repo "$GH_REPO" -p '*.dmg' -D /tmp/astroshots-dmg
 open /tmp/astroshots-dmg
 ```
 
-Manual re-run for an existing tag: Actions → **Release DMG** → **Run workflow** → enter tag.
+Re-run packaging for an existing tag: Actions → **Release DMG** → **Run workflow** → enter tag.
 
 ---
 
