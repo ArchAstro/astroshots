@@ -1369,7 +1369,14 @@
     renderDetail();
     tickClock();
     setInterval(tickClock, 30000);
-    setScene("overlay");
+
+    const params = new URLSearchParams(location.search);
+    const scene = params.get("scene") || "overlay";
+    if (params.get("shot") === "1") {
+      document.querySelector(".mock-notes")?.setAttribute("hidden", "");
+      document.querySelector(".desktop-copy")?.setAttribute("hidden", "");
+    }
+    setScene(scene);
   </script>
 </body>
 </html>

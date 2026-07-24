@@ -4,6 +4,10 @@
 
 Astroshots is a macOS menu-bar app for anyone who captures UI during browser tests, harness runs, or manual QA. Point your tools at a simple folder layout — frames stream in live, flash over your desktop, and stay in one history across every project you work in.
 
+<p align="center">
+  <img src="docs/images/hero-overlay.jpg" alt="Astroshots desktop overlays flashing new screenshots above the menu bar" width="900" />
+</p>
+
 ---
 
 ## Why Astroshots
@@ -11,11 +15,15 @@ Astroshots is a macOS menu-bar app for anyone who captures UI during browser tes
 | Problem | What Astroshots does |
 |---------|----------------------|
 | Screenshots buried in `/tmp` or CI artifacts | Live stream as soon as a PNG is written |
-| Jumping between worktrees to find shots | One tray, every project under your watch folder |
+| Jumping between projects to find shots | One tray, every project under your watch folder |
 | “Did that step look right?” mid-run | Desktop overlay above all windows |
 | Manual folder digging after a suite | Newest-first history with titles from a small manifest |
 
-No worktree picker. No account. No cloud. Just files on disk and a camera icon in the menu bar.
+No project picker. No account. No cloud. Just files on disk and a camera icon in the menu bar.
+
+<p align="center">
+  <img src="docs/images/overlay-cards.png" alt="Stacked overlay cards from different projects" width="420" />
+</p>
 
 ---
 
@@ -50,6 +58,18 @@ Details: [`macos/README.md`](macos/README.md).
 1. **Watch** — Astroshots recursively watches a folder you choose (default `~/archastro`) for `.astroshot/` trees.
 2. **Write** — Your harness, agent, or script drops PNGs (and an optional `manifest.json`) under that layout.
 3. **See** — New frames flash on the desktop; open the tray for the full stream. Click a row for detail.
+
+### The tray
+
+<p align="center">
+  <img src="docs/images/tray-stream.png" alt="Astroshots menu-bar tray showing a live multi-project screenshot stream" width="360" />
+  &nbsp;
+  <img src="docs/images/tray-detail.png" alt="Astroshots detail view for a single screenshot frame" width="360" />
+</p>
+
+<p align="center">
+  <img src="docs/images/hero-stream.jpg" alt="Astroshots tray open on the desktop stream view" width="900" />
+</p>
 
 ### Write layout
 
@@ -149,6 +169,3 @@ Maintainers: cut a version with **Actions → Cut release** (patch / minor / maj
 - macOS 14 or later  
 - A folder of projects to watch (configure in-app)  
 - Tools that can write PNG files (any language, any harness)
-
----
-
