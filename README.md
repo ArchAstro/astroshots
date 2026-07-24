@@ -132,7 +132,7 @@ The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skill
 
 ### Agent skills
 
-Install with the [skills](https://github.com/vercel-labs/skills) CLI.
+This repo ships **three** skills. Install them with the [skills](https://github.com/vercel-labs/skills) CLI.
 
 | Skill | What it teaches |
 |-------|-----------------|
@@ -140,31 +140,53 @@ Install with the [skills](https://github.com/vercel-labs/skills) CLI.
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
 
-**Global** (all your projects — recommended):
+#### Install all skills (recommended)
+
+**Global** (user-level, every project):
 
 ```bash
+npx skills add ArchAstro/astroshots --skill '*' -g -y
+```
+
+**This git project only** (from that project’s root — no `-g`):
+
+```bash
+cd /path/to/your/project
+npx skills add ArchAstro/astroshots --skill '*' -y
+```
+
+`--skill '*'` installs **every** skill in this repo (`astroshots`, `agent-browser`, `browser-ui-harness`).  
+Using a single name (e.g. only `--skill astroshots`) installs just that one.
+
+#### Install one skill
+
+```bash
+# Global
 npx skills add ArchAstro/astroshots --skill astroshots -g -y
 npx skills add ArchAstro/astroshots --skill agent-browser -g -y
 npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
 
-# or all skills from this repo:
-npx skills add ArchAstro/astroshots --skill '*' -g -y
-```
-
-**This git project only** (run from the project root; no `-g`):
-
-```bash
-cd /path/to/your/project
-npx skills add ArchAstro/astroshots --skill astroshots -y
+# This project only (from project root)
 npx skills add ArchAstro/astroshots --skill agent-browser -y
-npx skills add ArchAstro/astroshots --skill browser-ui-harness -y
 ```
 
-Optional: target agents with `-a claude-code -a cursor` or `-a '*'`.
+#### Agents, list, update
 
 ```bash
-npx skills update -g -y    # global updates
-npx skills update -y       # this project
+# Limit which coding agents receive the skills
+npx skills add ArchAstro/astroshots --skill '*' -g -y -a claude-code -a cursor -a codex
+npx skills add ArchAstro/astroshots --skill '*' -g -y -a '*'
+
+# See what’s in the package without installing
+npx skills add ArchAstro/astroshots -l
+
+# What’s installed
+npx skills list -g          # global
+npx skills list             # this project
+
+# Update
+npx skills update -g -y     # global
+npx skills update -y        # this project
 ```
 
 Skill sources: [`skills/`](skills/).
