@@ -65,7 +65,7 @@ final class AppState {
             self?.openDetail(shot)
         }
 
-        // Defer filesystem work so MenuBarExtra can appear immediately.
+        // Defer filesystem work so the status item can appear immediately.
         // Scanning ~/archastro (or any large tree) on the main thread made the
         // app look like it crashed: no status item until the walk finished.
         Task { @MainActor in

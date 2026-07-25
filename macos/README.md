@@ -66,7 +66,8 @@ Example `manifest.json`:
 
 ```
 Astroshots/
-  AstroshotsApp.swift       MenuBarExtra + pinned Window
+  AstroshotsApp.swift       App entry (status item via AppDelegate)
+  App/StatusItemController  Left-click popover, right-click Quit
   App/                      AppState, Preferences, Theme
   Models/                   Shot, Manifest
   Watch/                    AstroshotWatcher (scan + FSEvents)

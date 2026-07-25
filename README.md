@@ -35,6 +35,7 @@ No project picker. No account. No cloud. Just files on disk and a camera icon in
 2. Open the DMG and drag **Astroshots** into **Applications**.
 3. Launch Astroshots — it lives in the **menu bar** (no Dock icon).
 4. Click the camera icon → gear → set your **watch root** if you want something other than the default.
+5. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
 
 Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
 

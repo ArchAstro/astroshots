@@ -3,8 +3,7 @@ import SwiftUI
 /// Menu-bar tray: stream home, detail drill-in, settings via gear.
 struct TrayView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.trayChrome) private var trayChrome
 
     var isPinned = false
 
@@ -82,16 +81,15 @@ struct TrayView: View {
                 active: isPinned
             ) {
                 if isPinned {
-                    dismiss()
+                    trayChrome.close()
                 } else {
-                    openWindow(id: "astroshots-panel")
-                    dismiss()
+                    trayChrome.openPinned()
                 }
             }
 
             if !isPinned {
                 iconButton(systemImage: "xmark", title: "Close") {
-                    dismiss()
+                    trayChrome.close()
                 }
             }
         }
