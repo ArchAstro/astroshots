@@ -11,7 +11,13 @@ struct AstroshotsApp: App {
             TrayView()
                 .environment(appState)
         } label: {
-            Image(systemName: appState.isEmpty ? "camera" : "camera.fill")
+            // Always show a camera glyph so the status item is visible even
+            // while the background scan is still walking the watch root.
+            if appState.isScanning && appState.isEmpty {
+                Image(systemName: "camera")
+            } else {
+                Image(systemName: appState.isEmpty ? "camera" : "camera.fill")
+            }
             if appState.unreadCount > 0 {
                 Text("\(appState.unreadCount)")
             }
