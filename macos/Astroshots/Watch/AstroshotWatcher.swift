@@ -3,6 +3,10 @@ import Foundation
 
 /// Discovers and live-watches `.astroshot/<feature>/*` under one or more roots.
 /// Callbacks are always delivered on the main queue.
+///
+/// Initial and full scans run on a background queue so the menu-bar app can
+/// appear immediately (scanning a large home/worktree tree on the main thread
+/// made the app look like it crashed with no status item).
 final class AstroshotWatcher: @unchecked Sendable {
     struct Configuration: Sendable {
         var roots: [URL]
@@ -12,13 +16,24 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     var onShotsChanged: (@MainActor ([Shot]) -> Void)?
     var onNewShot: (@MainActor (Shot) -> Void)?
+    /// Fired on main when a background full scan begins / ends.
+    var onScanStateChanged: (@MainActor (Bool) -> Void)?
 
     private var configuration: Configuration
     private var stream: FSEventStreamRef?
     private var knownPaths: Set<String> = []
     private var settleWorkItems: [String: DispatchWorkItem] = [:]
     private let lock = NSLock()
-    private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents")
+    private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
+    private var scanGeneration = 0
+
+    /// Directory names we never descend into (monorepo / build junk).
+    private static let skipDirectoryNames: Set<String> = [
+        "node_modules", ".git", "DerivedData", "build", ".build", "Pods",
+        ".next", "dist", "out", "target", "vendor", "Checkouts", "xcuserdata",
+        ".turbo", ".cache", "coverage", "tmp", ".pnpm-store", "Carthage",
+        "bazel-bin", "bazel-out", "bazel-testlogs", ".gradle",
+    ]
 
     init(configuration: Configuration) {
         self.configuration = configuration
@@ -40,14 +55,11 @@ final class AstroshotWatcher: @unchecked Sendable {
         start()
     }
 
+    /// Non-blocking: starts FSEvents immediately, scans on a background queue.
     func start() {
         stop()
-        let existing = scanAll()
-        lock.lock()
-        knownPaths = Set(existing.map(\.path))
-        lock.unlock()
-        emitShots(existing)
         startFSEvents()
+        scheduleFullScan()
     }
 
     func stop() {
@@ -58,17 +70,37 @@ final class AstroshotWatcher: @unchecked Sendable {
             self.stream = nil
         }
         lock.lock()
+        scanGeneration += 1
         settleWorkItems.values.forEach { $0.cancel() }
         settleWorkItems.removeAll()
         lock.unlock()
+        emitScanState(false)
     }
 
     func rescan() {
-        let shots = scanAll()
+        scheduleFullScan()
+    }
+
+    private func scheduleFullScan() {
         lock.lock()
-        knownPaths = Set(shots.map(\.path))
+        scanGeneration += 1
+        let generation = scanGeneration
         lock.unlock()
-        emitShots(shots)
+
+        emitScanState(true)
+        queue.async { [weak self] in
+            guard let self else { return }
+            let shots = self.scanAll()
+            self.lock.lock()
+            let stillCurrent = self.scanGeneration == generation
+            if stillCurrent {
+                self.knownPaths = Set(shots.map(\.path))
+            }
+            self.lock.unlock()
+            guard stillCurrent else { return }
+            self.emitShots(shots)
+            self.emitScanState(false)
+        }
     }
 
     // MARK: Scan
@@ -99,7 +131,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         let fm = FileManager.default
 
         func walk(_ dir: URL, depth: Int) {
-            guard depth < 12 else { return }
+            guard depth < 10 else { return }
             guard let children = try? fm.contentsOfDirectory(
                 at: dir,
                 includingPropertiesForKeys: [.isDirectoryKey],
@@ -112,9 +144,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                     results.append(contentsOf: scanFeatureDirs(in: child))
                     continue
                 }
-                if name == "node_modules" || name == ".git" || name == "DerivedData"
-                    || name == "build" || name == ".build" || name == "Pods"
-                {
+                if Self.skipDirectoryNames.contains(name) {
                     continue
                 }
                 var isDir: ObjCBool = false
@@ -238,9 +268,10 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     private func handleFSEvents(paths: [String]) {
+        var needsFeatureRefresh = false
         for path in paths {
             if path.hasSuffix("manifest.json") {
-                rescan()
+                needsFeatureRefresh = true
                 continue
             }
 
@@ -248,6 +279,11 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard ShotPath.imageExtensions.contains(ext) else { continue }
             guard ShotPath.parse(imagePath: path) != nil else { continue }
             scheduleSettledIngest(path: path)
+        }
+        // Manifest-only updates: cheap re-scan of that feature dir is enough,
+        // but a full scan is rare; schedule one background rescan.
+        if needsFeatureRefresh {
+            scheduleFullScan()
         }
     }
 
@@ -274,8 +310,12 @@ final class AstroshotWatcher: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: path) else {
             lock.lock()
             let known = knownPaths.contains(path)
+            if known { knownPaths.remove(path) }
             lock.unlock()
-            if known { rescan() }
+            if known {
+                // Drop from UI via full list refresh (background).
+                scheduleFullScan()
+            }
             return
         }
 
@@ -286,9 +326,12 @@ final class AstroshotWatcher: @unchecked Sendable {
         knownPaths.insert(path)
         lock.unlock()
 
-        rescan()
+        // Do not re-walk the whole tree for every PNG — emit the shot and let
+        // AppState merge it into the list.
         if isNew {
             emitNew(shot)
+        } else {
+            emitNew(shot) // treat overwrite as update; AppState upserts by path
         }
     }
 
@@ -306,6 +349,15 @@ final class AstroshotWatcher: @unchecked Sendable {
         DispatchQueue.main.async {
             Task { @MainActor in
                 handler?(shot)
+            }
+        }
+    }
+
+    private func emitScanState(_ scanning: Bool) {
+        let handler = onScanStateChanged
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                handler?(scanning)
             }
         }
     }

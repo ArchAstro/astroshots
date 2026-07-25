@@ -45,15 +45,25 @@ struct TrayView: View {
 
             HStack(spacing: 5) {
                 Circle()
-                    .fill(appState.isEmpty ? Color(hex: 0xB0AAA2) : Color(hex: 0x20A37F))
+                    .fill(
+                        appState.isScanning
+                            ? Theme.amber
+                            : (appState.isEmpty ? Color(hex: 0xB0AAA2) : Color(hex: 0x20A37F))
+                    )
                     .frame(width: 5, height: 5)
                     .shadow(
-                        color: appState.isEmpty ? .clear : Color(hex: 0x20A37F).opacity(0.35),
+                        color: appState.isEmpty || appState.isScanning
+                            ? .clear
+                            : Color(hex: 0x20A37F).opacity(0.35),
                         radius: 3
                     )
-                Text(appState.isEmpty ? "idle" : "live")
+                Text(appState.isScanning ? "scanning" : (appState.isEmpty ? "idle" : "live"))
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(appState.isEmpty ? Theme.muted : Theme.green)
+                    .foregroundStyle(
+                        appState.isScanning
+                            ? Theme.amber
+                            : (appState.isEmpty ? Theme.muted : Theme.green)
+                    )
             }
 
             Spacer(minLength: 4)
