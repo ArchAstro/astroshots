@@ -4,14 +4,22 @@ import Foundation
 /// Discovers and live-watches `.astroshot/<feature>/*` under one or more roots.
 /// Callbacks are always delivered on the main queue.
 ///
-/// Initial and full scans run on a background queue so the menu-bar app can
-/// appear immediately (scanning a large home/worktree tree on the main thread
-/// made the app look like it crashed with no status item).
+/// Startup:
+/// 1. **Warm** — re-scan `.astroshot` dirs from a persistent index (fast).
+/// 2. **Full** — recursive discovery walk; rewrites the index.
+///
+/// Full scans run on a background queue so the menu-bar status item can appear
+/// immediately even when the watch root is a large monorepo.
 final class AstroshotWatcher: @unchecked Sendable {
     struct Configuration: Sendable {
         var roots: [URL]
         /// Wait for partial PNG writes to settle before ingesting.
         var settleNanos: UInt64 = 250_000_000
+    }
+
+    private struct ScanResult: Sendable {
+        var shots: [Shot]
+        var astroshotDirs: [String]
     }
 
     var onShotsChanged: (@MainActor ([Shot]) -> Void)?
@@ -22,6 +30,8 @@ final class AstroshotWatcher: @unchecked Sendable {
     private var configuration: Configuration
     private var stream: FSEventStreamRef?
     private var knownPaths: Set<String> = []
+    /// `.astroshot` directories known from cache and/or the last full scan.
+    private var knownAstroshotDirs: Set<String> = []
     private var settleWorkItems: [String: DispatchWorkItem] = [:]
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
@@ -55,11 +65,11 @@ final class AstroshotWatcher: @unchecked Sendable {
         start()
     }
 
-    /// Non-blocking: starts FSEvents immediately, scans on a background queue.
+    /// Non-blocking: FSEvents first, then warm cache + full discovery.
     func start() {
         stop()
         startFSEvents()
-        scheduleFullScan()
+        scheduleStartupScan()
     }
 
     func stop() {
@@ -78,56 +88,142 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     func rescan() {
-        scheduleFullScan()
+        scheduleFullScan(persistCache: true)
     }
 
-    private func scheduleFullScan() {
+    // MARK: Startup / full scan
+
+    private func scheduleStartupScan() {
         lock.lock()
         scanGeneration += 1
         let generation = scanGeneration
+        let roots = configuration.roots
         lock.unlock()
 
         emitScanState(true)
         queue.async { [weak self] in
             guard let self else { return }
-            let shots = self.scanAll()
+
+            // Phase 1 — warm: only directories we already found last session.
+            if let cache = ShotIndexCache.load(for: roots), !cache.astroshotDirs.isEmpty {
+                let warm = self.scanKnownAstroshotDirs(cache.astroshotDirs)
+                self.lock.lock()
+                let stillCurrent = self.scanGeneration == generation
+                if stillCurrent {
+                    self.knownPaths = Set(warm.shots.map(\.path))
+                    self.knownAstroshotDirs = Set(warm.astroshotDirs)
+                }
+                self.lock.unlock()
+                if stillCurrent, !warm.shots.isEmpty {
+                    self.emitShots(warm.shots)
+                }
+            }
+
+            guard self.isScanCurrent(generation) else { return }
+
+            // Phase 2 — full recursive discovery; source of truth + cache rewrite.
+            let full = self.scanAllCollectingDirs()
             self.lock.lock()
             let stillCurrent = self.scanGeneration == generation
             if stillCurrent {
-                self.knownPaths = Set(shots.map(\.path))
+                self.knownPaths = Set(full.shots.map(\.path))
+                self.knownAstroshotDirs = Set(full.astroshotDirs)
             }
             self.lock.unlock()
             guard stillCurrent else { return }
-            self.emitShots(shots)
+
+            self.emitShots(full.shots)
+            ShotIndexCache.save(roots: roots, astroshotDirs: full.astroshotDirs)
             self.emitScanState(false)
         }
     }
 
+    private func scheduleFullScan(persistCache: Bool) {
+        lock.lock()
+        scanGeneration += 1
+        let generation = scanGeneration
+        let roots = configuration.roots
+        lock.unlock()
+
+        emitScanState(true)
+        queue.async { [weak self] in
+            guard let self else { return }
+            let full = self.scanAllCollectingDirs()
+            self.lock.lock()
+            let stillCurrent = self.scanGeneration == generation
+            if stillCurrent {
+                self.knownPaths = Set(full.shots.map(\.path))
+                self.knownAstroshotDirs = Set(full.astroshotDirs)
+            }
+            self.lock.unlock()
+            guard stillCurrent else { return }
+            self.emitShots(full.shots)
+            if persistCache {
+                ShotIndexCache.save(roots: roots, astroshotDirs: full.astroshotDirs)
+            }
+            self.emitScanState(false)
+        }
+    }
+
+    private func isScanCurrent(_ generation: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return scanGeneration == generation
+    }
+
     // MARK: Scan
 
+    /// Public entry for tests / tooling: unique shots newest-first.
     func scanAll() -> [Shot] {
+        scanAllCollectingDirs().shots
+    }
+
+    private func scanAllCollectingDirs() -> ScanResult {
         lock.lock()
         let roots = configuration.roots
         lock.unlock()
 
         var shots: [Shot] = []
+        var dirs: [String] = []
         for root in roots {
             guard FileManager.default.fileExists(atPath: root.path) else { continue }
-            shots.append(contentsOf: scanAstroshotTrees(under: root))
+            let partial = scanAstroshotTrees(under: root)
+            shots.append(contentsOf: partial.shots)
+            dirs.append(contentsOf: partial.astroshotDirs)
         }
 
-        var seen = Set<String>()
-        var unique: [Shot] = []
-        for shot in shots.sorted(by: { $0.capturedAt > $1.capturedAt }) {
-            if seen.insert(shot.path).inserted {
-                unique.append(shot)
-            }
-        }
-        return unique
+        return ScanResult(
+            shots: uniqueSortedShots(shots),
+            astroshotDirs: Array(Set(dirs)).sorted()
+        )
     }
 
-    private func scanAstroshotTrees(under root: URL) -> [Shot] {
+    /// Re-scan only previously discovered `.astroshot` trees (no monorepo walk).
+    private func scanKnownAstroshotDirs(_ dirs: [String]) -> ScanResult {
+        let fm = FileManager.default
+        var shots: [Shot] = []
+        var liveDirs: [String] = []
+
+        for path in dirs {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+                continue
+            }
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            guard url.lastPathComponent == ShotPath.astroshotDirName else { continue }
+            liveDirs.append(url.standardizedFileURL.path)
+            shots.append(contentsOf: scanFeatureDirs(in: url))
+        }
+
+        return ScanResult(
+            shots: uniqueSortedShots(shots),
+            astroshotDirs: Array(Set(liveDirs)).sorted()
+        )
+    }
+
+    private func scanAstroshotTrees(under root: URL) -> ScanResult {
         var results: [Shot] = []
+        var dirs: [String] = []
         let fm = FileManager.default
 
         func walk(_ dir: URL, depth: Int) {
@@ -141,6 +237,7 @@ final class AstroshotWatcher: @unchecked Sendable {
             for child in children {
                 let name = child.lastPathComponent
                 if name == ShotPath.astroshotDirName {
+                    dirs.append(child.standardizedFileURL.path)
                     results.append(contentsOf: scanFeatureDirs(in: child))
                     continue
                 }
@@ -157,7 +254,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
 
         walk(root, depth: 0)
-        return results
+        return ScanResult(shots: results, astroshotDirs: dirs)
     }
 
     private func scanFeatureDirs(in astroshot: URL) -> [Shot] {
@@ -193,6 +290,17 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard ShotPath.imageExtensions.contains(ext) else { return nil }
             return makeShot(at: fileURL.path, manifest: manifest)
         }
+    }
+
+    private func uniqueSortedShots(_ shots: [Shot]) -> [Shot] {
+        var seen = Set<String>()
+        var unique: [Shot] = []
+        for shot in shots.sorted(by: { $0.capturedAt > $1.capturedAt }) {
+            if seen.insert(shot.path).inserted {
+                unique.append(shot)
+            }
+        }
+        return unique
     }
 
     func makeShot(at path: String, manifest: FeatureManifest? = nil) -> Shot? {
@@ -283,7 +391,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         // Manifest-only updates: cheap re-scan of that feature dir is enough,
         // but a full scan is rare; schedule one background rescan.
         if needsFeatureRefresh {
-            scheduleFullScan()
+            scheduleFullScan(persistCache: true)
         }
     }
 
@@ -314,7 +422,7 @@ final class AstroshotWatcher: @unchecked Sendable {
             lock.unlock()
             if known {
                 // Drop from UI via full list refresh (background).
-                scheduleFullScan()
+                scheduleFullScan(persistCache: true)
             }
             return
         }
@@ -324,15 +432,23 @@ final class AstroshotWatcher: @unchecked Sendable {
         lock.lock()
         let isNew = !knownPaths.contains(path)
         knownPaths.insert(path)
+        var shouldPersistDirs = false
+        if let dir = ShotIndexCache.astroshotDir(forImagePath: path),
+           knownAstroshotDirs.insert(dir).inserted {
+            shouldPersistDirs = true
+        }
+        let roots = configuration.roots
+        let dirsSnapshot = Array(knownAstroshotDirs)
         lock.unlock()
+
+        if shouldPersistDirs {
+            ShotIndexCache.save(roots: roots, astroshotDirs: dirsSnapshot)
+        }
 
         // Do not re-walk the whole tree for every PNG — emit the shot and let
         // AppState merge it into the list.
-        if isNew {
-            emitNew(shot)
-        } else {
-            emitNew(shot) // treat overwrite as update; AppState upserts by path
-        }
+        emitNew(shot)
+        _ = isNew
     }
 
     private func emitShots(_ shots: [Shot]) {

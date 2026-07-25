@@ -12,10 +12,12 @@
 		342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */; };
 		4775F0ACFAFE194C51D69855 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B08FD45A80670CAD9391ADB /* AppDelegate.swift */; };
 		51D0FFA42C1196281E94E2F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 369606653B9FD1E6FBE4B43D /* Assets.xcassets */; };
+		57ED4434B7E830DD91FE67B9 /* ShotIndexCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239B5944E0638F1D931913A7 /* ShotIndexCache.swift */; };
 		59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */; };
 		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
 		8F2395DC60D12581FB418608 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9976B5034C36AABFDFD4B2C8 /* AppState.swift */; };
 		96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */; };
+		A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */; };
 		A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */; };
 		B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDC12CB9342C5E685FD8A25 /* DetailView.swift */; };
 		BB6D913C2F3291617685815E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A6D30FE0070BBC23546100 /* OverlayController.swift */; };
@@ -41,6 +43,7 @@
 /* Begin PBXFileReference section */
 		02F094E7A3E11CE16C3E5ADB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayView.swift; sourceTree = "<group>"; };
+		239B5944E0638F1D931913A7 /* ShotIndexCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCache.swift; sourceTree = "<group>"; };
 		254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2788CCB47877372A7EF96688 /* Manifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manifest.swift; sourceTree = "<group>"; };
 		2B08FD45A80670CAD9391ADB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -51,6 +54,7 @@
 		5089282794B5A6E6B3636886 /* ShotPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotPathTests.swift; sourceTree = "<group>"; };
 		5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotsApp.swift; sourceTree = "<group>"; };
 		5679FA304E48ED78A5B24170 /* StreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamView.swift; sourceTree = "<group>"; };
+		70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCacheTests.swift; sourceTree = "<group>"; };
 		75955E0D26EB206BCE2025ED /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		823B8B4248FDCBE1985DECAE /* Shot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shot.swift; sourceTree = "<group>"; };
 		84934BBEECF7545EB5C02073 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -69,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */,
+				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
 			);
 			path = AstroshotsTests;
@@ -129,6 +134,7 @@
 			isa = PBXGroup;
 			children = (
 				976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */,
+				239B5944E0638F1D931913A7 /* ShotIndexCache.swift */,
 			);
 			path = Watch;
 			sourceTree = "<group>";
@@ -267,6 +273,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */,
+				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -286,6 +293,7 @@
 				E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */,
 				DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */,
 				CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */,
+				57ED4434B7E830DD91FE67B9 /* ShotIndexCache.swift in Sources */,
 				A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */,
 				01F71C7E4F92A354272E716C /* StatusItemController.swift in Sources */,
 				F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */,
@@ -391,7 +399,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -405,7 +413,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.2;
+				MARKETING_VERSION = 0.1.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -471,7 +479,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -491,7 +499,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.2;
+				MARKETING_VERSION = 0.1.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
