@@ -78,9 +78,9 @@ final class AppState {
         didStartWatching = true
         watcher.start()
         Task {
-            // Allow overlays once the first scan has had a chance to complete,
-            // or after a short grace if the tree is empty/fast.
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // Warm cache can populate the tray in tens of ms; wait a short
+            // grace so the warm emit does not flash overlays for old frames.
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             self.suppressOverlay = false
         }
     }

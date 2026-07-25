@@ -68,6 +68,7 @@ Example `manifest.json`:
 Astroshots/
   AstroshotsApp.swift       App entry (status item via AppDelegate)
   App/StatusItemController  Left-click popover, right-click Quit
+  Watch/ShotIndexCache      Persisted .astroshot dir index for fast warm start
   App/                      AppState, Preferences, Theme
   Models/                   Shot, Manifest
   Watch/                    AstroshotWatcher (scan + FSEvents)
