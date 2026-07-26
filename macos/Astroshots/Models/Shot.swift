@@ -31,6 +31,8 @@ struct Shot: Identifiable, Hashable, Sendable {
     let status: FeatureStatus?
     /// File modification time (used for ordering + display).
     let capturedAt: Date
+    /// App-owned human review state from the feature's `review.json` sidecar.
+    var review: ReviewSnapshot? = nil
 
     var isFailure: Bool {
         status == .fail || slug.localizedCaseInsensitiveContains("fail")

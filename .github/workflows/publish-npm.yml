@@ -1,0 +1,103 @@
+name: Publish npm package
+
+on:
+  push:
+    tags:
+      - "react-shot-v*"
+      - "tui-shot-v*"
+
+concurrency:
+  group: publish-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish with npm trusted publishing
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Require a release commit from main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Release tags must point to a commit contained in origin/main" >&2
+            exit 1
+          fi
+
+      - name: Select package from tag
+        id: package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            react-shot-v*)
+              echo "workspace=@archastro/react-shot" >>"$GITHUB_OUTPUT"
+              echo "directory=packages/react-shot" >>"$GITHUB_OUTPUT"
+              echo "version=${TAG#react-shot-v}" >>"$GITHUB_OUTPUT"
+              ;;
+            tui-shot-v*)
+              echo "workspace=@archastro/tui-shot" >>"$GITHUB_OUTPUT"
+              echo "directory=packages/tui-shot" >>"$GITHUB_OUTPUT"
+              echo "version=${TAG#tui-shot-v}" >>"$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported npm release tag: $TAG" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package version
+        env:
+          DIRECTORY: ${{ steps.package.outputs.directory }}
+          TAG_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./${DIRECTORY}/package.json').version")"
+          if [[ "$PACKAGE_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Tag version $TAG_VERSION does not match package version $PACKAGE_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Install Chromium
+        env:
+          DIRECTORY: ${{ steps.package.outputs.directory }}
+          WORKSPACE: ${{ steps.package.outputs.workspace }}
+        run: |
+          TOOL="${WORKSPACE##*/}"
+          node "$DIRECTORY/bin/$TOOL.mjs" install-browser --with-deps
+
+      - name: Verify package
+        env:
+          WORKSPACE: ${{ steps.package.outputs.workspace }}
+        run: |
+          npm run typecheck --workspace "$WORKSPACE" --if-present
+          npm test --workspace "$WORKSPACE" --if-present
+          npm run pack:check
+
+      - name: Publish
+        env:
+          WORKSPACE: ${{ steps.package.outputs.workspace }}
+        run: npm publish --workspace "$WORKSPACE" --access public --registry https://registry.npmjs.org

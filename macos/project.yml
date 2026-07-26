@@ -51,6 +51,17 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
+  AstroshotsUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - AstroshotsUITests
+    dependencies:
+      - target: Astroshots
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   Astroshots:
     build:
@@ -62,3 +73,15 @@ schemes:
       config: Debug
       targets:
         - AstroshotsTests
+
+  AstroshotsReviewUITests:
+    build:
+      targets:
+        Astroshots: all
+        AstroshotsUITests: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AstroshotsUITests

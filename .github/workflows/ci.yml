@@ -12,8 +12,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  node-tools:
+    name: Node screenshot tools on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.14.0", "24"]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: |
+          node packages/react-shot/bin/react-shot.mjs install-browser --with-deps
+          node packages/tui-shot/bin/tui-shot.mjs install-browser --with-deps
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Verify documentation and skill commands
+        env:
+          ASTROSHOTS_VERIFY_INTEGRATION: "1"
+        run: npm run verify:skills
+
+      - name: Inspect published package contents
+        env:
+          ASTROSHOTS_VERIFY_PACKAGES_CAPTURE: "1"
+        run: npm run pack:check
+
   test:
-    name: Test
+    name: macOS app
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -39,3 +83,17 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             test
+
+      - name: Compile signed-desktop review proof
+        working-directory: macos
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Astroshots.xcodeproj \
+            -scheme AstroshotsReviewUITests \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData-review-ui \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build-for-testing
