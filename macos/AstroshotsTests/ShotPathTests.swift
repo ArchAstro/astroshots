@@ -4,12 +4,12 @@ import Foundation
 
 struct ShotPathTests {
     @Test func parsesStandardAstroshotPath() {
-        let path = "/Users/calvin/archastro/firstlanding-wt4/.astroshot/install-wizard/0004-configure.png"
+        let path = "/Users/example/worktrees/project-wt4/.astroshot/install-wizard/0004-configure.png"
         let parts = ShotPath.parse(imagePath: path)
-        #expect(parts?.worktree == "firstlanding-wt4")
+        #expect(parts?.worktree == "project-wt4")
         #expect(parts?.feature == "install-wizard")
         #expect(parts?.fileName == "0004-configure.png")
-        #expect(parts?.worktreePath.hasSuffix("firstlanding-wt4") == true)
+        #expect(parts?.worktreePath.hasSuffix("project-wt4") == true)
     }
 
     @Test func rejectsNonImage() {

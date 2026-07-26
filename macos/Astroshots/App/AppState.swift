@@ -20,6 +20,9 @@ final class AppState {
     /// True while a background full scan of the watch root is running.
     var isScanning = false
     var toast: String?
+    /// AppKit owns the chromeless review window; SwiftUI and overlays request it
+    /// through this callback without knowing window lifecycle details.
+    var onReviewRequested: ((Shot) -> Void)?
 
     var overlayEnabled: Bool
     var autoDismiss: Bool
@@ -27,6 +30,7 @@ final class AppState {
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher
+    private let reviewStore = ReviewStore()
     private let overlayController = OverlayController()
     /// When true, skip overlay (e.g. initial scan).
     private var suppressOverlay = true
@@ -42,6 +46,14 @@ final class AppState {
     init() {
         let prefs = Preferences.shared
         let rootPath = prefs.watchRootPath
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        let isReviewUITest =
+            environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] != nil
+                || environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+        #else
+        let isReviewUITest = false
+        #endif
         overlayEnabled = prefs.overlayEnabled
         autoDismiss = prefs.autoDismiss
         watchRootPath = rootPath
@@ -54,6 +66,9 @@ final class AppState {
         watcher.onShotsChanged = { [weak self] shots in
             self?.applyFullShotList(shots)
         }
+        watcher.onFeatureShotsChanged = { [weak self] directoryPath, shots in
+            self?.applyFeatureShotList(directoryPath: directoryPath, shots: shots)
+        }
         watcher.onNewShot = { [weak self] shot in
             self?.handleNewShot(shot)
         }
@@ -62,14 +77,16 @@ final class AppState {
         }
 
         overlayController.onOpen = { [weak self] shot in
-            self?.openDetail(shot)
+            self?.requestReview(shot)
         }
 
         // Defer filesystem work so the status item can appear immediately.
         // Scanning ~/archastro (or any large tree) on the main thread made the
         // app look like it crashed: no status item until the walk finished.
-        Task { @MainActor in
-            self.startWatching()
+        if !isReviewUITest {
+            Task { @MainActor in
+                self.startWatching()
+            }
         }
     }
 
@@ -90,6 +107,23 @@ final class AppState {
         if selectedShotID == nil {
             selectedShotID = shots.first?.id
         } else if let id = selectedShotID, !shots.contains(where: { $0.id == id }) {
+            selectedShotID = shots.first?.id
+        }
+    }
+
+    private func applyFeatureShotList(directoryPath: String, shots replacement: [Shot]) {
+        let directory = URL(fileURLWithPath: directoryPath, isDirectory: true).standardizedFileURL.path
+        shots.removeAll {
+            URL(fileURLWithPath: $0.path)
+                .deletingLastPathComponent()
+                .standardizedFileURL.path == directory
+        }
+        shots.append(contentsOf: replacement)
+        shots.sort { $0.capturedAt > $1.capturedAt }
+
+        if let selectedShotID, !shots.contains(where: { $0.id == selectedShotID }) {
+            self.selectedShotID = shots.first?.id
+        } else if selectedShotID == nil {
             selectedShotID = shots.first?.id
         }
     }
@@ -133,6 +167,54 @@ final class AppState {
         selectedShotID = shot.id
         pane = .detail
         NotificationCenter.default.post(name: .astroshotsOpenTray, object: nil)
+    }
+
+    func requestReview(_ shot: Shot) {
+        selectedShotID = shot.id
+        onReviewRequested?(shot)
+    }
+
+    /// Navigate within the same worktree, feature, and run while the takeover
+    /// remains open. A missing run id intentionally groups only the feature.
+    func reviewSibling(from shotID: String, delta: Int) -> Shot? {
+        guard let current = shots.first(where: { $0.id == shotID }) else { return nil }
+        let runShots = shots
+            .filter {
+                $0.worktreePath == current.worktreePath
+                    && $0.feature == current.feature
+                    && $0.runID == current.runID
+            }
+            .sorted { lhs, rhs in
+                if let left = lhs.sequence, let right = rhs.sequence, left != right {
+                    return left < right
+                }
+                return lhs.capturedAt < rhs.capturedAt
+            }
+        guard let index = runShots.firstIndex(where: { $0.id == shotID }) else { return nil }
+        let next = index + delta
+        guard runShots.indices.contains(next) else { return nil }
+        return runShots[next]
+    }
+
+    func addReviewComment(_ body: String, to shot: Shot) async throws {
+        let snapshot = try await reviewStore.addComment(body, to: shot)
+        applyReview(snapshot, to: shot.id)
+        showToast("Comment added")
+    }
+
+    func setReviewDecision(
+        _ decision: ReviewDecision,
+        note: String?,
+        for shot: Shot
+    ) async throws {
+        let snapshot = try await reviewStore.setDecision(decision, note: note, for: shot)
+        applyReview(snapshot, to: shot.id)
+        showToast(decision == .approved ? "Approved" : "Changes requested")
+    }
+
+    private func applyReview(_ snapshot: ReviewSnapshot, to shotID: String) {
+        guard let index = shots.firstIndex(where: { $0.id == shotID }) else { return }
+        shots[index].review = snapshot
     }
 
     func backToStream() {

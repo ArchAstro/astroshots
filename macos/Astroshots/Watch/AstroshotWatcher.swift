@@ -23,6 +23,9 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     var onShotsChanged: (@MainActor ([Shot]) -> Void)?
+    /// Replaces just one feature directory after its manifest or review
+    /// sidecar changes, avoiding a recursive workspace scan per comment.
+    var onFeatureShotsChanged: (@MainActor (_ featureDirectoryPath: String, _ shots: [Shot]) -> Void)?
     var onNewShot: (@MainActor (Shot) -> Void)?
     /// Fired on main when a background full scan begins / ends.
     var onScanStateChanged: (@MainActor (Bool) -> Void)?
@@ -308,6 +311,11 @@ final class AstroshotWatcher: @unchecked Sendable {
         let featureDir = URL(fileURLWithPath: path).deletingLastPathComponent()
         let resolvedManifest = manifest ?? ManifestParser.load(from: featureDir)
         let meta = ManifestParser.shotMetadata(fileName: parts.fileName, manifest: resolvedManifest)
+        let review = try? ReviewStore.readReview(
+            forImage: URL(fileURLWithPath: path),
+            featureDirectory: featureDir,
+            expectedRunID: meta.runID
+        )
 
         let attrs = try? FileManager.default.attributesOfItem(atPath: path)
         let mtime = (attrs?[.modificationDate] as? Date) ?? Date()
@@ -325,7 +333,8 @@ final class AstroshotWatcher: @unchecked Sendable {
             url: meta.url,
             runID: meta.runID,
             status: meta.status,
-            capturedAt: meta.capturedAt ?? mtime
+            capturedAt: meta.capturedAt ?? mtime,
+            review: review
         )
     }
 
@@ -375,11 +384,17 @@ final class AstroshotWatcher: @unchecked Sendable {
         self.stream = stream
     }
 
-    private func handleFSEvents(paths: [String]) {
-        var needsFeatureRefresh = false
+    /// Internal so focused tests can exercise settle/cancellation behavior
+    /// without relying on the host FSEvents daemon.
+    func handleFSEvents(paths: [String]) {
+        var featureDirectories = Set<String>()
         for path in paths {
-            if path.hasSuffix("manifest.json") {
-                needsFeatureRefresh = true
+            if path.hasSuffix("manifest.json") || path.hasSuffix(ReviewStore.sidecarFileName) {
+                featureDirectories.insert(
+                    URL(fileURLWithPath: path)
+                        .deletingLastPathComponent()
+                        .standardizedFileURL.path
+                )
                 continue
             }
 
@@ -388,30 +403,81 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard ShotPath.parse(imagePath: path) != nil else { continue }
             scheduleSettledIngest(path: path)
         }
-        // Manifest-only updates: cheap re-scan of that feature dir is enough,
-        // but a full scan is rare; schedule one background rescan.
-        if needsFeatureRefresh {
-            scheduleFullScan(persistCache: true)
+        for directory in featureDirectories {
+            scheduleFeatureRefresh(directoryPath: directory)
         }
+    }
+
+    private func scheduleFeatureRefresh(directoryPath: String) {
+        let key = "feature:\(directoryPath)"
+        lock.lock()
+        settleWorkItems[key]?.cancel()
+        let nanos = configuration.settleNanos
+        let generation = scanGeneration
+        let work = DispatchWorkItem { [weak self] in
+            self?.refreshFeatureDirectory(
+                path: directoryPath,
+                workItemKey: key,
+                generation: generation
+            )
+        }
+        settleWorkItems[key] = work
+        queue.asyncAfter(deadline: .now() + .nanoseconds(Int(nanos)), execute: work)
+        lock.unlock()
+    }
+
+    private func refreshFeatureDirectory(
+        path: String,
+        workItemKey: String,
+        generation: Int
+    ) {
+        lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        settleWorkItems[workItemKey] = nil
+        lock.unlock()
+
+        let directory = URL(fileURLWithPath: path, isDirectory: true)
+        let shots = uniqueSortedShots(shotsInFeatureDirectory(directory))
+        let featurePrefix = directory.standardizedFileURL.path + "/"
+
+        lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        knownPaths = knownPaths.filter { !$0.hasPrefix(featurePrefix) }
+        knownPaths.formUnion(shots.map(\.path))
+        lock.unlock()
+
+        emitFeatureShots(
+            directoryPath: directory.standardizedFileURL.path,
+            shots: shots,
+            generation: generation
+        )
     }
 
     private func scheduleSettledIngest(path: String) {
         lock.lock()
         settleWorkItems[path]?.cancel()
         let nanos = configuration.settleNanos
-        lock.unlock()
-
+        let generation = scanGeneration
         let work = DispatchWorkItem { [weak self] in
-            self?.ingestIfReady(path: path)
+            self?.ingestIfReady(path: path, generation: generation)
         }
-        lock.lock()
         settleWorkItems[path] = work
-        lock.unlock()
         queue.asyncAfter(deadline: .now() + .nanoseconds(Int(nanos)), execute: work)
+        lock.unlock()
     }
 
-    private func ingestIfReady(path: String) {
+    private func ingestIfReady(path: String, generation: Int) {
         lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
         settleWorkItems[path] = nil
         lock.unlock()
 
@@ -430,6 +496,10 @@ final class AstroshotWatcher: @unchecked Sendable {
         guard let shot = makeShot(at: path) else { return }
 
         lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
         let isNew = !knownPaths.contains(path)
         knownPaths.insert(path)
         var shouldPersistDirs = false
@@ -447,7 +517,7 @@ final class AstroshotWatcher: @unchecked Sendable {
 
         // Do not re-walk the whole tree for every PNG — emit the shot and let
         // AppState merge it into the list.
-        emitNew(shot)
+        emitNew(shot, generation: generation)
         _ = isNew
     }
 
@@ -460,11 +530,28 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
     }
 
-    private func emitNew(_ shot: Shot) {
+    /// Internal so tests can prove a callback queued before a root replacement
+    /// is rejected at MainActor delivery time.
+    func emitNew(_ shot: Shot, generation: Int) {
         let handler = onNewShot
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
             Task { @MainActor in
+                guard self?.isScanCurrent(generation) == true else { return }
                 handler?(shot)
+            }
+        }
+    }
+
+    private func emitFeatureShots(
+        directoryPath: String,
+        shots: [Shot],
+        generation: Int
+    ) {
+        let handler = onFeatureShotsChanged
+        DispatchQueue.main.async { [weak self] in
+            Task { @MainActor in
+                guard self?.isScanCurrent(generation) == true else { return }
+                handler?(directoryPath, shots)
             }
         }
     }

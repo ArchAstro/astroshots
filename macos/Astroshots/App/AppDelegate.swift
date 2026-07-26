@@ -15,6 +15,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = StatusItemController(appState: state)
         statusItemController = controller
         controller.install()
+
+        #if DEBUG
+        if let reviewPath = ProcessInfo.processInfo.environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] {
+            DispatchQueue.main.async {
+                controller.openReview(atImagePath: reviewPath)
+            }
+        } else if let trayPath = ProcessInfo.processInfo.environment[
+            "ASTROSHOTS_UI_TEST_TRAY_PATH"
+        ] {
+            DispatchQueue.main.async {
+                controller.openTray(atImagePath: trayPath)
+            }
+        }
+        #endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {
