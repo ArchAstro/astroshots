@@ -1,0 +1,364 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CAPTURE="$SCRIPT_DIR/astroshot-capture"
+TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/astroshot-capture-test.XXXXXX")"
+observer_pid=""
+
+cleanup() {
+  local exit_code=$?
+  trap - EXIT HUP INT TERM
+  if [[ -n "$observer_pid" ]]; then
+    kill "$observer_pid" 2>/dev/null || true
+    wait "$observer_pid" 2>/dev/null || true
+  fi
+  rm -rf "$TEST_ROOT"
+  exit "$exit_code"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
+
+SOURCE="$TEST_ROOT/source.png"
+PNG_BASE64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL6WQAAAABJRU5ErkJggg=='
+if ! printf '%s' "$PNG_BASE64" | base64 --decode >"$SOURCE" 2>/dev/null; then
+  printf '%s' "$PNG_BASE64" | base64 -D >"$SOURCE"
+fi
+png_signature="$(od -An -t x1 -N 8 "$SOURCE" | tr -d '[:space:]')"
+[[ "$png_signature" == "89504e470d0a1a0a" ]] ||
+  fail "test fixture is not a PNG"
+
+# Unsupported and extensionless sources must fail before creating capture state;
+# relabeling arbitrary bytes as PNG would publish undecodable media.
+UNSUPPORTED_SOURCE="$TEST_ROOT/source.txt"
+EXTENSIONLESS_SOURCE="$TEST_ROOT/source"
+CORRUPT_SOURCE="$TEST_ROOT/corrupt.png"
+printf 'plain text\n' >"$UNSUPPORTED_SOURCE"
+cp "$SOURCE" "$EXTENSIONLESS_SOURCE"
+printf 'not actually a png\n' >"$CORRUPT_SOURCE"
+
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature unsupported-source \
+  --slug rejected \
+  --source "$UNSUPPORTED_SOURCE" >"$TEST_ROOT/unsupported.out" 2>"$TEST_ROOT/unsupported.err"; then
+  fail "capture unexpectedly accepted an unsupported source extension"
+fi
+grep -q 'unsupported --source extension .txt' "$TEST_ROOT/unsupported.err" ||
+  fail "unsupported source rejection was not actionable"
+
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature extensionless-source \
+  --slug rejected \
+  --source "$EXTENSIONLESS_SOURCE" >"$TEST_ROOT/extensionless.out" 2>"$TEST_ROOT/extensionless.err"; then
+  fail "capture unexpectedly accepted an extensionless source"
+fi
+grep -q 'must have a supported extension' "$TEST_ROOT/extensionless.err" ||
+  fail "extensionless source rejection was not actionable"
+
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature corrupt-source \
+  --slug rejected \
+  --source "$CORRUPT_SOURCE" >"$TEST_ROOT/corrupt.out" 2>"$TEST_ROOT/corrupt.err"; then
+  fail "capture unexpectedly accepted corrupt bytes named .png"
+fi
+grep -q 'is not a valid .png image' "$TEST_ROOT/corrupt.err" ||
+  fail "corrupt image rejection was not actionable"
+
+for rejected_feature in unsupported-source extensionless-source corrupt-source; do
+  [[ ! -e "$TEST_ROOT/.astroshot/$rejected_feature" ]] ||
+    fail "rejected source created capture state for $rejected_feature"
+done
+
+# Single capture proves initial manifest creation and image publication.
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --slug first \
+  --source "$SOURCE" \
+  --title "First capture" >/dev/null
+
+SINGLE_MANIFEST="$TEST_ROOT/.astroshot/single/manifest.json"
+jq -e '
+  .version == 1
+  and .feature == "single"
+  and .status == "running"
+  and (.shots | length) == 1
+  and .shots[0].id == "0001"
+  and .shots[0].file == "0001-first.png"
+' "$SINGLE_MANIFEST" >/dev/null || fail "single capture manifest is incorrect"
+[[ -f "$TEST_ROOT/.astroshot/single/0001-first.png" ]] ||
+  fail "single capture image is missing"
+FIRST_RUN_ID="$(jq -r '.run_id' "$SINGLE_MANIFEST")"
+
+# Finalize proves status-only updates preserve the existing shots.
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --status pass \
+  --finalize >/dev/null
+jq -e '
+  .status == "pass"
+  and (.shots | length) == 1
+  and .shots[0].id == "0001"
+' "$SINGLE_MANIFEST" >/dev/null || fail "finalize did not preserve the manifest"
+
+# A capture after finalization starts a fresh default run while retaining old
+# image files as immutable evidence from the prior run.
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --slug second \
+  --source "$SOURCE" >/dev/null
+SECOND_RUN_ID="$(jq -r '.run_id' "$SINGLE_MANIFEST")"
+[[ "$SECOND_RUN_ID" != "$FIRST_RUN_ID" ]] ||
+  fail "capture after finalize reused the prior default run ID"
+jq -e '
+  .status == "running"
+  and (.shots | length) == 1
+  and .shots[0].id == "0002"
+  and .shots[0].file == "0002-second.png"
+' "$SINGLE_MANIFEST" >/dev/null || fail "capture after finalize did not reset the run"
+[[ -f "$TEST_ROOT/.astroshot/single/0001-first.png" ]] ||
+  fail "new run removed prior run evidence"
+
+# Reusing the active explicit ID continues that run; selecting a different
+# explicit ID deliberately starts another run and resets its shot list.
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --slug third \
+  --source "$SOURCE" \
+  --run-id "$SECOND_RUN_ID" >/dev/null
+jq -e --arg run_id "$SECOND_RUN_ID" '
+  .run_id == $run_id
+  and [.shots[].id] == ["0002", "0003"]
+' "$SINGLE_MANIFEST" >/dev/null || fail "matching explicit run ID did not continue the run"
+
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --slug replacement \
+  --source "$SOURCE" \
+  --run-id replacement-run >/dev/null
+jq -e '
+  .run_id == "replacement-run"
+  and [.shots[].id] == ["0004"]
+' "$SINGLE_MANIFEST" >/dev/null || fail "new explicit run ID did not reset the manifest"
+
+# Finalize may name the active run defensively, but must reject a mismatched ID.
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --status pass \
+  --run-id replacement-run \
+  --finalize >/dev/null
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --status fail \
+  --run-id wrong-run \
+  --finalize >"$TEST_ROOT/wrong-run.out" 2>"$TEST_ROOT/wrong-run.err"; then
+  fail "finalize unexpectedly accepted a mismatched explicit run ID"
+fi
+jq -e '
+  .run_id == "replacement-run"
+  and .status == "pass"
+  and [.shots[].id] == ["0004"]
+' "$SINGLE_MANIFEST" >/dev/null || fail "mismatched finalize mutated the active run"
+
+"$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature single \
+  --slug explicit-resume \
+  --source "$SOURCE" \
+  --run-id replacement-run >/dev/null
+jq -e '
+  .run_id == "replacement-run"
+  and .status == "running"
+  and [.shots[].id] == ["0004", "0005"]
+' "$SINGLE_MANIFEST" >/dev/null ||
+  fail "matching explicit run ID did not intentionally resume the finalized run"
+
+# A live lock must fail in bounded time with an actionable error.
+LOCK_DIR="$TEST_ROOT/.astroshot/locked/.capture.lock"
+mkdir -p "$LOCK_DIR"
+printf '%s\n' "$$" >"$LOCK_DIR/pid"
+if ASTROSHOT_LOCK_TIMEOUT_SECONDS=1 "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature locked \
+  --slug blocked \
+  --source "$SOURCE" >"$TEST_ROOT/locked.out" 2>"$TEST_ROOT/locked.err"; then
+  fail "capture unexpectedly succeeded while a live lock was held"
+fi
+grep -q 'timed out after 1s waiting for capture lock' "$TEST_ROOT/locked.err" ||
+  fail "lock timeout did not report a clear error"
+rm -rf "$TEST_ROOT/.astroshot/locked"
+
+# A lock left by a dead process must fail promptly and identify safe recovery.
+STALE_LOCK="$TEST_ROOT/.astroshot/stale/.capture.lock"
+mkdir -p "$STALE_LOCK"
+printf '99999999\n' >"$STALE_LOCK/pid"
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature stale \
+  --slug recovered \
+  --source "$SOURCE" >"$TEST_ROOT/stale.out" 2>"$TEST_ROOT/stale.err"; then
+  fail "capture unexpectedly reclaimed a stale lock"
+fi
+grep -q 'stale capture lock from dead pid 99999999' "$TEST_ROOT/stale.err" ||
+  fail "stale lock failure did not identify the dead owner"
+grep -Fq '.capture.lock; remove it and retry' "$TEST_ROOT/stale.err" ||
+  fail "stale lock failure did not identify safe recovery"
+rm -rf "$TEST_ROOT/.astroshot/stale"
+
+# A failed manifest update must roll back the published image and release all
+# temporary state so the next caller is never blocked by the failed process.
+BROKEN_DIR="$TEST_ROOT/.astroshot/broken"
+mkdir -p "$BROKEN_DIR"
+printf '{invalid json\n' >"$BROKEN_DIR/manifest.json"
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature broken \
+  --slug rollback \
+  --source "$SOURCE" >"$TEST_ROOT/broken.out" 2>"$TEST_ROOT/broken.err"; then
+  fail "capture unexpectedly succeeded with an invalid manifest"
+fi
+if find "$BROKEN_DIR" -type f -name '[0-9][0-9][0-9][0-9]-*' -print | grep -q .; then
+  fail "failed capture left a published image behind"
+fi
+if find "$BROKEN_DIR" \( -name '.capture*' -o -name '.manifest.tmp.*' \) -print | grep -q .; then
+  fail "failed capture left temporary or lock residue behind"
+fi
+
+# Failure during a feature's first browser capture must roll back the empty
+# running manifest created for that attempt.
+FAKE_BIN="$TEST_ROOT/fake-bin"
+mkdir -p "$FAKE_BIN"
+printf '#!/usr/bin/env bash\nexit 17\n' >"$FAKE_BIN/agent-browser"
+chmod +x "$FAKE_BIN/agent-browser"
+if PATH="$FAKE_BIN:$PATH" "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature first-failure \
+  --slug unavailable \
+  --from-agent-browser fake >"$TEST_ROOT/first-failure.out" 2>"$TEST_ROOT/first-failure.err"; then
+  fail "capture unexpectedly succeeded with a failing browser"
+fi
+[[ ! -e "$TEST_ROOT/.astroshot/first-failure/manifest.json" ]] ||
+  fail "first capture failure left an empty running manifest"
+if find "$TEST_ROOT/.astroshot/first-failure" \
+  \( -name '.capture*' -o -name '.manifest.tmp.*' \) -print | grep -q .; then
+  fail "first capture failure left temporary or lock residue behind"
+fi
+
+# The four-digit sequence format must fail clearly before it can reuse an ID.
+LIMIT_DIR="$TEST_ROOT/.astroshot/sequence-limit"
+mkdir -p "$LIMIT_DIR"
+cp "$SOURCE" "$LIMIT_DIR/9999-existing.png"
+if "$CAPTURE" \
+  --root "$TEST_ROOT" \
+  --feature sequence-limit \
+  --slug ten-thousand \
+  --source "$SOURCE" >"$TEST_ROOT/limit.out" 2>"$TEST_ROOT/limit.err"; then
+  fail "capture unexpectedly exceeded the sequence limit"
+fi
+grep -q 'capture sequence limit 9999 reached' "$TEST_ROOT/limit.err" ||
+  fail "sequence limit did not report a clear error"
+[[ ! -e "$LIMIT_DIR/10000-ten-thousand.png" ]] ||
+  fail "sequence limit failure published an image"
+[[ ! -e "$LIMIT_DIR/manifest.json" ]] ||
+  fail "sequence limit failure left an empty running manifest"
+
+# Concurrent captures exercise sequence allocation, image rename, and manifest
+# replacement through the same filesystem boundary used by real callers.
+CONCURRENT_COUNT=12
+CONCURRENT_DIR="$TEST_ROOT/.astroshot/concurrent"
+CONCURRENT_MANIFEST="$CONCURRENT_DIR/manifest.json"
+OBSERVER_STOP="$TEST_ROOT/observer.stop"
+OBSERVER_FAILURE="$TEST_ROOT/observer.failure"
+
+# Observe the directory throughout publication, not just once all writers have
+# settled. Every visible manifest must parse and reference only visible images.
+(
+  while [[ ! -e "$OBSERVER_STOP" ]]; do
+    if [[ -f "$CONCURRENT_MANIFEST" ]]; then
+      if ! jq empty "$CONCURRENT_MANIFEST" >/dev/null 2>&1; then
+        printf 'invalid manifest\n' >"$OBSERVER_FAILURE"
+        exit 1
+      fi
+      while IFS= read -r file; do
+        if [[ ! -f "$CONCURRENT_DIR/$file" ]]; then
+          printf 'missing image: %s\n' "$file" >"$OBSERVER_FAILURE"
+          exit 1
+        fi
+      done < <(jq -r '.shots[]?.file' "$CONCURRENT_MANIFEST")
+    fi
+    sleep 0.01
+  done
+) &
+observer_pid="$!"
+
+pids=()
+for n in $(seq 1 "$CONCURRENT_COUNT"); do
+  "$CAPTURE" \
+    --root "$TEST_ROOT" \
+    --feature concurrent \
+    --slug "shot-$n" \
+    --source "$SOURCE" \
+    --description "concurrent capture $n" >/dev/null &
+  pids+=("$!")
+done
+
+for pid in "${pids[@]}"; do
+  wait "$pid" || fail "concurrent capture process $pid failed"
+done
+: >"$OBSERVER_STOP"
+wait "$observer_pid" || fail "observer saw a non-atomic publication"
+observer_pid=""
+[[ ! -e "$OBSERVER_FAILURE" ]] ||
+  fail "observer saw a non-atomic publication: $(cat "$OBSERVER_FAILURE")"
+
+jq empty "$CONCURRENT_MANIFEST" >/dev/null ||
+  fail "concurrent manifest is not valid JSON"
+
+shot_count="$(jq '.shots | length' "$CONCURRENT_MANIFEST")"
+[[ "$shot_count" == "$CONCURRENT_COUNT" ]] ||
+  fail "expected $CONCURRENT_COUNT manifest shots, found $shot_count"
+
+unique_ids="$(jq -r '.shots[].id' "$CONCURRENT_MANIFEST" | sort -u | wc -l | tr -d ' ')"
+[[ "$unique_ids" == "$CONCURRENT_COUNT" ]] ||
+  fail "manifest sequence IDs are not unique"
+
+jq -e --argjson count "$CONCURRENT_COUNT" '
+  [.shots[].id] == [range(1; $count + 1) | tostring | ("0000" + .)[-4:]]
+' "$CONCURRENT_MANIFEST" >/dev/null ||
+  fail "manifest sequence IDs are not contiguous"
+
+image_count="$(find "$CONCURRENT_DIR" -type f \
+  \( -name '[0-9][0-9][0-9][0-9]-*.png' -o -name '[0-9][0-9][0-9][0-9]-*.jpg' \
+     -o -name '[0-9][0-9][0-9][0-9]-*.jpeg' -o -name '[0-9][0-9][0-9][0-9]-*.webp' \
+     -o -name '[0-9][0-9][0-9][0-9]-*.gif' \) \
+  | wc -l | tr -d ' ')"
+[[ "$image_count" == "$CONCURRENT_COUNT" ]] ||
+  fail "expected $CONCURRENT_COUNT images, found $image_count"
+
+while IFS= read -r file; do
+  [[ -f "$CONCURRENT_DIR/$file" ]] ||
+    fail "manifest references missing image $file"
+done < <(jq -r '.shots[].file' "$CONCURRENT_MANIFEST")
+
+if find "$TEST_ROOT/.astroshot" \
+  \( -name '.capture*' -o -name '.manifest.tmp.*' \) -print | grep -q .; then
+  fail "temporary or lock residue remains after capture"
+fi
+
+echo "PASS: astroshot-capture atomicity and concurrency"
