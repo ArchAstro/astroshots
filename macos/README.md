@@ -31,12 +31,30 @@ xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platfo
   newest-first list. Project name is a badge on each row / overlay.
 - **Desktop overlay**: new frames float above all windows; Open jumps to detail.
 - **Tray**: stream → click for detail → gear for settings. Pin keeps a floating window.
+- **Review**: clicking a screenshot opens a chromeless, screen-sized takeover
+  with a dim gray stage, close control, comment history, and approve/request
+  changes actions. Feedback is saved beside the execution manifest so an agent
+  can read it without an app-specific API.
+
+The unsigned `Astroshots` scheme contains the focused model and storage tests.
+The real-window review proof is isolated in `AstroshotsReviewUITests` because
+macOS UI automation requires a local development signing team:
+
+```bash
+xcodebuild \
+  -project Astroshots.xcodeproj \
+  -scheme AstroshotsReviewUITests \
+  -destination 'platform=macOS' \
+  DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+  test
+```
 
 ## Harness layout
 
 ```
 <worktree>/.astroshot/<feature>/
-  manifest.json          # optional but recommended
+  manifest.json          # optional harness execution state
+  review.json            # optional human review state
   0001-signed-in.png
   0002-configure.png
 ```
@@ -61,6 +79,42 @@ Example `manifest.json`:
   ]
 }
 ```
+
+`manifest.json.status` belongs to the harness: `running`, `pass`, `fail`, or
+`idle` describes execution, not human acceptance. Astroshots stores human
+feedback separately in `review.json`:
+
+```json
+{
+  "version": 1,
+  "run_id": "install-wizard-…",
+  "updated_at": "2026-07-26T17:42:00Z",
+  "reviews": {
+    "0002-configure.png": {
+      "decision": "approved",
+      "reviewed_at": "2026-07-26T17:42:00Z",
+      "image_sha256": "a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1",
+      "comments": [
+        {
+          "id": "A1B2C3D4-E5F6-47A8-9000-111122223333",
+          "body": "The final action is now fully visible.",
+          "created_at": "2026-07-26T17:41:32Z"
+        }
+      ]
+    }
+  }
+}
+```
+
+Review entries use exact image filenames. A decision is current only when its
+`image_sha256` matches the file's SHA-256. If a harness or agent replaces the
+image, Astroshots treats the prior decision as stale/pending while preserving
+comments as agent-readable feedback. A comment may exist without a decision;
+such pending entries may omit `reviewed_at` and `image_sha256`.
+
+When a manifest supplies `run_id`, Astroshots only applies feedback from a
+`review.json` with the same run id. A missing or different review run is
+pending, and its prior decision and comments are not shown for the current run.
 
 ## Architecture
 

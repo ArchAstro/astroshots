@@ -11,6 +11,7 @@ final class StatusItemController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var pinnedWindow: NSWindow?
+    private var reviewWindowController: ReviewWindowController?
     private var contextMenu: NSMenu?
     private var observationTask: Task<Void, Never>?
 
@@ -20,6 +21,12 @@ final class StatusItemController: NSObject {
     }
 
     func install() {
+        let reviewWindowController = ReviewWindowController(appState: appState)
+        self.reviewWindowController = reviewWindowController
+        appState.onReviewRequested = { [weak reviewWindowController] shot in
+            reviewWindowController?.open(shot)
+        }
+
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.imagePosition = .imageLeft
@@ -65,12 +72,41 @@ final class StatusItemController: NSObject {
         observationTask = nil
         closePopover()
         closePinnedWindow()
+        reviewWindowController?.close()
+        reviewWindowController = nil
+        appState.onReviewRequested = nil
         if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
         }
         statusItem = nil
         popover = nil
         contextMenu = nil
+    }
+
+    /// Test-only launch bridge for exercising the real review window without
+    /// automating the system menu bar.
+    func openReview(atImagePath path: String) {
+        guard let shot = loadTestShot(atImagePath: path) else { return }
+        reviewWindowController?.open(shot)
+    }
+
+    /// Seeds and opens the real stream popover so UI automation can prove the
+    /// same thumbnail interaction a reviewer uses from the menu-bar app.
+    func openTray(atImagePath path: String) {
+        guard loadTestShot(atImagePath: path) != nil else { return }
+        showPopover()
+    }
+
+    private func loadTestShot(atImagePath path: String) -> Shot? {
+        let imageURL = URL(fileURLWithPath: path)
+        let root = imageURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let reader = AstroshotWatcher(configuration: .init(roots: [root]))
+        guard let shot = reader.makeShot(at: path) else { return nil }
+        appState.handleNewShot(shot)
+        return shot
     }
 
     // MARK: - Button / menu
@@ -133,6 +169,7 @@ final class StatusItemController: NSObject {
         let root = TrayView(isPinned: false)
             .environment(appState)
             .environment(\.trayChrome, trayChromeForPopover())
+            .environment(\.reviewChrome, reviewChrome())
         popover.contentViewController = NSHostingController(rootView: root)
     }
 
@@ -155,6 +192,7 @@ final class StatusItemController: NSObject {
             let root = TrayView(isPinned: true)
                 .environment(appState)
                 .environment(\.trayChrome, trayChromeForPinned())
+                .environment(\.reviewChrome, reviewChrome())
             let hosting = NSHostingController(rootView: root)
             let window = NSPanel(
                 contentRect: NSRect(x: 0, y: 0, width: Theme.trayWidth, height: Theme.trayHeight),
@@ -189,6 +227,15 @@ final class StatusItemController: NSObject {
             },
             openPinned: { [weak self] in
                 self?.openPinnedWindow()
+            }
+        )
+    }
+
+    private func reviewChrome() -> ReviewChrome {
+        ReviewChrome(
+            open: { [weak self] shot in
+                self?.closePopover()
+                self?.reviewWindowController?.open(shot)
             }
         )
     }

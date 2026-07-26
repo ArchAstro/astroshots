@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DetailView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.reviewChrome) private var reviewChrome
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,21 +57,41 @@ struct DetailView: View {
             if let shot = appState.selectedShot {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        ShotThumbnail(path: shot.path)
-                            .aspectRatio(16 / 10, contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Theme.line, lineWidth: 1)
-                            )
-                            .padding(.horizontal, 12)
-                            .padding(.top, 12)
+                        Button {
+                            reviewChrome.open(shot)
+                        } label: {
+                            ShotThumbnail(path: shot.path)
+                                .aspectRatio(16 / 10, contentMode: .fit)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Theme.line, lineWidth: 1)
+                                )
+                                .overlay(alignment: .bottomTrailing) {
+                                    Label("Review full screen", systemImage: "arrow.up.left.and.arrow.down.right")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 6)
+                                        .background(.black.opacity(0.68), in: Capsule())
+                                        .padding(10)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open full-screen review")
+                        .accessibilityLabel("Review \(shot.title) full screen")
+                        .padding(.horizontal, 12)
+                        .padding(.top, 12)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(heading(for: shot))
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Theme.ink)
-                                .tracking(-0.3)
+                            HStack {
+                                Text(heading(for: shot))
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(Theme.ink)
+                                    .tracking(-0.3)
+                                Spacer()
+                                ReviewBadge(state: shot.review?.state ?? .pending)
+                            }
                             Text(shot.description.isEmpty ? shot.fileName : shot.description)
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink2)
@@ -88,6 +109,10 @@ struct DetailView: View {
                                 if let run = shot.runID, !run.isEmpty {
                                     row("Run", run)
                                 }
+                                if let status = shot.status {
+                                    row("Execution", status.rawValue.capitalized)
+                                }
+                                row("Review", reviewLabel(for: shot))
                                 row("Path", shot.path)
                             }
                             .padding(11)
@@ -110,6 +135,14 @@ struct DetailView: View {
             } else {
                 EmptyStreamView()
             }
+        }
+    }
+
+    private func reviewLabel(for shot: Shot) -> String {
+        switch shot.review?.state ?? .pending {
+        case .pending: "Pending"
+        case .approved: "Approved"
+        case .changesRequested: "Changes requested"
         }
     }
 
