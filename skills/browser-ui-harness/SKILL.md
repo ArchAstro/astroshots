@@ -239,7 +239,8 @@ Keep `run.sh` under a few hundred lines by pushing product detail into cases.
 |------|------|
 | **agent-browser** | Drive one browser session (see **agent-browser** skill) |
 | **Playwright test runner** | Large suites, parallel specs, CI gates |
-| **Component shot tools** | Isolated docs PNGs without a full stack |
+| `@archastro/react-shot` from npmjs | Isolated React docs PNGs without a full stack |
+| `@archastro/tui-shot` from npmjs | Isolated Ink terminal PNGs without a PTY |
 | **Astroshots** | Live human review of harness frames |
 
 Use a Bash agent-browser harness when you want a **readable journey + evidence**
@@ -263,6 +264,9 @@ strict CI parallelism.
 
 ## Related
 
+- **screenshot** skill — documentation asset planning and visual review
 - **agent-browser** skill — CLI loop, snapshot, screenshots  
 - **astroshots** skill — `.astroshot/` layout + `astroshot-capture`  
+- **react-shot** skill — deterministic React component fixtures
+- **tui-shot** skill — deterministic Ink terminal fixtures
 - CLI deep dive: `agent-browser skills get core --full`

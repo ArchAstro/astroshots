@@ -17,7 +17,7 @@ Options:
   --url TEXT              Route / UI context
   --viewport WxH          e.g. 1280x1100
   --status STATUS         running|pass|fail|idle (default: running)
-  --run-id ID             Override run id (default: feature-timestamp-pid)
+  --run-id ID             Explicit run identity; a new ID resets the shot list
   --root DIR              Repo/worktree root (default: git root or cwd)
   --source PATH           Copy this image instead of agent-browser
   --from-agent-browser S  Session name for: agent-browser screenshot --full
@@ -27,10 +27,24 @@ Options:
   --finalize              Only update manifest status (no new PNG)
   -h, --help              Show help
 
+Environment:
+  ASTROSHOT_LOCK_TIMEOUT_SECONDS
+                          Capture lock timeout (default: 120)
+
+Requirements:
+  jq                      Required for manifest updates
+  agent-browser           Required only with --from-agent-browser
+
+Run lifecycle:
+  Captures append while the manifest status is running. After pass, fail, or
+  idle, the next capture starts a fresh run and shot list. Existing image files
+  remain as prior-run evidence. An explicit matching --run-id intentionally
+  continues that run, including after finalize; a different ID starts a new run.
+
 Examples:
   astroshot-capture --feature install-wizard --slug configure \
     --title "Configure" --description "Config step" \
-    --from-agent-browser "browse-firstlanding-wt4"
+    --from-agent-browser "browse-my-project"
 
   astroshot-capture --feature install-wizard --status pass --finalize
 EOF
@@ -44,8 +58,10 @@ URL=""
 VIEWPORT=""
 STATUS="running"
 RUN_ID=""
+RUN_ID_OVERRIDE=0
 ROOT=""
 SOURCE=""
+SOURCE_EXT=""
 AB_SESSION=""
 FULL=1
 SELECTOR=""
@@ -60,7 +76,7 @@ while [[ $# -gt 0 ]]; do
     --url) URL="${2:-}"; shift 2 ;;
     --viewport) VIEWPORT="${2:-}"; shift 2 ;;
     --status) STATUS="${2:-}"; shift 2 ;;
-    --run-id) RUN_ID="${2:-}"; shift 2 ;;
+    --run-id) RUN_ID="${2:-}"; RUN_ID_OVERRIDE=1; shift 2 ;;
     --root) ROOT="${2:-}"; shift 2 ;;
     --source) SOURCE="${2:-}"; shift 2 ;;
     --from-agent-browser) AB_SESSION="${2:-}"; shift 2 ;;
@@ -92,6 +108,10 @@ case "$STATUS" in
     exit 1
     ;;
 esac
+if [[ "$RUN_ID_OVERRIDE" == "1" && -z "$RUN_ID" ]]; then
+  echo "error: --run-id must not be empty" >&2
+  exit 1
+fi
 
 if [[ -z "$ROOT" ]]; then
   if ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
@@ -110,31 +130,261 @@ require_cmd() {
 }
 
 require_cmd jq
-require_cmd python3
+
+hex_bytes() {
+  od -An -t x1 "$@" | tr -d '[:space:]'
+}
+
+validate_image_source() {
+  local path="$1"
+  local extension="$2"
+  local size=""
+  local signature=""
+  local b0="" b1="" b2="" b3=""
+  local declared_size=0
+
+  size="$(wc -c <"$path" | tr -d '[:space:]')"
+  case "$extension" in
+    png)
+      # PNG signature, mandatory first IHDR chunk, and terminal IEND chunk.
+      [[ "$size" -ge 45 ]] || return 1
+      [[ "$(hex_bytes -N 8 "$path")" == "89504e470d0a1a0a" ]] || return 1
+      [[ "$(hex_bytes -j 8 -N 4 "$path")" == "0000000d" ]] || return 1
+      [[ "$(hex_bytes -j 12 -N 4 "$path")" == "49484452" ]] || return 1
+      [[ "$(tail -c 12 "$path" | hex_bytes)" == "0000000049454e44ae426082" ]] || return 1
+      ;;
+    jpg|jpeg)
+      # JPEG codestreams begin with SOI and a marker and terminate with EOI.
+      [[ "$size" -ge 20 ]] || return 1
+      signature="$(hex_bytes -N 3 "$path")"
+      [[ "$signature" == ffd8ff ]] || return 1
+      [[ "$(tail -c 2 "$path" | hex_bytes)" == "ffd9" ]] || return 1
+      ;;
+    gif)
+      # GIF requires a version header, logical screen descriptor, and trailer.
+      [[ "$size" -ge 14 ]] || return 1
+      signature="$(hex_bytes -N 6 "$path")"
+      [[ "$signature" == "474946383761" || "$signature" == "474946383961" ]] || return 1
+      [[ "$(tail -c 1 "$path" | hex_bytes)" == "3b" ]] || return 1
+      ;;
+    webp)
+      # WebP is a RIFF container whose declared size must match the file.
+      [[ "$size" -ge 20 ]] || return 1
+      [[ "$(hex_bytes -N 4 "$path")" == "52494646" ]] || return 1
+      [[ "$(hex_bytes -j 8 -N 4 "$path")" == "57454250" ]] || return 1
+      signature="$(hex_bytes -j 12 -N 4 "$path")"
+      [[ "$signature" == "56503820" || "$signature" == "5650384c" || "$signature" == "56503858" ]] ||
+        return 1
+      read -r b0 b1 b2 b3 < <(od -An -t u1 -j 4 -N 4 "$path")
+      [[ -n "$b0" && -n "$b1" && -n "$b2" && -n "$b3" ]] || return 1
+      declared_size=$((b0 + (b1 << 8) + (b2 << 16) + (b3 << 24)))
+      (( declared_size + 8 == size )) || return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  # Use a real decoder when one is available, while keeping the standalone
+  # helper portable on systems that only provide standard Unix tools.
+  if command -v sips >/dev/null 2>&1; then
+    sips -g pixelWidth -g pixelHeight "$path" >/dev/null 2>&1
+  elif command -v magick >/dev/null 2>&1; then
+    magick identify "$path" >/dev/null 2>&1
+  elif command -v identify >/dev/null 2>&1; then
+    identify "$path" >/dev/null 2>&1
+  fi
+}
+
+if [[ "$FINALIZE" != "1" && -n "$SOURCE" ]]; then
+  if [[ ! -f "$SOURCE" ]]; then
+    echo "error: --source not found: $SOURCE" >&2
+    exit 1
+  fi
+
+  source_name="$(basename "$SOURCE")"
+  if [[ "$source_name" != *.* || "${source_name##*.}" == "" ]]; then
+    echo "error: --source must have a supported extension: png|jpg|jpeg|webp|gif" >&2
+    exit 1
+  fi
+
+  SOURCE_EXT="$(printf '%s' "${source_name##*.}" | tr '[:upper:]' '[:lower:]')"
+  case "$SOURCE_EXT" in
+    png|jpg|jpeg|webp|gif) ;;
+    *)
+      echo "error: unsupported --source extension .$SOURCE_EXT; expected png|jpg|jpeg|webp|gif" >&2
+      exit 1
+      ;;
+  esac
+
+  if ! validate_image_source "$SOURCE" "$SOURCE_EXT"; then
+    echo "error: --source is not a valid .$SOURCE_EXT image: $SOURCE" >&2
+    exit 1
+  fi
+fi
 
 DIR="$ROOT/.astroshot/$FEATURE"
 mkdir -p "$DIR"
 MANIFEST="$DIR/manifest.json"
+LOCK_DIR="$DIR/.capture.lock"
+LOCK_HELD=0
+MANIFEST_TMP=""
+CAPTURE_TMP=""
+CAPTURE_TMP_DIR=""
+CAPTURE_DEST=""
+MANIFEST_CREATED=0
+NEW_RUN=0
 
-humanize() {
-  python3 -c '
-import re, sys
-s = sys.argv[1].replace("-", " ").replace("_", " ")
-print(" ".join(p[:1].upper() + p[1:] if p else p for p in s.split()))
-' "$1"
+cleanup() {
+  local exit_code=$?
+  local lock_owner=""
+  local published_file=""
+  local manifest_has_capture=0
+  trap - EXIT HUP INT TERM
+
+  [[ -z "$MANIFEST_TMP" ]] || rm -f "$MANIFEST_TMP"
+  [[ -z "$CAPTURE_TMP_DIR" ]] || rm -rf "$CAPTURE_TMP_DIR"
+  if [[ -n "$CAPTURE_DEST" ]]; then
+    published_file="$(basename "$CAPTURE_DEST")"
+    if jq -e --arg file "$published_file" \
+      'any(.shots[]?; .file == $file)' "$MANIFEST" >/dev/null 2>&1; then
+      manifest_has_capture=1
+    fi
+  fi
+  # The manifest is the durable commit record. If a signal arrives immediately
+  # after its rename, trust the referenced shot rather than an in-memory flag
+  # that the shell may not have had a chance to update.
+  if [[ "$exit_code" -ne 0 && -n "$CAPTURE_DEST" ]]; then
+    if [[ "$manifest_has_capture" == "0" ]]; then
+      rm -f "$CAPTURE_DEST"
+    fi
+  fi
+  if [[ "$exit_code" -ne 0 && "$MANIFEST_CREATED" == "1" && "$manifest_has_capture" == "0" ]]; then
+    rm -f "$MANIFEST"
+  fi
+  if [[ "$LOCK_HELD" == "1" ]]; then
+    lock_owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ -z "$lock_owner" || "$lock_owner" == "$$" ]]; then
+      rm -rf "$LOCK_DIR"
+    fi
+  fi
+
+  exit "$exit_code"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+acquire_lock() {
+  # The lock covers capture publication as well as manifest mutation so a shot
+  # can never race its sequence reservation. Browser captures may take a while
+  # on cold start, hence the deliberately generous but bounded default.
+  local timeout="${ASTROSHOT_LOCK_TIMEOUT_SECONDS:-120}"
+  local waited_tenths=0
+  local timeout_tenths
+  local owner=""
+
+  if [[ ! "$timeout" =~ ^[0-9]+$ ]] || [[ "$timeout" == "0" ]]; then
+    echo "error: ASTROSHOT_LOCK_TIMEOUT_SECONDS must be a positive integer" >&2
+    exit 1
+  fi
+  timeout_tenths=$((timeout * 10))
+
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    if [[ -f "$LOCK_DIR/pid" ]]; then
+      owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+      if [[ "$owner" =~ ^[0-9]+$ ]] && ! kill -0 "$owner" 2>/dev/null; then
+        echo "error: stale capture lock from dead pid $owner: $LOCK_DIR; remove it and retry" >&2
+        exit 1
+      fi
+    fi
+
+    if (( waited_tenths >= timeout_tenths )); then
+      echo "error: timed out after ${timeout}s waiting for capture lock: $LOCK_DIR" >&2
+      exit 1
+    fi
+    sleep 0.1
+    waited_tenths=$((waited_tenths + 1))
+  done
+
+  LOCK_HELD=1
+  printf '%s\n' "$$" >"$LOCK_DIR/pid"
 }
 
-if [[ -z "$RUN_ID" ]]; then
-  if [[ -f "$MANIFEST" ]]; then
-    RUN_ID="$(jq -r '.run_id // empty' "$MANIFEST" 2>/dev/null || true)"
+replace_manifest() {
+  MANIFEST_TMP="$(mktemp "$DIR/.manifest.tmp.XXXXXX")"
+  "$@" >"$MANIFEST_TMP"
+  mv "$MANIFEST_TMP" "$MANIFEST"
+  MANIFEST_TMP=""
+}
+
+prepare_capture_tmp() {
+  local extension="$1"
+
+  CAPTURE_TMP_DIR="$(mktemp -d "$DIR/.capture.tmp.XXXXXX")"
+  CAPTURE_TMP="$CAPTURE_TMP_DIR/capture.$extension"
+}
+
+humanize() {
+  local input="${1//-/ }"
+  local word=""
+  local result=""
+  local initial=""
+
+  input="${input//_/ }"
+  for word in $input; do
+    initial="$(printf '%s' "${word:0:1}" | tr '[:lower:]' '[:upper:]')"
+    result="${result}${result:+ }${initial}${word:1}"
+  done
+  printf '%s\n' "$result"
+}
+
+if [[ "$FINALIZE" != "1" ]]; then
+  if [[ -z "$SLUG" ]]; then
+    echo "error: --slug is required unless --finalize" >&2
+    exit 1
+  fi
+  if [[ ! "$SLUG" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+    echo "error: --slug must be [a-z0-9_-]+" >&2
+    exit 1
+  fi
+  if [[ -z "$SOURCE" && -z "$AB_SESSION" ]]; then
+    echo "error: provide --source PATH or --from-agent-browser SESSION" >&2
+    exit 1
   fi
 fi
-if [[ -z "$RUN_ID" ]]; then
+
+acquire_lock
+
+EXISTING_RUN_ID=""
+EXISTING_STATUS=""
+if [[ -f "$MANIFEST" ]]; then
+  EXISTING_RUN_ID="$(jq -r '.run_id // empty' "$MANIFEST" 2>/dev/null || true)"
+  EXISTING_STATUS="$(jq -r '.status // empty' "$MANIFEST" 2>/dev/null || true)"
+fi
+
+if [[ "$FINALIZE" == "1" ]]; then
+  if [[ "$RUN_ID_OVERRIDE" == "1" && -n "$EXISTING_RUN_ID" && "$RUN_ID" != "$EXISTING_RUN_ID" ]]; then
+    echo "error: --run-id $RUN_ID does not match active run $EXISTING_RUN_ID" >&2
+    exit 1
+  fi
+  if [[ -z "$RUN_ID" ]]; then
+    RUN_ID="${EXISTING_RUN_ID:-${FEATURE}-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+  fi
+elif [[ "$RUN_ID_OVERRIDE" == "1" ]]; then
+  if [[ -z "$EXISTING_RUN_ID" || "$RUN_ID" != "$EXISTING_RUN_ID" ]]; then
+    NEW_RUN=1
+  fi
+elif [[ -n "$EXISTING_RUN_ID" && "$EXISTING_STATUS" == "running" ]]; then
+  RUN_ID="$EXISTING_RUN_ID"
+else
   RUN_ID="${FEATURE}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  NEW_RUN=1
 fi
 
 if [[ ! -f "$MANIFEST" ]]; then
-  jq -n \
+  replace_manifest jq -n \
     --arg feature "$FEATURE" \
     --arg run_id "$RUN_ID" \
     --arg status "$STATUS" \
@@ -144,24 +394,14 @@ if [[ ! -f "$MANIFEST" ]]; then
       run_id: $run_id,
       status: $status,
       shots: []
-    }' >"$MANIFEST"
+    }'
+  MANIFEST_CREATED=1
 fi
 
 if [[ "$FINALIZE" == "1" ]]; then
-  tmp="$(mktemp)"
-  jq --arg status "$STATUS" '.status = $status' "$MANIFEST" >"$tmp"
-  mv "$tmp" "$MANIFEST"
+  replace_manifest jq --arg status "$STATUS" '.status = $status' "$MANIFEST"
   printf 'finalized %s status=%s\n' "$MANIFEST" "$STATUS"
   exit 0
-fi
-
-if [[ -z "$SLUG" ]]; then
-  echo "error: --slug is required unless --finalize" >&2
-  exit 1
-fi
-if [[ ! "$SLUG" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
-  echo "error: --slug must be [a-z0-9_-]+" >&2
-  exit 1
 fi
 
 if [[ -z "$TITLE" ]]; then
@@ -172,16 +412,21 @@ fi
 next_index() {
   local max=0 n base
   shopt -s nullglob
-  for f in "$DIR"/[0-9][0-9][0-9][0-9]-*.png \
-           "$DIR"/[0-9][0-9][0-9][0-9]-*.jpg \
-           "$DIR"/[0-9][0-9][0-9][0-9]-*.jpeg \
-           "$DIR"/[0-9][0-9][0-9][0-9]-*.webp; do
+  for f in "$DIR"/[0-9]*-*.png \
+           "$DIR"/[0-9]*-*.jpg \
+           "$DIR"/[0-9]*-*.jpeg \
+           "$DIR"/[0-9]*-*.webp \
+           "$DIR"/[0-9]*-*.gif; do
     base="$(basename "$f")"
     n="${base%%-*}"
     if [[ "$n" =~ ^[0-9]+$ ]] && (( 10#$n > max )); then
       max=$((10#$n))
     fi
   done
+  if (( max >= 9999 )); then
+    echo "error: capture sequence limit 9999 reached for feature $FEATURE; start a new feature" >&2
+    return 1
+  fi
   printf '%04d' $((max + 1))
 }
 
@@ -191,44 +436,41 @@ DEST="$DIR/$FILE"
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 if [[ -n "$SOURCE" ]]; then
-  [[ -f "$SOURCE" ]] || {
-    echo "error: --source not found: $SOURCE" >&2
-    exit 1
-  }
-  # Preserve extension if not png
-  ext="${SOURCE##*.}"
-  ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
-  case "$ext" in
-    png|jpg|jpeg|webp|gif)
-      FILE="${SEQ}-${SLUG}.${ext}"
-      DEST="$DIR/$FILE"
-      ;;
-  esac
-  cp "$SOURCE" "$DEST"
+  FILE="${SEQ}-${SLUG}.${SOURCE_EXT}"
+  DEST="$DIR/$FILE"
+  prepare_capture_tmp "$SOURCE_EXT"
+  cp "$SOURCE" "$CAPTURE_TMP"
 elif [[ -n "$AB_SESSION" ]]; then
   require_cmd agent-browser
+  prepare_capture_tmp "png"
   args=(--session "$AB_SESSION" screenshot)
   if [[ -n "$SELECTOR" ]]; then
     args+=("$SELECTOR")
   elif [[ "$FULL" == "1" ]]; then
     args+=(--full)
   fi
-  args+=("$DEST")
+  args+=("$CAPTURE_TMP")
   agent-browser "${args[@]}" >/dev/null
-else
-  echo "error: provide --source PATH or --from-agent-browser SESSION" >&2
-  exit 1
 fi
 
-[[ -f "$DEST" ]] || {
-  echo "error: capture failed; missing $DEST" >&2
+[[ -f "$CAPTURE_TMP" ]] || {
+  echo "error: capture failed; missing temporary image $CAPTURE_TMP" >&2
   exit 1
 }
+if ! validate_image_source "$CAPTURE_TMP" "${FILE##*.}"; then
+  echo "error: capture produced an invalid .${FILE##*.} image" >&2
+  exit 1
+fi
+CAPTURE_DEST="$DEST"
+mv "$CAPTURE_TMP" "$DEST"
+CAPTURE_TMP=""
+rmdir "$CAPTURE_TMP_DIR"
+CAPTURE_TMP_DIR=""
 
-tmp="$(mktemp)"
-jq \
+replace_manifest jq \
   --arg status "$STATUS" \
   --arg run_id "$RUN_ID" \
+  --arg new_run "$NEW_RUN" \
   --arg id "$SEQ" \
   --arg file "$FILE" \
   --arg slug "$SLUG" \
@@ -239,8 +481,8 @@ jq \
   --arg captured_at "$CAPTURED_AT" \
   '
     .status = $status
-    | .run_id = (if (.run_id // "") == "" then $run_id else .run_id end)
-    | .shots = (.shots // [])
+    | .run_id = $run_id
+    | .shots = (if $new_run == "1" then [] else (.shots // []) end)
     | .shots += [{
         id: $id,
         file: $file,
@@ -251,7 +493,6 @@ jq \
       }
       + (if $url == "" then {} else {url: $url} end)
       + (if $viewport == "" then {} else {viewport: $viewport} end)]
-  ' "$MANIFEST" >"$tmp"
-mv "$tmp" "$MANIFEST"
+  ' "$MANIFEST"
 
 printf '%s\n' "$DEST"
