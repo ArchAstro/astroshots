@@ -1,0 +1,77 @@
+{
+  "name": "@archastro/tui-shot",
+  "version": "0.1.0",
+  "description": "Fixture-driven PNG screenshots of real Ink terminal UI states",
+  "keywords": [
+    "ink",
+    "terminal",
+    "screenshot",
+    "testing",
+    "tui"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchAstro/astroshots.git",
+    "directory": "packages/tui-shot"
+  },
+  "homepage": "https://github.com/ArchAstro/astroshots#readme",
+  "bugs": "https://github.com/ArchAstro/astroshots/issues",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "tui-shot": "bin/tui-shot.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node scripts/clean.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run clean && npm run build"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@xterm/headless": "^5.5.0",
+    "playwright": "1.61.1",
+    "tsx": "^4.20.0",
+    "yaml": "^2.8.0"
+  },
+  "peerDependencies": {
+    "ink": "^7.1.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "ink": "^7.1.0",
+    "react": "^19.2.0",
+    "sharp": "^0.35.3",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.0"
+  }
+}

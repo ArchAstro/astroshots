@@ -1,0 +1,28 @@
+{
+  "name": "astroshots",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Astroshots macOS app and deterministic screenshot tooling",
+  "license": "MIT",
+  "packageManager": "npm@11.17.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "fsevents": false
+  },
+  "scripts": {
+    "test": "npm run test --workspaces --if-present && npm run test:capture-helper && npm run test:review-contract",
+    "test:capture-helper": "bash skills/astroshots/scripts/test-astroshot-capture",
+    "test:review-contract": "bash scripts/test-review-contract.sh",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run typecheck && npm test && npm run verify:skills && npm run pack:check",
+    "verify:skills": "bash scripts/verify-skills.sh",
+    "pack:check": "node scripts/verify-packages.mjs"
+  }
+}
