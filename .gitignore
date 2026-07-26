@@ -19,6 +19,15 @@ dist/
 .swiftpm/
 Package.resolved
 
+# Node.js workspaces
+node_modules/
+coverage/
+test-results/
+playwright-report/
+*.tgz
+npm-debug.log*
+.verify-skills.*/
+
 # Editors
 .idea/
 .vscode/

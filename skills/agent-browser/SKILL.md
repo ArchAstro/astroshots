@@ -110,6 +110,12 @@ agent-browser --session "$SESSION" screenshot /tmp/annotated.png --annotate
 Always `networkidle` (or an explicit ready condition) before capture so you do
 not freeze loading skeletons.
 
+For an isolated React component or Ink terminal state, do not start a full
+application journey: use the npmjs-pinned `@archastro/react-shot` or
+`@archastro/tui-shot` commands from their sibling skills. Use agent-browser
+when the frame must prove the running application's routing, auth, data, or
+shell.
+
 ### Live review with Astroshots
 
 When a human is watching (or you want a durable project stream), prefer the
@@ -209,5 +215,8 @@ After a journey:
 ## Related
 
 - CLI self-docs: `agent-browser skills get core --full`
+- Documentation image workflow: **screenshot** skill (`npx skills add ArchAstro/astroshots --skill screenshot -g -y`)
 - Live streams: **astroshots** skill (`npx skills add ArchAstro/astroshots --skill astroshots -g -y`)
+- React fixtures: **react-shot** skill (`npx skills add ArchAstro/astroshots --skill react-shot -g -y`)
+- Ink fixtures: **tui-shot** skill (`npx skills add ArchAstro/astroshots --skill tui-shot -g -y`)
 - Bash harness design: **browser-ui-harness** skill

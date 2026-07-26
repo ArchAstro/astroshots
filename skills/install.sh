@@ -1,39 +1,42 @@
 #!/usr/bin/env bash
-# Optional local installer. Preferred:
-#   npx skills add ArchAstro/astroshots --skill astroshots -g -y
-#
-# This script only re-links from a local clone of this repository.
+# Optional installer from a local clone. Preferred:
+#   npx skills add ArchAstro/astroshots --skill <skill-name> -g -y
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/skills/astroshots"
-echo "Note: preferred install is: npx skills add ArchAstro/astroshots --skill astroshots -g -y"
-echo ""
 
-install_link() {
-  local dest="$1"
-  mkdir -p "$(dirname "$dest")"
-  ln -sfn "$SRC" "$dest"
-  echo "linked $dest -> $SRC"
+usage() {
+  cat <<'EOF'
+Usage:
+  bash ./skills/install.sh <skill-name> <destination>
+
+Example:
+  bash ./skills/install.sh astroshots "$HOME/.agents/skills/astroshots"
+
+The destination must not already exist. This script creates one symlink from
+the explicit destination to this clone; it never scans or rewrites worktrees.
+EOF
 }
 
-install_link "$HOME/.claude/skills/astroshots"
-install_link "$HOME/.grok/skills/astroshots"
+if [[ $# -ne 2 || "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+  [[ $# -eq 1 ]] && exit 0
+  exit 2
+fi
 
-# Monorepo worktree (if present)
-for wt in "$HOME/archastro"/firstlanding-wt*; do
-  [[ -d "$wt/.claude/skills" ]] || continue
-  dest="$wt/.claude/skills/astroshots"
-  # Prefer a real copy so worktrees are self-contained when offline
-  rm -rf "$dest"
-  mkdir -p "$dest"
-  cp -R "$SRC/SKILL.md" "$SRC/scripts" "$SRC/references" "$dest/"
-  chmod +x "$dest/scripts/astroshot-capture"
-  echo "copied $dest"
-done
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SKILL_NAME="$1"
+DESTINATION="$2"
+SOURCE="$ROOT/skills/$SKILL_NAME"
 
-# Relative link so the repo works on every machine (not /Users/you/...).
-mkdir -p "$ROOT/bin"
-ln -sfn ../skills/astroshots/scripts/astroshot-capture "$ROOT/bin/astroshot-capture"
-echo "bin: $ROOT/bin/astroshot-capture -> $(readlink "$ROOT/bin/astroshot-capture")"
-echo "Done. Add to PATH if useful: export PATH=\"$ROOT/bin:\$PATH\""
+if [[ ! "$SKILL_NAME" =~ ^[a-z0-9][a-z0-9-]*$ || ! -f "$SOURCE/SKILL.md" ]]; then
+  echo "error: unknown skill: $SKILL_NAME" >&2
+  exit 1
+fi
 
+if [[ -e "$DESTINATION" || -L "$DESTINATION" ]]; then
+  echo "error: destination already exists; refusing to replace it: $DESTINATION" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$DESTINATION")"
+ln -s "$SOURCE" "$DESTINATION"
+printf 'linked %s -> %s\n' "$DESTINATION" "$SOURCE"
