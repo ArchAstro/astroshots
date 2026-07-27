@@ -111,8 +111,8 @@ Always `networkidle` (or an explicit ready condition) before capture so you do
 not freeze loading skeletons.
 
 For an isolated React component or Ink terminal state, do not start a full
-application journey: use the npmjs-pinned `@archastro/react-shot` or
-`@archastro/tui-shot` commands from their sibling skills. Use agent-browser
+application journey: use the npmjs-pinned `@archastro/astroshot react` or
+`@archastro/astroshot tui` modes from their sibling skills. Use agent-browser
 when the frame must prove the running application's routing, auth, data, or
 shell.
 

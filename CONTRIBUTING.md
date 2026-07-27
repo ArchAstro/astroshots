@@ -17,8 +17,7 @@ The npm workspace requires Node.js 22.14 or later:
 ```bash
 npm ci
 npm run build --workspaces --if-present
-node packages/react-shot/bin/react-shot.mjs install-browser
-node packages/tui-shot/bin/tui-shot.mjs install-browser
+node packages/astroshot/bin/astroshot.mjs install-browser
 npm run check
 ```
 

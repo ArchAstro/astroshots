@@ -152,30 +152,30 @@ decision and comments do not carry forward, even when the image bytes match.
 
 ## Screenshot tools
 
-Astroshots also publishes two fixture-driven CLI tools. They create
-deterministic documentation and review images without requiring a running
-application:
+Astroshots publishes one fixture-driven CLI,
+[`@archastro/astroshot`](packages/astroshot), with React and terminal modes.
+It creates deterministic documentation and review images without requiring a
+running application:
 
-| Tool | Use it for | One-off command |
-|------|------------|-----------------|
-| [`@archastro/react-shot`](packages/react-shot) | React components, dialogs, forms, and other isolated UI states | `npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot --help` |
-| [`@archastro/tui-shot`](packages/tui-shot) | Ink terminal components rendered through a real terminal model | `npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot --help` |
+| Mode | Use it for | Command |
+|------|------------|---------|
+| `react` | React components, dialogs, forms, and other isolated UI states | `astroshot react <fixture> -o <image>` |
+| `tui` | Ink terminal components rendered through a real terminal model | `astroshot tui <fixture> -o <image>` |
 
-Install Chromium once for either tool:
+Install Chromium once for both modes:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser
-npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot install-browser
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 ```
 
 On Linux CI images that also need Chromium's system libraries, add
-`--with-deps` to the matching install command.
+`--with-deps`.
 
 Capture a React fixture:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot shot ./fixtures/account-dialog.tsx \
+  @archastro/astroshot react ./fixtures/account-dialog.tsx \
   -o ./screenshots/account-dialog.png
 ```
 
@@ -183,12 +183,12 @@ Capture an Ink fixture:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot shot ./fixtures/install-wizard.tsx \
+  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
   -o ./screenshots/install-wizard.png
 ```
 
-Both tools also accept `batch <manifest.yaml|json>`. Their fixture APIs,
-configuration, and manifest formats are documented in their package READMEs.
+Both modes also accept `batch <manifest.yaml|json>`. Their fixture APIs,
+configuration, and manifest formats are documented in the package READMEs.
 Use a component tool when fixed props can express the state. Use a browser
 journey when the screenshot must prove routing, authentication, live data, or
 the complete application shell.
@@ -202,7 +202,7 @@ helper:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot shot ./fixtures/account-dialog.tsx \
+  @archastro/astroshot react ./fixtures/account-dialog.tsx \
   -o /tmp/account-dialog.png
 
 ./bin/astroshot-capture \
@@ -213,7 +213,7 @@ npx --@archastro:registry=https://registry.npmjs.org \
   --source /tmp/account-dialog.png
 ```
 
-The npm tools run independently of the macOS viewer; CI verifies them on
+The npm CLI runs independently of the macOS viewer; CI verifies both modes on
 Linux with the minimum supported Node.js release and Node.js 24 LTS. The live
 viewer remains a macOS application.
 
@@ -256,8 +256,8 @@ This repo ships **six** skills. Install them with the [skills](https://github.co
 |-------|-----------------|
 | **astroshots** | Write live screenshot streams under `.astroshot/` |
 | **screenshot** | Plan, generate, review, and maintain documentation image sets |
-| **react-shot** | Capture deterministic React component fixtures with `@archastro/react-shot` from npmjs |
-| **tui-shot** | Capture deterministic Ink fixtures with `@archastro/tui-shot` from npmjs |
+| **react-shot** | Capture deterministic React fixtures with `@archastro/astroshot react` |
+| **tui-shot** | Capture deterministic Ink fixtures with `@archastro/astroshot tui` |
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
 
@@ -336,22 +336,21 @@ Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](doc
 |-----|----------------|
 | [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed, notarized **DMG** |
 | Tag `v*` | CI builds that DMG automatically |
-| Tag `react-shot-vX.Y.Z` | Publishes `@archastro/react-shot` with npm trusted publishing |
-| Tag `tui-shot-vX.Y.Z` | Publishes `@archastro/tui-shot` with npm trusted publishing |
+| Tag `astroshot-vX.Y.Z` | Publishes the unified `@archastro/astroshot` CLI and its rendering engines |
 
 Maintainers: **Actions → Cut release** only prepares the macOS app release and
-DMG. It does not bump or publish either npm package. macOS signing secrets are
+DMG. It does not bump or publish the npm CLI. macOS signing secrets are
 documented in [`docs/SIGNING.md`](docs/SIGNING.md).
 
 The npm packages use GitHub Actions OIDC trusted publishing, so normal releases
 need no long-lived npm token. npm requires a package to exist before a trusted
-publisher can be configured, so a maintainer must bootstrap each package's
-first public version from an authenticated, 2FA-protected npm account. From
-the repository root, explicitly disable provenance for only these bootstrap
-publishes because local publishes cannot create a supported provenance
-attestation. The scoped registry flag is intentional: ArchAstro development
-machines may map `@archastro` to GitHub Packages, while these packages publish
-to npmjs.
+publisher can be configured, so a maintainer must bootstrap the two rendering
+engines and then the unified CLI from an authenticated, 2FA-protected npm
+account. From the repository root, explicitly disable provenance for only
+these bootstrap publishes because local publishes cannot create a supported
+provenance attestation. The scoped registry flag is intentional: ArchAstro
+development machines may map `@archastro` to GitHub Packages, while these
+packages publish to npmjs.
 
 ```bash
 npm login --registry=https://registry.npmjs.org
@@ -363,10 +362,13 @@ npm --@archastro:registry=https://registry.npmjs.org \
 npm --@archastro:registry=https://registry.npmjs.org \
   publish --workspace @archastro/tui-shot \
   --access public --provenance=false
+npm --@archastro:registry=https://registry.npmjs.org \
+  publish --workspace @archastro/astroshot \
+  --access public --provenance=false
 ```
 
-Confirm both public package pages and tarballs, then use the repository-pinned
-npm 11.17 release to run `npm trust github` for each package:
+Confirm all three public package pages and tarballs, then use the
+repository-pinned npm 11.17 release to run `npm trust github` for each package:
 
 ```bash
 env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
@@ -377,50 +379,54 @@ env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
   npm trust github @archastro/tui-shot \
   --repo ArchAstro/astroshots --file publish-npm.yml --allow-publish \
   --yes
+env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
+  npm trust github @archastro/astroshot \
+  --repo ArchAstro/astroshots --file publish-npm.yml --allow-publish \
+  --yes
 ```
 
 These commands authorize `.github/workflows/publish-npm.yml` for
 `npm publish`. Do not use `--provenance=false` after the bootstrap; the tag
 workflow handles later releases with provenance enabled.
 
-For every later npm release, bump exactly one workspace in a pull request:
+For every later npm release, set all three workspaces and the unified CLI's
+renderer dependencies to the same version in a pull request:
 
 ```bash
-# Choose exactly one package.
-npm version patch --workspace @archastro/react-shot --no-git-tag-version
-# or:
-# npm version patch --workspace @archastro/tui-shot --no-git-tag-version
+npm run version:packages -- 0.1.1
 
 npm ci
 npm run build --workspaces --if-present
-node packages/react-shot/bin/react-shot.mjs install-browser
-node packages/tui-shot/bin/tui-shot.mjs install-browser
+node packages/astroshot/bin/astroshot.mjs install-browser
 npm run check
 ASTROSHOTS_VERIFY_PACKAGES_CAPTURE=1 npm run pack:check
 git diff --check
 ```
 
-The version command updates the selected `package.json` and the root
-`package-lock.json`; include both in the pull request. After that pull request
-is merged, tag the exact clean `origin/main` commit:
+The version command updates all three `package.json` files, pins the unified
+CLI to the matching renderer versions, and updates the root `package-lock.json`;
+include them in the pull request. After that pull request is merged, tag the
+exact clean `origin/main` commit:
 
 ```bash
 git fetch origin main
 test -z "$(git status --porcelain)"
 test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
-PACKAGE=react-shot # or tui-shot
-VERSION="$(node -p "require('./packages/$PACKAGE/package.json').version")"
-TAG="$PACKAGE-v$VERSION"
-git tag -a "$TAG" -m "Release @archastro/$PACKAGE $VERSION"
+VERSION="$(node -p "require('./packages/astroshot/package.json').version")"
+TAG="astroshot-v$VERSION"
+git tag -a "$TAG" -m "Release @archastro/astroshot $VERSION"
 git push origin "$TAG"
 ```
 
-Pushing `react-shot-vX.Y.Z` or `tui-shot-vX.Y.Z` starts
-`.github/workflows/publish-npm.yml`. The workflow rejects a tag whose version
-does not exactly match that package's `package.json`, reruns focused
-verification, and then publishes that one workspace through npm trusted
-publishing.
+The publish workflow is safe to retry after a partial npm release. It skips an
+existing package version only when the registry tarball has the same integrity
+as the package built from the tagged commit.
+
+Pushing `astroshot-vX.Y.Z` starts `.github/workflows/publish-npm.yml`. The
+workflow rejects a tag unless every package has the same version, reruns
+verification, publishes both rendering engines, and publishes the unified CLI
+last through npm trusted publishing.
 
 The workflow explicitly targets `https://registry.npmjs.org`. Trusted
 publishing automatically attaches provenance after this repository and the

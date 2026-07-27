@@ -5,14 +5,17 @@ Create deterministic PNG screenshots of real
 `tui-shot` renders the actual Ink tree, interprets its ANSI output with xterm,
 and captures the styled terminal grid in Chromium.
 
+This package is the terminal rendering engine. Use the unified
+`@archastro/astroshot` package for command-line capture.
+
 ## Quick start
 
 Run these commands from an Ink project using Node.js 22.14 or newer:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot install-browser
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot shot ./screenshots/welcome.tsx \
+  @archastro/astroshot tui ./screenshots/welcome.tsx \
   -o ./screenshots/welcome.png
 ```
 
@@ -25,7 +28,7 @@ both the browser and OS dependencies:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot install-browser --with-deps
+  @archastro/astroshot install-browser --with-deps
 ```
 
 ## Fixture contract
@@ -33,7 +36,7 @@ npx --@archastro:registry=https://registry.npmjs.org \
 ```tsx
 import { Box, Text } from "ink";
 import React from "react";
-import type { TuiShotFixture } from "@archastro/tui-shot";
+import type { TuiShotFixture } from "@archastro/astroshot/tui";
 
 export default {
   cols: 80,
@@ -72,9 +75,9 @@ shots:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot batch ./screenshots/journey.yaml
+  @archastro/astroshot tui batch ./screenshots/journey.yaml
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot batch ./screenshots/journey.yaml \
+  @archastro/astroshot tui batch ./screenshots/journey.yaml \
   --out-dir ./artifacts
 ```
 
@@ -84,7 +87,7 @@ destinations are rejected before capture begins.
 
 Use `--headed` with either capture command to show Chromium while debugging.
 Run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot --help`
+`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot tui --help`
 for all options.
 
 ## Reproducibility

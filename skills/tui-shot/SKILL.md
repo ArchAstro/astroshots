@@ -2,16 +2,17 @@
 name: tui-shot
 description: >
   Capture deterministic PNG screenshots of Ink terminal components with the
-  @archastro/tui-shot CLI. Use for terminal UI documentation, wizard states,
-  command-center views, and repeatable fixture-driven TUI images.
+  tui mode of the unified @archastro/astroshot CLI. Use for terminal UI
+  documentation, wizard states, command-center views, and repeatable
+  fixture-driven TUI images.
 ---
 
-# tui-shot
+# astroshot tui
 
-`@archastro/tui-shot` renders a real Ink tree, interprets its ANSI output with
-a terminal model, and screenshots the styled terminal grid in Chromium. Prefer
-it for fixed terminal states that should not depend on a PTY, timing, or a
-running service.
+`@archastro/astroshot tui` renders a real Ink tree, interprets its ANSI output
+with a terminal model, and screenshots the styled terminal grid in Chromium.
+Prefer it for fixed terminal states that should not depend on a PTY, timing,
+or a running service.
 
 Use **react-shot** for browser React components. Use a real PTY or end-to-end
 harness when the image must prove keyboard interaction, process lifecycle, or
@@ -22,19 +23,19 @@ live network behavior.
 No global install is required:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot --help
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot tui --help
 ```
 
 Install the Playwright browser once on a new machine:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot install-browser
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 ```
 
 `npx` downloads and executes the package. Pin an exact package version in CI
 or other security-sensitive automation, and review its npm provenance before
 first use. Browser installation downloads a Chromium build; on Linux CI,
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot install-browser --with-deps`
+`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser --with-deps`
 may also install
 operating-system packages and should run only in an expected build environment.
 
@@ -42,7 +43,7 @@ Capture one fixture:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot shot ./fixtures/install-wizard.tsx \
+  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
   -o ./screenshots/install-wizard.png
 ```
 
@@ -50,7 +51,7 @@ Capture a manifest:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot batch ./shots.yaml
+  @archastro/astroshot tui batch ./shots.yaml
 ```
 
 ## Fixture design
@@ -61,7 +62,7 @@ public type from the package:
 ```tsx
 import React from "react";
 import { Box, Text } from "ink";
-import type { TuiShotFixture } from "@archastro/tui-shot";
+import type { TuiShotFixture } from "@archastro/astroshot/tui";
 
 export default {
   cols: 72,
@@ -110,7 +111,7 @@ test -x "$CAPTURE" || {
 }
 
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot shot ./fixtures/install-wizard.tsx \
+  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
   -o /tmp/install-wizard.png
 
 "$CAPTURE" \

@@ -26,7 +26,7 @@ async function browserFor(headed: boolean): Promise<Browser> {
     const detail = error instanceof Error ? error.message : String(error);
     if (detail.includes("Executable doesn't exist")) {
       throw new Error(
-        "Chromium is not installed. Run `npx --@archastro:registry=https://registry.npmjs.org @archastro/tui-shot install-browser` and retry.",
+        "Chromium is not installed. Run `npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser` and retry.",
         { cause: error },
       );
     }
