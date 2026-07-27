@@ -68,14 +68,14 @@ Install Chromium once:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot install-browser
+  @archastro/astroshot install-browser
 ```
 
 Capture a fixture directly into the documentation asset directory:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot shot ./fixtures/account-dialog.tsx \
+  @archastro/astroshot react ./fixtures/account-dialog.tsx \
   -o ./docs/public/screenshots/account-dialog.png
 ```
 
@@ -91,14 +91,14 @@ Install Chromium once:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot install-browser
+  @archastro/astroshot install-browser
 ```
 
 Capture a fixed terminal state:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/tui-shot shot ./fixtures/install-confirmation.tsx \
+  @archastro/astroshot tui ./fixtures/install-confirmation.tsx \
   -o ./docs/public/screenshots/install-confirmation.png
 ```
 

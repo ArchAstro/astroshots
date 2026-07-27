@@ -3,8 +3,7 @@ name: Publish npm package
 on:
   push:
     tags:
-      - "react-shot-v*"
-      - "tui-shot-v*"
+      - "astroshot-v*"
 
 concurrency:
   group: publish-npm-${{ github.ref }}
@@ -33,22 +32,15 @@ jobs:
             exit 1
           fi
 
-      - name: Select package from tag
-        id: package
+      - name: Read release version from tag
+        id: release
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           case "$TAG" in
-            react-shot-v*)
-              echo "workspace=@archastro/react-shot" >>"$GITHUB_OUTPUT"
-              echo "directory=packages/react-shot" >>"$GITHUB_OUTPUT"
-              echo "version=${TAG#react-shot-v}" >>"$GITHUB_OUTPUT"
-              ;;
-            tui-shot-v*)
-              echo "workspace=@archastro/tui-shot" >>"$GITHUB_OUTPUT"
-              echo "directory=packages/tui-shot" >>"$GITHUB_OUTPUT"
-              echo "version=${TAG#tui-shot-v}" >>"$GITHUB_OUTPUT"
+            astroshot-v*)
+              echo "version=${TAG#astroshot-v}" >>"$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unsupported npm release tag: $TAG" >&2
@@ -72,35 +64,48 @@ jobs:
       - name: Build screenshot CLIs
         run: npm run build --workspaces --if-present
 
-      - name: Verify tag matches package version
+      - name: Verify tag matches every package version
         env:
-          DIRECTORY: ${{ steps.package.outputs.directory }}
-          TAG_VERSION: ${{ steps.package.outputs.version }}
+          TAG_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          PACKAGE_VERSION="$(node -p "require('./${DIRECTORY}/package.json').version")"
-          if [[ "$PACKAGE_VERSION" != "$TAG_VERSION" ]]; then
-            echo "Tag version $TAG_VERSION does not match package version $PACKAGE_VERSION" >&2
-            exit 1
-          fi
+          for directory in packages/react-shot packages/tui-shot packages/astroshot; do
+            package_version="$(node -p "require('./${directory}/package.json').version")"
+            if [[ "$package_version" != "$TAG_VERSION" ]]; then
+              echo "Tag version $TAG_VERSION does not match $directory version $package_version" >&2
+              exit 1
+            fi
+          done
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import astroshot from "./packages/astroshot/package.json" with { type: "json" };
+
+          const version = process.env.TAG_VERSION;
+          assert.equal(
+            astroshot.dependencies["@archastro/react-shot"],
+            version,
+            "@archastro/astroshot must depend on the release version of @archastro/react-shot",
+          );
+          assert.equal(
+            astroshot.dependencies["@archastro/tui-shot"],
+            version,
+            "@archastro/astroshot must depend on the release version of @archastro/tui-shot",
+          );
+          NODE
 
       - name: Install Chromium
-        env:
-          DIRECTORY: ${{ steps.package.outputs.directory }}
-          WORKSPACE: ${{ steps.package.outputs.workspace }}
-        run: |
-          TOOL="${WORKSPACE##*/}"
-          node "$DIRECTORY/bin/$TOOL.mjs" install-browser --with-deps
+        run: node packages/astroshot/bin/astroshot.mjs install-browser --with-deps
 
-      - name: Verify package
-        env:
-          WORKSPACE: ${{ steps.package.outputs.workspace }}
+      - name: Verify packages
         run: |
-          npm run typecheck --workspace "$WORKSPACE" --if-present
-          npm test --workspace "$WORKSPACE" --if-present
+          npm run typecheck --workspaces --if-present
+          npm test --workspaces --if-present
           npm run pack:check
 
-      - name: Publish
-        env:
-          WORKSPACE: ${{ steps.package.outputs.workspace }}
-        run: npm publish --workspace "$WORKSPACE" --access public --registry https://registry.npmjs.org
+      - name: Publish rendering engines
+        run: |
+          node scripts/publish-package.mjs @archastro/react-shot
+          node scripts/publish-package.mjs @archastro/tui-shot
+
+      - name: Publish unified CLI
+        run: node scripts/publish-package.mjs @archastro/astroshot

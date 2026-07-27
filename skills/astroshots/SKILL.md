@@ -50,12 +50,12 @@ No project picker — project is a badge on each row. Configure the watch root i
 
 | What the frame must prove | Tool |
 |---------------------------|------|
-| Fixed React component state | `@archastro/react-shot` from npmjs and the **react-shot** skill |
-| Fixed Ink terminal state | `@archastro/tui-shot` from npmjs and the **tui-shot** skill |
+| Fixed React component state | `@archastro/astroshot react` from npmjs and the **react-shot** skill |
+| Fixed Ink terminal state | `@archastro/astroshot tui` from npmjs and the **tui-shot** skill |
 | Routing, auth, live data, or full browser shell | `agent-browser` and the **agent-browser** skill |
 | Live human review of any resulting PNG | `astroshot-capture` from this skill |
 
-The two npm tools generate deterministic images. This skill describes how to
+The two npm modes generate deterministic images. This skill describes how to
 stream any generated image into the macOS app.
 
 ---
