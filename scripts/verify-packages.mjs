@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Pack both public workspaces, install their tarballs into a clean consumer,
- * and exercise the exact executable names that npx exposes.
+ * Pack the unified public CLI and its two rendering engines, install their
+ * tarballs into a clean consumer, and exercise the one executable users run.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -14,6 +14,24 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "astroshots-pack-"));
 const archiveDir = path.join(tempRoot, "archives");
 const consumerDir = path.join(tempRoot, "consumer");
+const astroshotManifest = JSON.parse(
+  fs.readFileSync(
+    path.join(repoRoot, "packages", "astroshot", "package.json"),
+    "utf8",
+  ),
+);
+const packageVersion = astroshotManifest.version;
+
+for (const engineName of [
+  "@archastro/react-shot",
+  "@archastro/tui-shot",
+]) {
+  if (astroshotManifest.dependencies[engineName] !== packageVersion) {
+    throw new Error(
+      `@archastro/astroshot ${packageVersion} must depend on ${engineName} ${packageVersion}`,
+    );
+  }
+}
 
 fs.mkdirSync(archiveDir, { recursive: true });
 fs.mkdirSync(consumerDir, { recursive: true });
@@ -49,6 +67,7 @@ function pack(packageDirectory) {
 try {
   const reactTarball = pack("packages/react-shot");
   const tuiTarball = pack("packages/tui-shot");
+  const astroshotTarball = pack("packages/astroshot");
 
   fs.writeFileSync(
     path.join(consumerDir, "package.json"),
@@ -73,6 +92,7 @@ try {
       "--no-fund",
       reactTarball,
       tuiTarball,
+      astroshotTarball,
       "react@19",
       "react-dom@19",
       "ink@7",
@@ -80,12 +100,48 @@ try {
     { cwd: consumerDir },
   );
 
-  run("npx", ["--no-install", "react-shot", "--help"], {
+  run("npx", ["--no-install", "astroshot", "--help"], {
     cwd: consumerDir,
   });
-  run("npx", ["--no-install", "tui-shot", "--help"], {
+  run("npx", ["--no-install", "astroshot", "react", "--help"], {
     cwd: consumerDir,
   });
+  run("npx", ["--no-install", "astroshot", "tui", "--help"], {
+    cwd: consumerDir,
+  });
+  run(
+    "node",
+    [
+      "--input-type=module",
+      "-e",
+      `
+        const react = await import("@archastro/astroshot/react");
+        const tui = await import("@archastro/astroshot/tui");
+        if (typeof react.takeShot !== "function") throw new Error("missing React API");
+        if (typeof tui.takeTuiShot !== "function") throw new Error("missing TUI API");
+      `,
+    ],
+    { cwd: consumerDir },
+  );
+
+  const unifiedRoot = path.join(
+    consumerDir,
+    "node_modules",
+    "@archastro",
+    "astroshot",
+  );
+  for (const requiredPath of [
+    "package.json",
+    "bin/astroshot.mjs",
+    "react.d.ts",
+    "react.js",
+    "tui.d.ts",
+    "tui.js",
+  ]) {
+    if (!fs.existsSync(path.join(unifiedRoot, requiredPath))) {
+      throw new Error(`@archastro/astroshot tarball is missing ${requiredPath}`);
+    }
+  }
 
   for (const packageName of ["react-shot", "tui-shot"]) {
     const packageRoot = path.join(
@@ -105,6 +161,15 @@ try {
           `@archastro/${packageName} tarball is missing ${requiredPath}`,
         );
       }
+    }
+
+    const installedPackage = JSON.parse(
+      fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"),
+    );
+    if (installedPackage.version !== packageVersion) {
+      throw new Error(
+        `@archastro/${packageName} ${installedPackage.version} does not match unified CLI ${packageVersion}`,
+      );
     }
   }
 
@@ -152,8 +217,8 @@ export default {
       "npx",
       [
         "--no-install",
-        "react-shot",
-        "shot",
+        "astroshot",
+        "react",
         "./react-fixture.tsx",
         "-o",
         "./react-proof.png",
@@ -164,8 +229,8 @@ export default {
       "npx",
       [
         "--no-install",
-        "tui-shot",
-        "shot",
+        "astroshot",
+        "tui",
         "./tui-fixture.tsx",
         "-o",
         "./tui-proof.png",
@@ -182,7 +247,7 @@ export default {
   }
 
   console.log(
-    "verify-packages: tarballs install cleanly and expose both npx commands",
+    "verify-packages: tarballs install cleanly and expose one astroshot command",
   );
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });

@@ -23,6 +23,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run typecheck && npm test && npm run verify:skills && npm run pack:check",
     "verify:skills": "bash scripts/verify-skills.sh",
-    "pack:check": "node scripts/verify-packages.mjs"
+    "pack:check": "node scripts/verify-packages.mjs",
+    "version:packages": "node scripts/set-package-version.mjs"
   }
 }

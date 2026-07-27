@@ -4,6 +4,9 @@ Capture deterministic PNG screenshots from small React or TSX fixtures. The
 CLI starts an isolated Vite page, renders the fixture in Chromium with
 Playwright, and captures either a CSS selector or the full page.
 
+This package is the React rendering engine. Use the unified
+`@archastro/astroshot` package for command-line capture.
+
 Use this for component documentation, release assets, and repeatable visual
 fixtures. Use browser automation against your application when the screenshot
 needs real authentication, routing, server data, or a complete product flow.
@@ -14,16 +17,16 @@ Node.js 22.14 or newer is required. Install the package's compatible Chromium
 build once:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 ```
 
 On a Linux machine that also needs Chromium's operating-system libraries, run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser --with-deps`.
+`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser --with-deps`.
 
 Then create `example.shot.tsx`:
 
 ```tsx
-import type { ReactShotFixture } from "@archastro/react-shot";
+import type { ReactShotFixture } from "@archastro/astroshot/react";
 
 function WelcomeCard() {
   return (
@@ -48,14 +51,14 @@ Capture it without a permanent install:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot example.shot.tsx --out welcome.png
+  @archastro/astroshot react example.shot.tsx --out welcome.png
 ```
 
-Or install the package and use `react-shot` in project scripts:
+Or install the unified package and use `astroshot` in project scripts:
 
 ```bash
-npm install --save-dev @archastro/react-shot
-npx react-shot shot example.shot.tsx -o welcome.png
+npm install --save-dev @archastro/astroshot
+npx astroshot react example.shot.tsx -o welcome.png
 ```
 
 ## Fixture API
@@ -132,7 +135,7 @@ before capture; duplicate and case-only colliding output paths are rejected:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot batch shots.yaml
+  @archastro/astroshot react batch shots.yaml
 ```
 
 ## Programmatic API
@@ -167,7 +170,7 @@ It does not provide a sandbox for fixture code.
 ## Troubleshooting
 
 - `Executable doesn't exist`: run
-  `npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser`.
+  `npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser`.
 - Import failures: pass `--root` or define `root` and `alias` in the config.
 - Missing styles: add their entry files to `styles`; CSS is not inferred.
 - A modal includes a dimmer: target `[role=dialog]` or set
@@ -176,5 +179,5 @@ It does not provide a sandbox for fixture code.
   deterministic providers, or capture the running application instead.
 
 Run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot --help`
+`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot react --help`
 for all CLI options.

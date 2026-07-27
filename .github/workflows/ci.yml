@@ -39,9 +39,7 @@ jobs:
         run: npm run build --workspaces --if-present
 
       - name: Install Chromium
-        run: |
-          node packages/react-shot/bin/react-shot.mjs install-browser --with-deps
-          node packages/tui-shot/bin/tui-shot.mjs install-browser --with-deps
+        run: node packages/astroshot/bin/astroshot.mjs install-browser --with-deps
 
       - name: Typecheck
         run: npm run typecheck

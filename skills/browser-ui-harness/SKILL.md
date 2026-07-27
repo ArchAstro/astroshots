@@ -239,8 +239,8 @@ Keep `run.sh` under a few hundred lines by pushing product detail into cases.
 |------|------|
 | **agent-browser** | Drive one browser session (see **agent-browser** skill) |
 | **Playwright test runner** | Large suites, parallel specs, CI gates |
-| `@archastro/react-shot` from npmjs | Isolated React docs PNGs without a full stack |
-| `@archastro/tui-shot` from npmjs | Isolated Ink terminal PNGs without a PTY |
+| `@archastro/astroshot react` from npmjs | Isolated React docs PNGs without a full stack |
+| `@archastro/astroshot tui` from npmjs | Isolated Ink terminal PNGs without a PTY |
 | **Astroshots** | Live human review of harness frames |
 
 Use a Bash agent-browser harness when you want a **readable journey + evidence**

@@ -1,0 +1,60 @@
+{
+  "name": "@archastro/astroshot",
+  "version": "0.1.0",
+  "description": "One CLI for deterministic React and terminal UI screenshots",
+  "keywords": [
+    "react",
+    "ink",
+    "terminal",
+    "screenshot",
+    "visual-testing"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchAstro/astroshots.git",
+    "directory": "packages/astroshot"
+  },
+  "homepage": "https://github.com/ArchAstro/astroshots#readme",
+  "bugs": {
+    "url": "https://github.com/ArchAstro/astroshots/issues"
+  },
+  "type": "module",
+  "bin": {
+    "astroshot": "bin/astroshot.mjs"
+  },
+  "exports": {
+    "./react": {
+      "types": "./react.d.ts",
+      "import": "./react.js"
+    },
+    "./tui": {
+      "types": "./tui.d.ts",
+      "import": "./tui.js"
+    }
+  },
+  "files": [
+    "bin",
+    "react.d.ts",
+    "react.js",
+    "tui.d.ts",
+    "tui.js",
+    "README.md"
+  ],
+  "scripts": {
+    "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@archastro/react-shot": "0.1.0",
+    "@archastro/tui-shot": "0.1.0"
+  }
+}

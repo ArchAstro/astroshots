@@ -2,16 +2,16 @@
 name: react-shot
 description: >
   Capture deterministic PNG screenshots of isolated React components with the
-  @archastro/react-shot CLI. Use for documentation images, dialogs, forms,
-  panels, empty states, and repeatable visual fixtures that do not need a
-  running application.
+  react mode of the unified @archastro/astroshot CLI. Use for documentation
+  images, dialogs, forms, panels, empty states, and repeatable visual fixtures
+  that do not need a running application.
 ---
 
-# react-shot
+# astroshot react
 
-`@archastro/react-shot` mounts a typed React fixture in a temporary Vite page
-and captures the selected element with Chromium. Prefer it for isolated UI
-whose state can be expressed with fixed props and local providers.
+`@archastro/astroshot react` mounts a typed React fixture in a temporary Vite
+page and captures the selected element with Chromium. Prefer it for isolated
+UI whose state can be expressed with fixed props and local providers.
 
 Use **agent-browser** instead when the image must prove authentication,
 routing, live backend data, or a complete application shell. Use
@@ -22,19 +22,19 @@ routing, live backend data, or a complete application shell. Use
 No global install is required:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot --help
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot react --help
 ```
 
 Install the Playwright browser once on a new machine:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 ```
 
 `npx` downloads and executes the package. Pin an exact package version in CI
 or other security-sensitive automation, and review its npm provenance before
 first use. Browser installation downloads a Chromium build; on Linux CI,
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/react-shot install-browser --with-deps`
+`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser --with-deps`
 may also install
 operating-system packages and should run only in an expected build environment.
 
@@ -42,7 +42,7 @@ Capture one fixture:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot shot ./fixtures/account-dialog.tsx \
+  @archastro/astroshot react ./fixtures/account-dialog.tsx \
   -o ./screenshots/account-dialog.png
 ```
 
@@ -50,7 +50,7 @@ Capture a manifest:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot batch ./shots.yaml
+  @archastro/astroshot react batch ./shots.yaml
 ```
 
 Resolve fixture and output paths from the caller's working directory. Use
@@ -62,7 +62,7 @@ A fixture default-exports a component plus capture metadata. Import the type
 from the public package:
 
 ```tsx
-import type { ReactShotFixture } from "@archastro/react-shot";
+import type { ReactShotFixture } from "@archastro/astroshot/react";
 import { AccountDialog } from "../src/AccountDialog";
 
 export default {
@@ -99,8 +99,8 @@ fixture or shipped PNG.
 
 ## Send the PNG to Astroshots
 
-`react-shot` creates the deterministic image. `astroshot-capture` adds it to a
-live `.astroshot/<feature>/` stream:
+`astroshot react` creates the deterministic image. `astroshot-capture` adds it
+to a live `.astroshot/<feature>/` stream:
 
 ```bash
 # Install the astroshots skill first:
@@ -116,7 +116,7 @@ test -x "$CAPTURE" || {
 }
 
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/react-shot shot ./fixtures/account-dialog.tsx \
+  @archastro/astroshot react ./fixtures/account-dialog.tsx \
   -o /tmp/account-dialog.png
 
 "$CAPTURE" \

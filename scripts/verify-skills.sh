@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Canonical documentation/skill proof for the public screenshot CLIs.
+# Canonical documentation/skill proof for the public screenshot CLI.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,17 +18,13 @@ require_reference() {
     fail "$file does not document: $text"
 }
 
-# Keep package names and the public npx entry points discoverable in both the
-# human README and the matching agent skill.
-for tool in react-shot tui-shot; do
-  require_reference "packages/$tool/package.json" "\"name\": \"@archastro/$tool\""
-  require_reference "README.md" "npx --@archastro:registry=https://registry.npmjs.org"
-  require_reference "README.md" "@archastro/$tool install-browser"
-  require_reference "packages/$tool/README.md" "npx --@archastro:registry=https://registry.npmjs.org"
-  require_reference "packages/$tool/README.md" "@archastro/$tool install-browser"
-  require_reference "skills/$tool/SKILL.md" "npx --@archastro:registry=https://registry.npmjs.org"
-  require_reference "skills/$tool/SKILL.md" "@archastro/$tool --help"
-  require_reference "skills/$tool/SKILL.md" "@archastro/$tool install-browser"
+# Keep the one public npx entry point discoverable in the README and both
+# mode-specific agent skills.
+require_reference "packages/astroshot/package.json" '"name": "@archastro/astroshot"'
+for file in README.md packages/astroshot/README.md \
+  skills/react-shot/SKILL.md skills/tui-shot/SKILL.md; do
+  require_reference "$file" "npx --@archastro:registry=https://registry.npmjs.org"
+  require_reference "$file" "@archastro/astroshot"
 done
 
 for skill in astroshots screenshot react-shot tui-shot agent-browser browser-ui-harness; do
@@ -36,8 +32,7 @@ for skill in astroshots screenshot react-shot tui-shot agent-browser browser-ui-
 done
 
 for reference in \
-  "@archastro/react-shot" \
-  "@archastro/tui-shot" \
+  "@archastro/astroshot" \
   "agent-browser" \
   "astroshot-capture" \
   "documentation asset directory" \
@@ -45,18 +40,22 @@ for reference in \
   require_reference "skills/screenshot/SKILL.md" "$reference"
 done
 
-# Exercise the same CLI entry points that npx exposes. Build only when a fresh
-# checkout has no generated CLI, so this script also works after `npm install`.
+# Exercise the same single CLI entry point that npx exposes. Build the internal
+# engines only when a fresh checkout has no generated CLI.
 for tool in react-shot tui-shot; do
   if [[ ! -f "packages/$tool/dist/cli.js" ]]; then
     npm run build --workspace "@archastro/$tool"
   fi
-  help_output="$(node "packages/$tool/bin/$tool.mjs" --help)"
-  grep -Fq "$tool" <<<"$help_output" ||
-    fail "$tool --help did not identify the command"
-  grep -Fq "install-browser" <<<"$help_output" ||
-    fail "$tool --help did not document browser installation"
 done
+help_output="$(node packages/astroshot/bin/astroshot.mjs --help)"
+grep -Fq "astroshot react" <<<"$help_output" ||
+  fail "astroshot --help did not document React capture"
+grep -Fq "astroshot tui" <<<"$help_output" ||
+  fail "astroshot --help did not document TUI capture"
+grep -Fq "install-browser" <<<"$help_output" ||
+  fail "astroshot --help did not document browser installation"
+node packages/astroshot/bin/astroshot.mjs react --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs tui --help >/dev/null
 
 if [[ "${ASTROSHOTS_VERIFY_INTEGRATION:-0}" != "1" ]]; then
   echo "verify-skills: command help and skill references pass"
@@ -124,11 +123,11 @@ export default {
 };
 EOF
 
-node packages/react-shot/bin/react-shot.mjs \
-  shot "$VERIFY_TMP/react-fixture.tsx" \
+node packages/astroshot/bin/astroshot.mjs \
+  react "$VERIFY_TMP/react-fixture.tsx" \
   -o "$DOCS_ASSETS/react-component.png"
-node packages/tui-shot/bin/tui-shot.mjs \
-  shot "$VERIFY_TMP/tui-fixture.tsx" \
+node packages/astroshot/bin/astroshot.mjs \
+  tui "$VERIFY_TMP/tui-fixture.tsx" \
   -o "$DOCS_ASSETS/terminal-state.png"
 
 for asset in "$DOCS_ASSETS/react-component.png" "$DOCS_ASSETS/terminal-state.png"; do
@@ -154,11 +153,11 @@ shots:
   - asset: public/screenshots/react-component.png
     source: react-fixture.tsx
     page: content/component-guide.md
-    regenerate: react-shot shot
+    regenerate: astroshot react
   - asset: public/screenshots/terminal-state.png
     source: tui-fixture.tsx
     page: content/component-guide.md
-    regenerate: tui-shot shot
+    regenerate: astroshot tui
 EOF
 
 node --input-type=module - "$VERIFY_TMP/docs" <<'EOF'
@@ -197,7 +196,7 @@ bash bin/astroshot-capture \
   --feature skill-proof \
   --slug react \
   --title "React proof" \
-  --description "react-shot generated this frame." \
+  --description "astroshot react generated this frame." \
   --source "$DOCS_ASSETS/react-component.png" \
   >/dev/null
 bash bin/astroshot-capture \
@@ -205,7 +204,7 @@ bash bin/astroshot-capture \
   --feature skill-proof \
   --slug terminal \
   --title "Terminal proof" \
-  --description "tui-shot generated this frame." \
+  --description "astroshot tui generated this frame." \
   --source "$DOCS_ASSETS/terminal-state.png" \
   >/dev/null
 MANIFEST="$STREAM_ROOT/.astroshot/skill-proof/manifest.json"
