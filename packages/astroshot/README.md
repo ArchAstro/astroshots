@@ -49,6 +49,8 @@ import type { InkShotFixture } from "@archastro/astroshot/ink";
 PTY YAML and JSON files launch `command` directly, without a shell. Their
 `actions` can wait for visible text, send named keys or literal text, and
 pause for bounded durations. Paths in `cwd` are relative to the fixture.
+On Windows, point `command` at an `.exe`; `.cmd` and `.bat` files are rejected
+because running them would introduce an implicit shell.
 
 Fixtures, imported modules, and PTY commands execute with the current user's
 permissions. Review untrusted files before capture and never include

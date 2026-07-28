@@ -103,7 +103,8 @@ expectText:
 ```
 
 `cwd` resolves relative to the fixture. The command launches directly without
-a shell. Actions may use:
+a shell. On Windows, select the underlying `.exe`; `.cmd` and `.bat` scripts
+are rejected because they require a shell. Actions may use:
 
 - `waitFor` and optional `timeoutMs`;
 - `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or
