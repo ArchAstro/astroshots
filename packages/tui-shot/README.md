@@ -88,6 +88,8 @@ fixture environment. `command` is spawned directly—not through a shell—and
 are:
 
 - `waitFor` with an optional per-action `timeoutMs`;
+- `waitForExit: true` with an optional `timeoutMs` when the documented program
+  is expected to terminate before capture;
 - `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or
   `ctrl-d`;
 - `text` for literal input;
@@ -99,7 +101,9 @@ after the screenshot.
 
 A child that exits nonzero before capture fails by default, even when expected
 text rendered. Set `allowNonZeroExit: true` only to document an intentional
-failure state.
+failure state. Use a final `waitForExit: true` action when process completion is
+part of the documented state; this waits for the authoritative child status
+instead of relying on a fixed settle delay.
 
 The renderer targets text and ANSI/VT terminal interfaces. Mouse events,
 mid-journey resize actions, and terminal graphics protocols such as Sixel or
