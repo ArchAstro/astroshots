@@ -17,6 +17,7 @@
 		51D0FFA42C1196281E94E2F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 369606653B9FD1E6FBE4B43D /* Assets.xcassets */; };
 		57ED4434B7E830DD91FE67B9 /* ShotIndexCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239B5944E0638F1D931913A7 /* ShotIndexCache.swift */; };
 		59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */; };
+		601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */; };
 		6646659397470D89CDBB4DAC /* ReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91C394D6B3C96C99B77EDD7 /* ReviewModels.swift */; };
 		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
 		87D9D684AF70B41C69A9A1C7 /* ReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D528EB0C9FF62471B7103498 /* ReviewStore.swift */; };
@@ -58,6 +59,7 @@
 
 /* Begin PBXFileReference section */
 		02F094E7A3E11CE16C3E5ADB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandAssetsTests.swift; sourceTree = "<group>"; };
 		0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayView.swift; sourceTree = "<group>"; };
 		182E7298047007414ABC9862 /* ReviewFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFlowUITests.swift; sourceTree = "<group>"; };
 		239B5944E0638F1D931913A7 /* ShotIndexCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCache.swift; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */,
+				0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */,
 				A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */,
 				26844F440291050990A83490 /* PreferencesTests.swift */,
 				F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */,
@@ -356,6 +359,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */,
+				601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */,
 				F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */,
 				CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */,
 				FF7CB55DF3385E5F06077544 /* ReviewStoreTests.swift in Sources */,

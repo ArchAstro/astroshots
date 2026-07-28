@@ -264,9 +264,9 @@ final class StatusItemController: NSObject {
 
     private func refreshButton() {
         guard let button = statusItem?.button else { return }
-        let symbol = appState.isEmpty ? "camera" : "camera.fill"
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Astroshots")
+        let image = NSImage(named: "AstroshotsMark")
         image?.isTemplate = true
+        image?.accessibilityDescription = "Astroshots"
         button.image = image
         if appState.unreadCount > 0 {
             button.title = " \(appState.unreadCount)"
