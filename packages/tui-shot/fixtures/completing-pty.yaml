@@ -1,0 +1,16 @@
+version: 1
+command: node
+args:
+  - completing-pty.mjs
+cwd: .
+cols: 36
+rows: 5
+timeoutMs: 5000
+settleMs: 50
+actions:
+  - waitFor: All artifacts are ready.
+  - waitForExit: true
+    timeoutMs: 2000
+expectText:
+  - Export complete
+  - All artifacts are ready.

@@ -11,5 +11,6 @@ actions:
   - waitFor: Ready for interrupt
   - key: ctrl-c
   - waitFor: Interrupted cleanly
+  - waitForExit: true
 expectText:
   - Interrupted cleanly

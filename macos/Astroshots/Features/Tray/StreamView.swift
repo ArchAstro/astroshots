@@ -125,6 +125,7 @@ struct ShotRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("stream.detail.\(shot.fileName)")
         }
         .padding(8)
         .background(

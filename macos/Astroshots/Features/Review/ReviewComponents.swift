@@ -96,6 +96,8 @@ struct ReviewCommentView: View {
 }
 
 struct ReviewActionButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     enum Tone {
         case quiet
         case primary
@@ -116,8 +118,10 @@ struct ReviewActionButtonStyle: ButtonStyle {
                     .stroke(border, lineWidth: tone == .quiet ? 1 : 0)
             )
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .opacity(configuration.isPressed ? 0.86 : 1)
+            .saturation(isEnabled ? 1 : 0.2)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.86 : 1) : 0.42)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: isEnabled)
     }
 
     private var foreground: Color {

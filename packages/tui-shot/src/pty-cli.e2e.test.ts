@@ -47,6 +47,37 @@ describe("arbitrary PTY capture boundary", () => {
     }
   });
 
+  it("waits for a clean terminal exit before capturing its final frame", async () => {
+    // Run without the test wrapper override: Unix exercises node-pty's native
+    // exit event, while Windows exercises the production ConPTY status bridge.
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pty-exit-e2e-"));
+    const outPath = path.join(tempDir, "complete.png");
+    try {
+      const stdout = execFileSync(
+        process.execPath,
+        [
+          path.resolve("bin/tui-shot.mjs"),
+          "pty",
+          path.resolve("fixtures/completing-pty.yaml"),
+          "-o",
+          outPath,
+        ],
+        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+      );
+
+      // A successful CLI result and real PNG prove waitForExit crossed the
+      // process boundary and retained the program's final visible frame.
+      expect(stdout).toContain(`wrote ${outPath}`);
+      const metadata = await sharp(outPath).metadata();
+      expect(metadata.format).toBe("png");
+      expect(metadata.width).toBeGreaterThan(300);
+      expect(metadata.height).toBeGreaterThan(100);
+      expect(fs.statSync(outPath).size).toBeGreaterThan(2_000);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a crashed terminal process even when its expected text rendered", () => {
     // Launch a real PTY child that draws a plausible final frame and exits 7.
     // This guards documentation capture from certifying a crash as success.
@@ -68,6 +99,9 @@ describe("arbitrary PTY capture boundary", () => {
             ...process.env,
             // Exercise the ConPTY exit-status bridge on every development OS.
             ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER: "1",
+            // Reproduce the failing runner: the real program status is ready,
+            // but ConPTY has not delivered the terminal marker before settle.
+            ASTROSHOT_TEST_DELAY_PTY_EXIT_MARKER_MS: "1500",
           },
           encoding: "utf8",
         },

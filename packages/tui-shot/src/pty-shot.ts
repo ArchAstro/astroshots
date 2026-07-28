@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -54,19 +55,20 @@ function validateAction(
   if (!isRecord(value)) {
     throw fixtureError(fixturePath, `actions[${index}] must be an object`);
   }
-  const operators = ["waitFor", "key", "text", "pauseMs"].filter(
-    (name) => value[name] !== undefined,
-  );
+  const operators = [
+    "waitFor",
+    "waitForExit",
+    "key",
+    "text",
+    "pauseMs",
+  ].filter((name) => value[name] !== undefined);
   if (operators.length !== 1) {
     throw fixtureError(
       fixturePath,
-      `actions[${index}] must set exactly one of waitFor, key, text, or pauseMs`,
+      `actions[${index}] must set exactly one of waitFor, waitForExit, key, text, or pauseMs`,
     );
   }
-  if (operators[0] === "waitFor") {
-    if (typeof value.waitFor !== "string" || !value.waitFor) {
-      throw fixtureError(fixturePath, `actions[${index}].waitFor must be text`);
-    }
+  const validatedTimeout = (): number | undefined => {
     if (
       value.timeoutMs !== undefined &&
       (typeof value.timeoutMs !== "number" ||
@@ -78,7 +80,22 @@ function validateAction(
         `actions[${index}].timeoutMs must be a positive number`,
       );
     }
-    return { waitFor: value.waitFor, timeoutMs: value.timeoutMs as number };
+    return value.timeoutMs as number | undefined;
+  };
+  if (operators[0] === "waitFor") {
+    if (typeof value.waitFor !== "string" || !value.waitFor) {
+      throw fixtureError(fixturePath, `actions[${index}].waitFor must be text`);
+    }
+    return { waitFor: value.waitFor, timeoutMs: validatedTimeout() };
+  }
+  if (operators[0] === "waitForExit") {
+    if (value.waitForExit !== true) {
+      throw fixtureError(
+        fixturePath,
+        `actions[${index}].waitForExit must be true`,
+      );
+    }
+    return { waitForExit: true, timeoutMs: validatedTimeout() };
   }
   if (operators[0] === "key") {
     if (
@@ -328,11 +345,18 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     process.env.ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER === "1";
   const exitMarkerToken = useExitWrapper ? randomBytes(16).toString("hex") : "";
   const exitMarkerPrefix = `\x1b]777;astroshot-exit-${exitMarkerToken}=`;
+  const exitStatusDirectory = useExitWrapper
+    ? fs.mkdtempSync(path.join(os.tmpdir(), "astroshot-pty-exit-"))
+    : null;
+  const exitStatusPath = exitStatusDirectory
+    ? path.join(exitStatusDirectory, "status")
+    : null;
   const spawnedCommand = useExitWrapper ? process.execPath : command;
   const spawnedArgs = useExitWrapper
     ? [
         fileURLToPath(new URL("./pty-exit-wrapper.js", import.meta.url)),
         exitMarkerToken,
+        exitStatusPath!,
         command,
         ...(fixture.args ?? []),
       ]
@@ -350,6 +374,23 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
   const screen = () => terminalPlainText(terminal, rows);
   const remaining = () => Math.max(0, deadline - Date.now());
   const exitState = () => exited;
+  const refreshWrappedExitCode = (): number | null => {
+    if (!exitStatusPath || wrappedExitCode !== null) return wrappedExitCode;
+    let value: string;
+    try {
+      value = fs.readFileSync(exitStatusPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    }
+    if (!/^\d+$/.test(value)) {
+      throw new Error("The PTY status wrapper reported an invalid exit code.");
+    }
+    wrappedExitCode = Number(value);
+    return wrappedExitCode;
+  };
 
   async function waitForText(text: string, actionTimeout?: number): Promise<void> {
     const actionDeadline = Math.min(
@@ -368,6 +409,31 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
       : "";
     throw new Error(
       `Timed out waiting for ${JSON.stringify(text)}.${exitDetail} Visible frame:\n${screen().slice(0, 1_200)}`,
+    );
+  }
+
+  async function waitForProgramExit(actionTimeout?: number): Promise<void> {
+    const waitStartedAt = Date.now();
+    const waitDuration = Math.min(
+      Math.max(0, deadline - waitStartedAt),
+      milliseconds(actionTimeout, timeoutMs, "action timeoutMs", 120_000),
+    );
+    const actionDeadline = waitStartedAt + waitDuration;
+    while (Date.now() <= actionDeadline) {
+      await writes;
+      if (useExitWrapper ? refreshWrappedExitCode() !== null : exited !== null) {
+        return;
+      }
+      await delay(Math.min(20, Math.max(1, actionDeadline - Date.now())));
+    }
+    if (useExitWrapper && exited) {
+      throw new Error(
+        "The PTY status wrapper exited without reporting the program exit code.",
+      );
+    }
+    throw new Error(
+      `Timed out waiting for the PTY program to exit within ${waitDuration}ms. ` +
+        `Visible frame:\n${screen().slice(0, 1_200)}`,
     );
   }
 
@@ -414,6 +480,8 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
       }
       if ("waitFor" in action) {
         await waitForText(action.waitFor, action.timeoutMs);
+      } else if ("waitForExit" in action) {
+        await waitForProgramExit(action.timeoutMs);
       } else if ("key" in action) {
         child.write(KEYSTROKES[action.key]);
       } else if ("text" in action) {
@@ -431,6 +499,7 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     }
     await delay(settleMs);
     await writes;
+    refreshWrappedExitCode();
     const plainFrame = screen();
     const completed = exitState();
     if (useExitWrapper && completed && wrappedExitCode === null) {
@@ -481,24 +550,30 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
       borderRadius,
     });
   } finally {
-    if (child && !exited) {
-      try {
-        child.kill();
-      } catch {
-        // The process may have exited between the state check and kill.
-      }
-      await Promise.race([exitPromise, delay(500)]);
-      if (!exited) {
+    try {
+      if (child && !exited) {
         try {
-          child.kill("SIGKILL");
+          child.kill();
         } catch {
-          // ConPTY and already-exited Unix children can reject a second kill.
+          // The process may have exited between the state check and kill.
         }
         await Promise.race([exitPromise, delay(500)]);
+        if (!exited) {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            // ConPTY and already-exited Unix children can reject a second kill.
+          }
+          await Promise.race([exitPromise, delay(500)]);
+        }
+      }
+      await writes;
+      terminal.dispose();
+    } finally {
+      if (exitStatusDirectory) {
+        fs.rmSync(exitStatusDirectory, { recursive: true, force: true });
       }
     }
-    await writes;
-    terminal.dispose();
   }
 }
 

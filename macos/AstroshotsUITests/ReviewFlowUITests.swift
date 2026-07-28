@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 final class ReviewFlowUITests: XCTestCase {
@@ -53,6 +54,77 @@ final class ReviewFlowUITests: XCTestCase {
 
         app.buttons["review.close"].click()
         XCTAssertFalse(takeover.waitForExistence(timeout: 1))
+    }
+
+    @MainActor
+    func testCompactDetailSupportsApproveAndRequestChangesWithoutClipping() throws {
+        // Setup boundary: seed and open the production tray popover with a
+        // filesystem-backed frame whose temporary path is intentionally long.
+        let app = launchTrayApp()
+        let detailEntry = app.buttons["stream.detail.0001-settings.png"]
+        XCTAssertTrue(detailEntry.waitForExistence(timeout: 8))
+        detailEntry.click()
+
+        // Compact layout boundary: every primary region must remain within the
+        // real 400-point popover instead of expanding around the long path.
+        let viewport = app.descendants(matching: .any)["detail.viewport"]
+        let compact = app.descendants(matching: .any)["detail.compact"]
+        let metadata = app.descendants(matching: .any)["detail.metadata"]
+        let controls = app.descendants(matching: .any)["detail.review.controls"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        XCTAssertTrue(compact.waitForExistence(timeout: 3))
+        XCTAssertTrue(metadata.waitForExistence(timeout: 3))
+        XCTAssertTrue(controls.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(metadata.frame.minX, compact.frame.minX - 1)
+        XCTAssertLessThanOrEqual(metadata.frame.maxX, compact.frame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(controls.frame.minX, compact.frame.minX - 1)
+        XCTAssertLessThanOrEqual(controls.frame.maxX, compact.frame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(controls.frame.minY, viewport.frame.minY - 1)
+        XCTAssertLessThanOrEqual(controls.frame.maxY, viewport.frame.maxY + 1)
+        XCTAssertTrue(controls.isHittable)
+        let visualProof = XCTAttachment(screenshot: viewport.screenshot())
+        visualProof.name = "Compact detail review controls"
+        visualProof.lifetime = .keepAlways
+        add(visualProof)
+        let requestChanges = app.buttons["detail.review.requestChanges"]
+        XCTAssertTrue(requestChanges.exists)
+        XCTAssertFalse(requestChanges.isEnabled)
+
+        // Human action: approve directly in the compact detail without opening
+        // the takeover, then observe the persisted sidecar and live badge.
+        let approve = app.buttons["detail.review.approve"]
+        XCTAssertTrue(approve.waitForExistence(timeout: 3))
+        approve.click()
+
+        let sidecar = featureDirectory.appendingPathComponent("review.json")
+        XCTAssertTrue(waitForDecision("approved", in: sidecar, timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["review.status.approved"]
+                .waitForExistence(timeout: 3)
+        )
+
+        // Human correction: enter required feedback and request changes from
+        // the same compact surface, proving both decisions cross the real store.
+        let note = app.descendants(matching: .any)["detail.review.note"]
+        XCTAssertTrue(note.waitForExistence(timeout: 3))
+        note.click()
+        note.typeText("Keep the primary action above the fold.")
+        XCTAssertTrue(requestChanges.isEnabled)
+        requestChanges.click()
+
+        XCTAssertTrue(
+            waitForDecision("changes_requested", in: sidecar, timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["review.status.changesRequested"]
+                .waitForExistence(timeout: 3)
+        )
+        let review = try reviewEntry(from: sidecar)
+        let comments = try XCTUnwrap(review["comments"] as? [[String: Any]])
+        XCTAssertEqual(
+            comments.last?["body"] as? String,
+            "Keep the primary action above the fold."
+        )
     }
 
     @MainActor
@@ -170,6 +242,7 @@ final class ReviewFlowUITests: XCTestCase {
 
     @MainActor
     private func launchReviewApp() -> XCUIApplication {
+        terminateRunningAstroshots()
         let app = XCUIApplication()
         app.launchEnvironment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] = imageURL.path
         app.launch()
@@ -178,10 +251,30 @@ final class ReviewFlowUITests: XCTestCase {
 
     @MainActor
     private func launchTrayApp() -> XCUIApplication {
+        terminateRunningAstroshots()
         let app = XCUIApplication()
         app.launchEnvironment["ASTROSHOTS_UI_TEST_TRAY_PATH"] = imageURL.path
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func terminateRunningAstroshots() {
+        let runningApps = NSRunningApplication
+            .runningApplications(withBundleIdentifier: "ai.archastro.Astroshots")
+
+        for runningApp in runningApps {
+            runningApp.forceTerminate()
+        }
+
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline,
+              NSRunningApplication
+                .runningApplications(withBundleIdentifier: "ai.archastro.Astroshots")
+                .isEmpty == false
+        {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
     }
 
     private func waitForFile(_ url: URL, timeout: TimeInterval) -> Bool {
