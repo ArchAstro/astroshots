@@ -175,7 +175,7 @@ Astroshots
 Drag Astroshots.app into Applications, then launch from the menu bar
 (camera icon). There is no Dock icon (LSUIElement).
 
-Default watch root: ~/archastro
+Default watched folder: ~/archastro
 Writes go under: <worktree>/.astroshot/<feature>/
 
 Signed with: $IDENTITY

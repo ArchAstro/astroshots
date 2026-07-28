@@ -9,7 +9,7 @@ import Foundation
 /// 2. **Full** — recursive discovery walk; rewrites the index.
 ///
 /// Full scans run on a background queue so the menu-bar status item can appear
-/// immediately even when the watch root is a large monorepo.
+/// immediately even when a watched root is a large monorepo.
 final class AstroshotWatcher: @unchecked Sendable {
     struct Configuration: Sendable {
         var roots: [URL]

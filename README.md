@@ -15,7 +15,7 @@ Astroshots is a macOS menu-bar app for anyone who captures UI during browser tes
 | Problem | What Astroshots does |
 |---------|----------------------|
 | Screenshots buried in `/tmp` or CI artifacts | Live stream as soon as a PNG is written |
-| Jumping between projects to find shots | One tray, every project under your watch folder |
+| Jumping between projects to find shots | One tray, every project under your watched folders |
 | “Did that step look right?” mid-run | Desktop overlay above all windows |
 | Manual folder digging after a suite | Newest-first history with titles from a small manifest |
 
@@ -34,7 +34,7 @@ No project picker. No account. No cloud. Just files on disk and a camera icon in
 1. Download the latest **Astroshots.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
 2. Open the DMG and drag **Astroshots** into **Applications**.
 3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). After the first run it **warms from a local index** of known `.astroshot` folders so the stream appears quickly, then finishes a full discovery walk in the background.
-4. Click the camera icon → gear → set your **watch root** if you want something other than the default.
+4. Click the camera icon → gear → add **watched folders** if you want locations beyond the default.
 5. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
 
 Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
@@ -56,7 +56,7 @@ Details: [`macos/README.md`](macos/README.md).
 
 ## How it works
 
-1. **Watch** — Astroshots recursively watches a folder you choose (default `~/archastro`) for `.astroshot/` trees.
+1. **Watch** — Astroshots recursively watches one or more folders you choose (default `~/archastro`) for `.astroshot/` trees.
 2. **Write** — Your harness, agent, or script drops PNGs (and an optional
    execution `manifest.json`) under that layout.
 3. **See** — New frames flash on the desktop; open the tray for the full
@@ -322,9 +322,9 @@ Skill sources: [`skills/`](skills/).
 | Surface | Job |
 |---------|-----|
 | **Desktop overlay** | New frame above all windows; Open / dismiss |
-| **Stream** | Newest-first list across all projects under the watch root |
+| **Stream** | Newest-first list across all projects under every watched folder |
 | **Detail** | Full frame + path, feature, URL, time |
-| **Settings** | Watch root, overlay toggles |
+| **Settings** | Watched folders, overlay toggles |
 
 Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](docs/mocks/astroshots-menubar.html).
 
@@ -438,7 +438,7 @@ repository.
 ## Requirements
 
 - macOS 14 or later  
-- A folder of projects to watch (configure in-app)  
+- One or more folders of projects to watch (configure in-app)
 - Tools that can write PNG files (any language, any harness)
 
 The npm screenshot tools require Node.js 22.14 or later and a locally installed
