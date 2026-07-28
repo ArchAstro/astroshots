@@ -80,6 +80,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build screenshot CLIs
+        run: npm run build --workspaces --if-present
+
       - name: Install Chromium
         run: node packages/astroshot/bin/astroshot.mjs install-browser
 
