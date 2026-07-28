@@ -62,7 +62,15 @@ describe("arbitrary PTY capture boundary", () => {
           "-o",
           outPath,
         ],
-        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+        {
+          cwd: path.resolve("."),
+          env: {
+            ...process.env,
+            // Exercise the ConPTY exit-status bridge on every development OS.
+            ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER: "1",
+          },
+          encoding: "utf8",
+        },
       );
 
       // The visible assertion passes, but the process boundary is authoritative.
@@ -73,4 +81,90 @@ describe("arbitrary PTY capture boundary", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("preserves a terminal interrupt until the wrapped program reports its exit", () => {
+    // Force the Windows status bridge on every OS, then send a real Ctrl-C
+    // through the PTY to both wrapper and target process.
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pty-signal-e2e-"));
+    const outPath = path.join(tempDir, "interrupted.png");
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.resolve("bin/tui-shot.mjs"),
+          "pty",
+          path.resolve("fixtures/interruptible-pty.yaml"),
+          "-o",
+          outPath,
+        ],
+        {
+          cwd: path.resolve("."),
+          env: {
+            ...process.env,
+            ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER: "1",
+          },
+          encoding: "utf8",
+        },
+      );
+
+      // The target's chosen status survives the shared process-group signal.
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("exited with code 42 before capture");
+      expect(result.stderr).not.toContain(
+        "status wrapper exited without reporting",
+      );
+      expect(fs.existsSync(outPath)).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(process.platform === "win32")(
+    "rejects Windows batch scripts instead of introducing a hidden shell",
+    () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pty-batch-e2e-"));
+      const fixturePath = path.join(tempDir, "batch.yaml");
+      const commandPath = path.join(tempDir, "astroshot-batch-probe.cmd");
+      const outPath = path.join(tempDir, "batch.png");
+      try {
+        fs.writeFileSync(commandPath, "@echo off\r\necho unsafe shell boundary\r\n");
+        fs.writeFileSync(
+          fixturePath,
+          [
+            "version: 1",
+            "command: astroshot-batch-probe",
+            "cols: 40",
+            "rows: 6",
+          ].join("\n"),
+        );
+
+        const result = spawnSync(
+          process.execPath,
+          [
+            path.resolve("bin/tui-shot.mjs"),
+            "pty",
+            fixturePath,
+            "-o",
+            outPath,
+          ],
+          {
+            cwd: path.resolve("."),
+            env: {
+              ...process.env,
+              PATH: `${tempDir}${path.delimiter}${process.env.PATH ?? ""}`,
+            },
+            encoding: "utf8",
+          },
+        );
+
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain(
+          "Windows batch script, which requires a shell",
+        );
+        expect(fs.existsSync(outPath)).toBe(false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    },
+  );
 });

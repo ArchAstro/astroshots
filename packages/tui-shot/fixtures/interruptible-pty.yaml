@@ -1,0 +1,15 @@
+version: 1
+command: node
+args:
+  - interruptible-pty.mjs
+cwd: .
+cols: 40
+rows: 6
+timeoutMs: 5000
+settleMs: 300
+actions:
+  - waitFor: Ready for interrupt
+  - key: ctrl-c
+  - waitFor: Interrupted cleanly
+expectText:
+  - Interrupted cleanly
