@@ -214,6 +214,45 @@ function delay(durationMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
+function resolvePtyCommand(
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): string {
+  if (path.isAbsolute(command)) return command;
+  if (command.includes("/") || command.includes("\\")) {
+    return path.resolve(cwd, command);
+  }
+  if (process.platform !== "win32") return command;
+
+  const pathValue =
+    Object.entries(env).find(([name]) => name.toLowerCase() === "path")?.[1] ??
+    "";
+  const commandExtension = path.extname(command);
+  const extensions = commandExtension
+    ? [""]
+    : (
+        Object.entries(env).find(
+          ([name]) => name.toLowerCase() === "pathext",
+        )?.[1] ?? ".COM;.EXE"
+      )
+        .split(";")
+        .filter(Boolean);
+  for (const directory of pathValue.split(path.delimiter)) {
+    const unquotedDirectory = directory.replace(/^"(.*)"$/, "$1");
+    if (!unquotedDirectory) continue;
+    for (const extension of extensions) {
+      const candidate = path.join(unquotedDirectory, command + extension);
+      try {
+        if (fs.statSync(candidate).isFile()) return candidate;
+      } catch {
+        // Continue through PATH candidates.
+      }
+    }
+  }
+  throw new Error(`PTY command was not found on PATH: ${command}`);
+}
+
 async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
   const absoluteFixturePath = path.resolve(request.fixturePath);
   const fixture = loadPtyFixture(absoluteFixturePath);
@@ -260,6 +299,13 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
   }
 
   const terminal = createHeadlessTerminal(cols, rows);
+  const childEnvironment: NodeJS.ProcessEnv = {
+    ...process.env,
+    TERM: "xterm-256color",
+    COLORTERM: "truecolor",
+    ...fixture.env,
+  };
+  const command = resolvePtyCommand(fixture.command, cwd, childEnvironment);
   let writes = Promise.resolve();
   let child: IPty | null = null;
   let exited: { exitCode: number; signal?: number } | null = null;
@@ -302,17 +348,12 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
         { cause: error },
       );
     }
-    child = spawnPty(fixture.command, fixture.args ?? [], {
+    child = spawnPty(command, fixture.args ?? [], {
       name: "xterm-256color",
       cols,
       rows,
       cwd,
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-        ...fixture.env,
-      },
+      env: childEnvironment,
     });
     child.onData((data) => {
       writes = writes.then(() => writeTerminal(terminal, data));
