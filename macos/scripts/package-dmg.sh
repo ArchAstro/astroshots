@@ -63,6 +63,7 @@ require_cmd xcodebuild
 require_cmd hdiutil
 require_cmd codesign
 require_cmd ditto
+require_cmd osascript
 
 if [[ "$ADHOC" == "1" || "$SKIP_SIGN" == "1" ]]; then
   IDENTITY="-"
@@ -134,6 +135,14 @@ echo "==> Staging app"
 ditto "$APP_SRC" "$APP"
 ln -s /Applications "$STAGE/Applications"
 
+DMG_BACKGROUND="$ROOT/Design/Generated/astroshots-dmg-background.png"
+if [[ ! -f "$DMG_BACKGROUND" ]]; then
+  echo "error: DMG background missing: $DMG_BACKGROUND" >&2
+  exit 1
+fi
+mkdir -p "$STAGE/.background"
+ditto "$DMG_BACKGROUND" "$STAGE/.background/Astroshots.png"
+
 sign_app() {
   local app="$1"
   echo "==> Codesigning app ($IDENTITY)"
@@ -168,12 +177,12 @@ else
   sign_app "$APP"
 fi
 
-cat >"$STAGE/README.txt" <<EOF
+cat >"$STAGE/.background/README.txt" <<EOF
 Astroshots
 ==========
 
 Drag Astroshots.app into Applications, then launch from the menu bar
-(camera icon). There is no Dock icon (LSUIElement).
+(stellar viewfinder icon). There is no Dock icon (LSUIElement).
 
 Default watched folder: ~/archastro
 Writes go under: <worktree>/.astroshot/<feature>/
@@ -198,13 +207,119 @@ rm -f "$OUT_DMG"
 
 VOLNAME="Astroshots ${VERSION}"
 echo "==> Creating DMG: $OUT_DMG"
+RW_DMG="$ROOT/build/Astroshots-layout-rw.dmg"
+rm -f "$RW_DMG"
+
 hdiutil create \
   -volname "$VOLNAME" \
   -srcfolder "$STAGE" \
   -ov \
+  -format UDRW \
+  "$RW_DMG"
+
+DEVICE=""
+MOUNT_POINT=""
+ATTACH_PLIST=""
+cleanup_layout_volume() {
+  if [[ -n "$DEVICE" ]]; then
+    hdiutil detach "$DEVICE" -force >/dev/null 2>&1 || true
+  elif [[ -n "$MOUNT_POINT" ]]; then
+    hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1 || true
+  fi
+  [[ -z "$ATTACH_PLIST" ]] || rm -f "$ATTACH_PLIST"
+  rm -f "$RW_DMG"
+}
+trap cleanup_layout_volume EXIT
+
+ATTACH_PLIST="$(mktemp "${TMPDIR:-/tmp}/astroshots-dmg-attach.XXXXXX.plist")"
+hdiutil attach \
+  "$RW_DMG" \
+  -readwrite \
+  -noverify \
+  -noautoopen \
+  -plist >"$ATTACH_PLIST"
+
+# hdiutil's human-readable output is not a stable API. Read every entity from
+# its plist result so cleanup can still detach by mount point if the root device
+# entry ever changes shape.
+for index in {0..15}; do
+  entity_device="$(
+    /usr/libexec/PlistBuddy \
+      -c "Print :system-entities:$index:dev-entry" \
+      "$ATTACH_PLIST" 2>/dev/null || true
+  )"
+  entity_mount="$(
+    /usr/libexec/PlistBuddy \
+      -c "Print :system-entities:$index:mount-point" \
+      "$ATTACH_PLIST" 2>/dev/null || true
+  )"
+  if [[ -z "$DEVICE" && -n "$entity_device" ]]; then
+    DEVICE="$entity_device"
+  fi
+  if [[ -n "$entity_mount" ]]; then
+    MOUNT_POINT="$entity_mount"
+  fi
+done
+if [[ -z "$DEVICE" ]]; then
+  echo "error: could not determine mounted DMG device" >&2
+  exit 1
+fi
+if [[ -z "$MOUNT_POINT" ]]; then
+  echo "error: could not determine mounted DMG path" >&2
+  exit 1
+fi
+
+echo "==> Applying branded Finder layout"
+osascript <<EOF
+tell application "Finder"
+  tell disk "$VOLNAME"
+    open
+    delay 1
+    set zoomed of container window to false
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set pathbar visible of container window to false
+    set sidebar width of container window to 0
+    set the bounds of container window to {100, 100, 820, 550}
+
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 112
+    set text size of viewOptions to 13
+    set background picture of viewOptions to file ".background:Astroshots.png"
+
+    set position of item "Astroshots.app" of container window to {180, 230}
+    set position of item "Applications" of container window to {500, 230}
+    update without registering applications
+    close container window
+    delay 1
+    open
+    delay 1
+    set zoomed of container window to false
+    set the bounds of container window to {100, 100, 820, 550}
+    update without registering applications
+    delay 3
+  end tell
+end tell
+EOF
+
+sync
+hdiutil detach "$DEVICE"
+DEVICE=""
+MOUNT_POINT=""
+rm -f "$ATTACH_PLIST"
+ATTACH_PLIST=""
+
+hdiutil convert \
+  "$RW_DMG" \
+  -ov \
   -format UDZO \
   -imagekey zlib-level=9 \
-  "$OUT_DMG"
+  -o "$OUT_DMG"
+
+rm -f "$RW_DMG"
+trap - EXIT
 
 if [[ "$ADHOC" != "1" ]]; then
   echo "==> Codesigning DMG"

@@ -155,9 +155,16 @@ export APPLE_API_ISSUER_ID=…
 
 Dev-only (Gatekeeper will warn): `./scripts/package-dmg.sh --adhoc`
 
+The packaged volume uses the Astroshots visor artwork, a fixed Finder window,
+and positioned **Astroshots → Applications** icons. The source artwork lives in
+`Design/Generated/`; packaging fails rather than silently shipping an unbranded
+fallback when the background is missing. Run `./scripts/test-package-dmg.sh`
+for the canonical end-to-end proof that builds, packages, mounts, and verifies
+the same installer contract before release.
+
 | Workflow | When | Output |
 |----------|------|--------|
-| `.github/workflows/ci.yml` | PRs / pushes | Tests only (no DMG) |
+| `.github/workflows/ci.yml` | PRs / pushes | Tests + ad-hoc branded DMG proof |
 | `.github/workflows/cut-release.yml` | Manual: patch / minor / major | `release/vX.Y.Z` branch + tag + PR to main |
 | `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized DMG on the GitHub Release |
 

@@ -130,3 +130,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build-for-testing
+
+      - name: Package branded DMG end-to-end proof
+        working-directory: macos
+        run: ./scripts/test-package-dmg.sh
