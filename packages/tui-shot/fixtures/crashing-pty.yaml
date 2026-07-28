@@ -6,6 +6,6 @@ cwd: .
 cols: 40
 rows: 6
 timeoutMs: 5000
-settleMs: 100
+settleMs: 600
 expectText:
   - Fatal terminal state
