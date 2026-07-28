@@ -2,9 +2,9 @@
 name: screenshot
 description: >
   Plan, generate, review, and maintain product screenshots for documentation.
-  Use react-shot for isolated React UI, tui-shot for Ink terminal UI,
-  agent-browser for real application journeys, and Astroshots to review the
-  resulting documentation image set.
+  Use react-shot for isolated React UI, tui-shot for Ink or arbitrary PTY
+  terminal UI, agent-browser for real application journeys, and Astroshots to
+  review the resulting documentation image set.
 ---
 
 # Screenshot documentation
@@ -19,6 +19,7 @@ application.
 |---|---|
 | React dialog, form, panel, empty state, or component with fixed props | **react-shot** |
 | Ink screen, wizard step, command center, or terminal state | **tui-shot** |
+| Ratatui, Bubble Tea, Textual, curses, or another executable terminal program | **tui-shot** with `astroshot pty` |
 | Complete application shell, authenticated page, routing, or live data | **agent-browser** |
 | Multi-image review journey for any of the above | **astroshots** |
 
@@ -87,24 +88,40 @@ corners.
 
 ## Capture Ink terminal documentation
 
-Install Chromium once:
+Install Ink's project-local peers and Chromium once:
 
 ```bash
+npm install --save-dev ink@^7.1 react@^19
 npx --@archastro:registry=https://registry.npmjs.org \
   @archastro/astroshot install-browser
 ```
 
-Capture a fixed terminal state:
+Generate and capture a fixed Ink state:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui ./fixtures/install-confirmation.tsx \
+  @archastro/astroshot init ink ./fixtures/install-confirmation.tsx
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot ink ./fixtures/install-confirmation.tsx \
   -o ./docs/public/screenshots/install-confirmation.png
 ```
 
 Use stable `cols`, `rows`, and `expectText` values. Prefer a fixture for a
-known visual state; use a real PTY harness when the documentation must prove
-keyboard interaction, process behavior, or a live network boundary.
+known visual state.
+
+For Ratatui or any executable terminal UI, use a real PTY fixture:
+
+```bash
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot init pty ./fixtures/install-confirmation.yaml
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot pty ./fixtures/install-confirmation.yaml \
+  -o ./docs/public/screenshots/install-confirmation.png
+```
+
+Prefer `waitFor` actions over sleeps, script the minimum meaningful input, and
+assert distinctive final `expectText`. Keep the PTY fixture with the docs so
+the screenshot remains reproducible.
 
 ## Capture a real application journey
 

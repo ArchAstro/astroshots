@@ -5,24 +5,32 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { writeFixtureTemplate } from "./templates.mjs";
+
 function help() {
-  console.log(`astroshot — one CLI for React and terminal UI screenshots
+  console.log(`astroshot — one CLI for React, Ink, and PTY screenshots
 
 Usage:
+  astroshot init react [fixture.tsx] [--force]
+  astroshot init ink [fixture.tsx] [--force]
+  astroshot init pty [fixture.yaml] [--force]
   astroshot react <fixture.tsx> -o <out.png> [options]
   astroshot react shot <fixture.tsx> -o <out.png> [options]
   astroshot react batch <manifest.yaml|json> [options]
-  astroshot tui <fixture.tsx> -o <out.png> [options]
-  astroshot tui shot <fixture.tsx> -o <out.png> [options]
-  astroshot tui batch <manifest.yaml|json> [options]
+  astroshot ink <fixture.tsx> -o <out.png> [options]
+  astroshot ink batch <manifest.yaml|json> [options]
+  astroshot pty <fixture.yaml|json> -o <out.png> [options]
   astroshot install-browser [--with-deps]
 
 Commands:
   react              Capture an isolated React component
-  tui                Capture an Ink terminal UI state
+  ink                Capture an Ink component fixture
+  pty                Capture any executable in a pseudoterminal
+  init               Generate a React, Ink, or PTY fixture template
   install-browser    Install the shared Chromium runtime
 
-Run "astroshot react --help" or "astroshot tui --help" for mode options.`);
+Compatibility: "astroshot tui" remains an alias for "astroshot ink".
+Run "astroshot <mode> --help" for mode options.`);
 }
 
 function modeHelp(mode) {
@@ -30,6 +38,7 @@ function modeHelp(mode) {
     console.log(`astroshot react — deterministic React component screenshots
 
 Usage:
+  astroshot init react [fixture.tsx] [--force]
   astroshot react <fixture.tsx> -o <out.png> [options]
   astroshot react batch <manifest.yaml|json> [options]
 
@@ -44,11 +53,13 @@ Options:
     return;
   }
 
-  console.log(`astroshot tui — deterministic Ink terminal UI screenshots
+  if (mode === "ink") {
+    console.log(`astroshot ink — deterministic Ink component screenshots
 
 Usage:
-  astroshot tui <fixture.tsx> -o <out.png> [options]
-  astroshot tui batch <manifest.yaml|json> [options]
+  astroshot init ink [fixture.tsx] [--force]
+  astroshot ink <fixture.tsx> -o <out.png> [options]
+  astroshot ink batch <manifest.yaml|json> [options]
 
 Options:
   -o, --out <path>       Output PNG path
@@ -56,6 +67,22 @@ Options:
   --rows <count>         Override terminal rows
   --scale <factor>       Override PNG device scale factor
   --out-dir <path>       Override batch output directory
+  --headed               Show Chromium for debugging
+  -h, --help             Show this help`);
+    return;
+  }
+
+  console.log(`astroshot pty — screenshots of arbitrary terminal programs
+
+Usage:
+  astroshot init pty [fixture.yaml] [--force]
+  astroshot pty <fixture.yaml|json> -o <out.png> [options]
+
+Options:
+  -o, --out <path>       Output PNG path
+  --cols <count>         Override terminal columns
+  --rows <count>         Override terminal rows
+  --scale <factor>       Override PNG device scale factor
   --headed               Show Chromium for debugging
   -h, --help             Show this help`);
 }
@@ -70,13 +97,18 @@ function engineBin(mode) {
 }
 
 function runEngine(mode, arguments_) {
+  const engineMode = mode === "react" ? "react" : "tui";
+  const engineArguments =
+    mode === "pty" ? ["pty", ...arguments_] : arguments_;
   const normalized =
-    arguments_[0] && /\.[cm]?tsx?$/.test(arguments_[0])
-      ? ["shot", ...arguments_]
-      : arguments_;
+    mode !== "pty" &&
+    engineArguments[0] &&
+    /\.[cm]?tsx?$/.test(engineArguments[0])
+      ? ["shot", ...engineArguments]
+      : engineArguments;
   const result = spawnSync(
     process.execPath,
-    [engineBin(mode), ...normalized],
+    [engineBin(engineMode), ...normalized],
     { stdio: "inherit" },
   );
   if (result.error) {
@@ -85,6 +117,54 @@ function runEngine(mode, arguments_) {
   }
   if (result.signal) process.kill(process.pid, result.signal);
   process.exit(result.status ?? 1);
+}
+
+function initHelp() {
+  console.log(`astroshot init — generate a fixture template
+
+Usage:
+  astroshot init react [fixture.tsx] [--force]
+  astroshot init ink [fixture.tsx] [--force]
+  astroshot init pty [fixture.yaml] [--force]
+
+Defaults:
+  react.shot.tsx
+  ink.shot.tsx
+  pty.shot.yaml
+
+Existing files are never replaced unless --force is passed.`);
+}
+
+function runInit(arguments_) {
+  if (
+    arguments_.length === 0 ||
+    arguments_[0] === "help" ||
+    arguments_[0] === "-h" ||
+    arguments_[0] === "--help"
+  ) {
+    initHelp();
+    process.exit(arguments_.length === 0 ? 1 : 0);
+  }
+
+  const mode = arguments_[0];
+  const rest = arguments_.slice(1);
+  const force = rest.includes("--force") || rest.includes("-f");
+  const unknownFlags = rest.filter(
+    (value) => value.startsWith("-") && value !== "--force" && value !== "-f",
+  );
+  if (unknownFlags.length) {
+    throw new Error(`Unknown init flag: ${unknownFlags[0]}`);
+  }
+  const positionals = rest.filter((value) => !value.startsWith("-"));
+  if (positionals.length > 1) {
+    throw new Error("init accepts at most one output path");
+  }
+  const result = writeFixtureTemplate({
+    mode,
+    outputPath: positionals[0],
+    force,
+  });
+  console.log(`Created ${result.label} fixture: ${result.absolutePath}`);
 }
 
 const [command, ...arguments_] = process.argv.slice(2);
@@ -106,17 +186,28 @@ if (command === "install-browser") {
   runEngine("react", ["install-browser", ...arguments_]);
 }
 
-if (command === "react" || command === "tui") {
+if (command === "init") {
+  try {
+    runInit(arguments_);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+if (command === "react" || command === "ink" || command === "tui" || command === "pty") {
+  const canonicalMode = command === "tui" ? "ink" : command;
   if (
     arguments_.length === 0 ||
     arguments_[0] === "help" ||
     arguments_[0] === "-h" ||
     arguments_[0] === "--help"
   ) {
-    modeHelp(command);
+    modeHelp(canonicalMode);
     process.exit(arguments_.length === 0 ? 1 : 0);
   }
-  runEngine(command, arguments_);
+  runEngine(canonicalMode, arguments_);
 }
 
 console.error(`Unknown command: ${command}`);

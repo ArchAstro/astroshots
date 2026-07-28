@@ -18,8 +18,8 @@ require_reference() {
     fail "$file does not document: $text"
 }
 
-# Keep the one public npx entry point discoverable in the README and both
-# mode-specific agent skills.
+# Keep the one public npx entry point discoverable in the README and capture
+# skills.
 require_reference "packages/astroshot/package.json" '"name": "@archastro/astroshot"'
 for file in README.md packages/astroshot/README.md \
   skills/react-shot/SKILL.md skills/tui-shot/SKILL.md; do
@@ -50,12 +50,15 @@ done
 help_output="$(node packages/astroshot/bin/astroshot.mjs --help)"
 grep -Fq "astroshot react" <<<"$help_output" ||
   fail "astroshot --help did not document React capture"
-grep -Fq "astroshot tui" <<<"$help_output" ||
-  fail "astroshot --help did not document TUI capture"
+grep -Fq "astroshot ink" <<<"$help_output" ||
+  fail "astroshot --help did not document Ink capture"
+grep -Fq "astroshot pty" <<<"$help_output" ||
+  fail "astroshot --help did not document PTY capture"
 grep -Fq "install-browser" <<<"$help_output" ||
   fail "astroshot --help did not document browser installation"
 node packages/astroshot/bin/astroshot.mjs react --help >/dev/null
-node packages/astroshot/bin/astroshot.mjs tui --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs ink --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs pty --help >/dev/null
 
 if [[ "${ASTROSHOTS_VERIFY_INTEGRATION:-0}" != "1" ]]; then
   echo "verify-skills: command help and skill references pass"
@@ -106,7 +109,7 @@ export default {
 };
 EOF
 
-cat >"$VERIFY_TMP/tui-fixture.tsx" <<'EOF'
+cat >"$VERIFY_TMP/ink-fixture.tsx" <<'EOF'
 import React from "react";
 import { Box, Text } from "ink";
 
@@ -123,14 +126,52 @@ export default {
 };
 EOF
 
+cat >"$VERIFY_TMP/pty-program.mjs" <<'EOF'
+process.stdin.setEncoding("utf8");
+process.stdin.setRawMode(true);
+function render(status = "Choose a terminal state") {
+  process.stdout.write(
+    "\u001b[?1049h\u001b[2J\u001b[H\u001b[36;1mPTY documentation proof\u001b[0m\r\n" + status,
+  );
+}
+process.stdin.on("data", (data) => {
+  if (data.includes("\r")) render("Ready to document");
+});
+process.on("SIGHUP", () => process.exit(0));
+render();
+process.stdin.resume();
+EOF
+
+cat >"$VERIFY_TMP/pty-fixture.yaml" <<'EOF'
+version: 1
+command: node
+args: [pty-program.mjs]
+cols: 44
+rows: 6
+scale: 1
+actions:
+  - waitFor: Choose a terminal state
+  - key: enter
+  - waitFor: Ready to document
+expectText:
+  - PTY documentation proof
+  - Ready to document
+EOF
+
 node packages/astroshot/bin/astroshot.mjs \
   react "$VERIFY_TMP/react-fixture.tsx" \
   -o "$DOCS_ASSETS/react-component.png"
 node packages/astroshot/bin/astroshot.mjs \
-  tui "$VERIFY_TMP/tui-fixture.tsx" \
-  -o "$DOCS_ASSETS/terminal-state.png"
+  ink "$VERIFY_TMP/ink-fixture.tsx" \
+  -o "$DOCS_ASSETS/ink-state.png"
+node packages/astroshot/bin/astroshot.mjs \
+  pty "$VERIFY_TMP/pty-fixture.yaml" \
+  -o "$DOCS_ASSETS/pty-state.png"
 
-for asset in "$DOCS_ASSETS/react-component.png" "$DOCS_ASSETS/terminal-state.png"; do
+for asset in \
+  "$DOCS_ASSETS/react-component.png" \
+  "$DOCS_ASSETS/ink-state.png" \
+  "$DOCS_ASSETS/pty-state.png"; do
   [[ -s "$asset" ]] || fail "documentation asset is empty: $asset"
   [[ "$(od -An -tx1 -N8 "$asset" | tr -d ' \n')" == "89504e470d0a1a0a" ]] ||
     fail "documentation asset is not a PNG: $asset"
@@ -143,9 +184,13 @@ The account panel exposes the editable fields and primary action.
 
 ![Account panel with editable fields and the Save action](/screenshots/react-component.png)
 
-The terminal confirmation state shows the final command before execution.
+The Ink confirmation state shows the final command before execution.
 
-![Terminal confirmation state with the command ready to run](/screenshots/terminal-state.png)
+![Ink confirmation state with the command ready to run](/screenshots/ink-state.png)
+
+The PTY state proves the real terminal program handled input.
+
+![Interactive terminal program ready for documentation](/screenshots/pty-state.png)
 EOF
 
 cat >"$VERIFY_TMP/docs/screenshots.yaml" <<'EOF'
@@ -154,10 +199,14 @@ shots:
     source: react-fixture.tsx
     page: content/component-guide.md
     regenerate: astroshot react
-  - asset: public/screenshots/terminal-state.png
-    source: tui-fixture.tsx
+  - asset: public/screenshots/ink-state.png
+    source: ink-fixture.tsx
     page: content/component-guide.md
-    regenerate: astroshot tui
+    regenerate: astroshot ink
+  - asset: public/screenshots/pty-state.png
+    source: pty-fixture.yaml
+    page: content/component-guide.md
+    regenerate: astroshot pty
 EOF
 
 node --input-type=module - "$VERIFY_TMP/docs" <<'EOF'
@@ -170,7 +219,7 @@ const markdown = fs.readFileSync(
   "utf8",
 );
 const images = [...markdown.matchAll(/!\[([^\]]+)\]\(\/screenshots\/([^)]+)\)/g)];
-if (images.length !== 2) throw new Error("docs proof must embed both images");
+if (images.length !== 3) throw new Error("docs proof must embed all three images");
 for (const [, alt, filename] of images) {
   if (!alt.trim() || /^screenshot of\b/i.test(alt)) {
     throw new Error(`docs proof has non-instructional alt text: ${alt}`);
@@ -202,17 +251,25 @@ bash bin/astroshot-capture \
 bash bin/astroshot-capture \
   --root "$STREAM_ROOT" \
   --feature skill-proof \
-  --slug terminal \
-  --title "Terminal proof" \
-  --description "astroshot tui generated this frame." \
-  --source "$DOCS_ASSETS/terminal-state.png" \
+  --slug ink \
+  --title "Ink proof" \
+  --description "astroshot ink generated this frame." \
+  --source "$DOCS_ASSETS/ink-state.png" \
+  >/dev/null
+bash bin/astroshot-capture \
+  --root "$STREAM_ROOT" \
+  --feature skill-proof \
+  --slug pty \
+  --title "PTY proof" \
+  --description "astroshot pty generated this frame." \
+  --source "$DOCS_ASSETS/pty-state.png" \
   >/dev/null
 MANIFEST="$STREAM_ROOT/.astroshot/skill-proof/manifest.json"
 [[ "$(jq -r '.status' "$MANIFEST")" == "running" ]] ||
   fail "automated proof must leave visual review status running"
-[[ "$(jq '.shots | length' "$MANIFEST")" == "2" ]] ||
-  fail "integration manifest did not contain both package screenshots"
-for file in react terminal; do
+[[ "$(jq '.shots | length' "$MANIFEST")" == "3" ]] ||
+  fail "integration manifest did not contain all package screenshots"
+for file in react ink pty; do
   jq -e --arg slug "$file" \
     '.shots[] | select(.slug == $slug) | .file' "$MANIFEST" >/dev/null ||
     fail "integration manifest missing $file screenshot"

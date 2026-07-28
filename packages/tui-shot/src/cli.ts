@@ -7,6 +7,7 @@ import path from "node:path";
 import YAML from "yaml";
 
 import { resolveBatchOutputPaths } from "./batch-paths.js";
+import { takePtyShot } from "./pty-shot.js";
 import { closeSharedBrowser, takeTuiShot } from "./shot.js";
 import type { BatchManifest } from "./types.js";
 
@@ -14,11 +15,12 @@ type Flags = Record<string, string | boolean>;
 const localRequire = createRequire(import.meta.url);
 
 function help(): void {
-  console.log(`tui-shot — deterministic PNG screenshots of Ink components
+  console.log(`tui-shot — deterministic PNG screenshots of terminal interfaces
 
 Usage:
   tui-shot install-browser [--with-deps]
   tui-shot shot <fixture.tsx> -o <out.png> [options]
+  tui-shot pty <fixture.yaml|json> -o <out.png> [options]
   tui-shot batch <manifest.yaml|json> [options]
 
 Options:
@@ -138,6 +140,21 @@ async function shot(fixturePath: string, flags: Flags): Promise<void> {
   console.log(`wrote ${written}`);
 }
 
+async function pty(fixturePath: string, flags: Flags): Promise<void> {
+  const outPath = flags.out;
+  if (typeof outPath !== "string") {
+    throw new Error("pty requires -o <out.png>");
+  }
+  assertPngPath(outPath);
+  const written = await takePtyShot({
+    fixturePath,
+    outPath,
+    headed: Boolean(flags.headed),
+    ...captureOverrides(flags),
+  });
+  console.log(`wrote ${written}`);
+}
+
 function parseManifest(absolute: string): BatchManifest {
   const raw = fs.readFileSync(absolute, "utf8");
   const value: unknown = absolute.endsWith(".json")
@@ -212,6 +229,9 @@ async function main(): Promise<void> {
   } else if (command === "shot") {
     if (!positionals[0]) throw new Error("shot requires a fixture path");
     await shot(positionals[0], flags);
+  } else if (command === "pty") {
+    if (!positionals[0]) throw new Error("pty requires a fixture path");
+    await pty(positionals[0], flags);
   } else if (command === "batch") {
     if (!positionals[0]) throw new Error("batch requires a manifest path");
     await batch(positionals[0], flags);

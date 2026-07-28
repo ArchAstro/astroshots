@@ -1,0 +1,11 @@
+version: 1
+command: node
+args:
+  - crashing-pty.mjs
+cwd: .
+cols: 40
+rows: 6
+timeoutMs: 5000
+settleMs: 100
+expectText:
+  - Fatal terminal state
