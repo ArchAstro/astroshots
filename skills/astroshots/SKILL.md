@@ -38,11 +38,11 @@ Update: `npx skills update astroshots -g -y` (global) or `npx skills update astr
 | Surface | Job |
 |---------|-----|
 | Desktop overlay | New frame flashes above all windows |
-| Menu-bar tray | Unified newest-first stream across projects under the watch root |
+| Menu-bar tray | Unified newest-first stream across projects under all watched folders |
 | Detail | Click a row; back returns to stream |
-| Settings (gear) | Watch root, overlay on/off |
+| Settings (gear) | Watched folders, overlay on/off |
 
-No project picker — project is a badge on each row. Configure the watch root in-app.
+No project picker — project is a badge on each row. Configure one or more watched folders in-app.
 
 ---
 
@@ -66,7 +66,7 @@ stream any generated image into the macOS app.
 |-----------|---------|
 | Manual or agent browser walk of a feature | Capture into `.astroshot/<feature>/` for live review |
 | Harness / smoke journey | Write each step with `astroshot-capture` (or the contract below) |
-| “Is Astroshots running / empty?” | Check app + watch root + that files are under `.astroshot/` |
+| “Is Astroshots running / empty?” | Check app + watched folders + that files are under `.astroshot/` |
 | Shipping docs site PNGs | Use the **screenshot** skill; use Astroshots for its visual review stream |
 
 **Astroshots is for live test/review streams**, not catalog asset production.
@@ -328,13 +328,13 @@ open Astroshots.xcodeproj       # ⌘R
 
 Or install a signed build from [Releases](https://github.com/ArchAstro/astroshots/releases).
 
-- Set **watch root** under tray → gear if needed.
+- Add or remove **watched folders** under tray → gear if needed.
 - App is menu bar only (no Dock icon).
 
 ### Sanity check that a write will appear
 
 ```bash
-# From a project under the watch root:
+# From a project under any watched folder:
 mkdir -p .astroshot/smoke-check
 cp /path/to/any.png .astroshot/smoke-check/0001-ping.png
 # Overlay should flash if Astroshots is running and overlay is enabled.
@@ -365,7 +365,7 @@ Astroshots will never see them.
 
 | Symptom | Fix |
 |---------|-----|
-| Empty tray | Files not under `**/.astroshot/**`, or watch root does not include this worktree |
+| Empty tray | Files not under `**/.astroshot/**`, or no watched folder includes this worktree |
 | No overlay | Gear → Show overlay; or file still settling (wait ~0.5s); or status bar app not running |
 | Wrong worktree badge | `.astroshot` must sit at worktree root, not nested under `services/…` unless that *is* the intended root |
 | Manifest ignored | Valid JSON; `file` must match the PNG basename |

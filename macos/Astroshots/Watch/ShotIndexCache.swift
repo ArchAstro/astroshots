@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persists locations of `.astroshot` directories discovered under the watch root.
+/// Persists locations of `.astroshot` directories discovered under watched roots.
 ///
 /// Warm start re-scans only these paths (cheap) so the tray fills before a full
 /// recursive walk of a large monorepo finishes. The full scan still runs and

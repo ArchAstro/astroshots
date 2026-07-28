@@ -143,9 +143,9 @@ explicitly that it remains open for debugging.
 
 ## Review the set with Astroshots
 
-On macOS, confirm Astroshots is running and its watch root includes the current
-project. Astroshots is an optional review surface, not proof that a human saw
-the images. On non-macOS systems or when the viewer is unavailable, open every
+On macOS, confirm Astroshots is running and one of its watched folders includes
+the current project. Astroshots is an optional review surface, not proof that a
+human saw the images. On non-macOS systems or when the viewer is unavailable, open every
 PNG with the agent's image inspection tool or a local image viewer instead.
 
 Resolve a caller override first, then check project-local, global, and clone

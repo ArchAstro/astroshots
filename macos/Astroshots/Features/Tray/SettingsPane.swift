@@ -47,36 +47,65 @@ struct SettingsPane: View {
                     }
 
                     card {
-                        Text("Watch root")
+                        Text("Watched folders")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("One recursive root. Every worktree under it streams in — no picker.")
+                        Text("Every worktree below any of these folders streams into one feed.")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.muted)
                             .padding(.bottom, 4)
 
-                        HStack(spacing: 7) {
-                            Circle()
-                                .fill(Color(hex: 0x20A37F))
-                                .frame(width: 6, height: 6)
-                            Text(displayPath(appState.watchRootPath))
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(Theme.ink2)
-                                .lineLimit(2)
-                            Spacer(minLength: 0)
+                        ForEach(
+                            Array(appState.watchRootPaths.enumerated()),
+                            id: \.element
+                        ) { index, path in
+                            HStack(spacing: 7) {
+                                Circle()
+                                    .fill(Color(hex: 0x20A37F))
+                                    .frame(width: 6, height: 6)
+                                Text(displayPath(path))
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(Theme.ink2)
+                                    .lineLimit(2)
+                                Spacer(minLength: 0)
+                                Button {
+                                    appState.removeWatchRoot(path)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(Theme.muted)
+                                        .frame(width: 18, height: 18)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(appState.watchRootPaths.count == 1)
+                                .help(
+                                    appState.watchRootPaths.count == 1
+                                        ? "Add another folder before removing this one"
+                                        : "Stop watching this folder"
+                                )
+                                .accessibilityIdentifier("remove-watch-root-\(index)")
+                                .accessibilityLabel(
+                                    "Stop watching \(displayPath(path))"
+                                )
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(
+                                Theme.surface,
+                                in: RoundedRectangle(cornerRadius: 8)
+                            )
+                            .accessibilityIdentifier("watch-root-\(index)")
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
 
                         HStack(spacing: 8) {
-                            Button("Choose…") {
-                                appState.chooseWatchRoot()
+                            Button("Add folders…") {
+                                appState.chooseWatchRoots()
                             }
                             .buttonStyle(.plain)
                             .font(.system(size: 11, weight: .semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+                            .accessibilityIdentifier("add-watch-roots")
 
                             Button("Rescan") {
                                 appState.rescan()

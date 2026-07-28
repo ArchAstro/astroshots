@@ -25,9 +25,9 @@ xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platfo
 
 ## Behavior
 
-- **Watch root** (configurable; default `~/archastro`): recursive scan + FSEvents
+- **Watch roots** (configurable; default `~/archastro`): recursive scan + FSEvents
   for `**/.astroshot/<feature>/*.{png,jpg,…}` and `manifest.json`.
-- **No project picker**: every project under the watch root streams into one
+- **No project picker**: every project under the watched roots streams into one
   newest-first list. Project name is a badge on each row / overlay.
 - **Desktop overlay**: new frames float above all windows; Open jumps to detail.
 - **Tray**: stream → click for detail → gear for settings. Pin keeps a floating window.

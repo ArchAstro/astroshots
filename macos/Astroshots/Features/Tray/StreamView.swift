@@ -218,14 +218,14 @@ struct EmptyStreamView: View {
                 .frame(width: 40, height: 40)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
                 .padding(.bottom, 12)
-            Text(appState.isScanning ? "Scanning watch root…" : "Waiting for frames")
+            Text(appState.isScanning ? "Scanning watched folders…" : "Waiting for frames")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
                 .padding(.bottom, 5)
             Text(
                 appState.isScanning
                     ? "First scan of a large folder can take a bit. The menu bar icon stays available."
-                    : "When any project under the watch root writes to .astroshot/, shots land here and on the desktop."
+                    : "When any project under a watched folder writes to .astroshot/, shots land here and on the desktop."
             )
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
