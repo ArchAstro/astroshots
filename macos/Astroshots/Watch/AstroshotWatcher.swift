@@ -307,21 +307,22 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     func makeShot(at path: String, manifest: FeatureManifest? = nil) -> Shot? {
-        guard let parts = ShotPath.parse(imagePath: path) else { return nil }
-        let featureDir = URL(fileURLWithPath: path).deletingLastPathComponent()
+        let canonicalPath = Self.canonicalPath(path)
+        guard let parts = ShotPath.parse(imagePath: canonicalPath) else { return nil }
+        let featureDir = URL(fileURLWithPath: canonicalPath).deletingLastPathComponent()
         let resolvedManifest = manifest ?? ManifestParser.load(from: featureDir)
         let meta = ManifestParser.shotMetadata(fileName: parts.fileName, manifest: resolvedManifest)
         let review = try? ReviewStore.readReview(
-            forImage: URL(fileURLWithPath: path),
+            forImage: URL(fileURLWithPath: canonicalPath),
             featureDirectory: featureDir,
             expectedRunID: meta.runID
         )
 
-        let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+        let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalPath)
         let mtime = (attrs?[.modificationDate] as? Date) ?? Date()
 
         return Shot(
-            path: path,
+            path: canonicalPath,
             worktree: parts.worktree,
             worktreePath: parts.worktreePath,
             feature: parts.feature,
@@ -388,7 +389,8 @@ final class AstroshotWatcher: @unchecked Sendable {
     /// without relying on the host FSEvents daemon.
     func handleFSEvents(paths: [String]) {
         var featureDirectories = Set<String>()
-        for path in paths {
+        for eventPath in paths {
+            let path = Self.canonicalPath(eventPath)
             if path.hasSuffix("manifest.json") || path.hasSuffix(ReviewStore.sidecarFileName) {
                 featureDirectories.insert(
                     URL(fileURLWithPath: path)
@@ -406,6 +408,16 @@ final class AstroshotWatcher: @unchecked Sendable {
         for directory in featureDirectories {
             scheduleFeatureRefresh(directoryPath: directory)
         }
+    }
+
+    /// FSEvents may report `/private/var/...` for a file scanned through
+    /// `/var/...`. Canonicalize both boundaries so one file cannot enter the
+    /// stream twice under symlink-equivalent paths.
+    private static func canonicalPath(_ path: String) -> String {
+        URL(fileURLWithPath: path)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
     }
 
     private func scheduleFeatureRefresh(directoryPath: String) {
