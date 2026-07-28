@@ -83,7 +83,9 @@ expectText:
 
 The child receives `TERM=xterm-256color`, a fixed terminal grid, and the
 fixture environment. `command` is spawned directly—not through a shell—and
-`cwd` resolves relative to the fixture. Supported actions are:
+`cwd` resolves relative to the fixture. On Windows, use an `.exe`; `.cmd` and
+`.bat` scripts are rejected because they require a shell. Supported actions
+are:
 
 - `waitFor` with an optional per-action `timeoutMs`;
 - `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or

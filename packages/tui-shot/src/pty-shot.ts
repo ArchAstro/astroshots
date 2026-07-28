@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 import type { IPty } from "node-pty";
 import YAML from "yaml";
@@ -219,11 +221,24 @@ function resolvePtyCommand(
   cwd: string,
   env: NodeJS.ProcessEnv,
 ): string {
-  if (path.isAbsolute(command)) return command;
+  const validateExecutable = (resolved: string): string => {
+    if (
+      process.platform === "win32" &&
+      [".bat", ".cmd"].includes(path.extname(resolved).toLowerCase())
+    ) {
+      throw new Error(
+        `PTY command resolves to a Windows batch script, which requires a shell: ${resolved}. ` +
+          "Use the underlying .exe executable to keep capture shell-free.",
+      );
+    }
+    return resolved;
+  };
+
+  if (path.isAbsolute(command)) return validateExecutable(command);
   if (command.includes("/") || command.includes("\\")) {
-    return path.resolve(cwd, command);
+    return validateExecutable(path.resolve(cwd, command));
   }
-  if (process.platform !== "win32") return command;
+  if (process.platform !== "win32") return validateExecutable(command);
 
   const pathValue =
     Object.entries(env).find(([name]) => name.toLowerCase() === "path")?.[1] ??
@@ -243,11 +258,13 @@ function resolvePtyCommand(
     if (!unquotedDirectory) continue;
     for (const extension of extensions) {
       const candidate = path.join(unquotedDirectory, command + extension);
+      let isFile = false;
       try {
-        if (fs.statSync(candidate).isFile()) return candidate;
+        isFile = fs.statSync(candidate).isFile();
       } catch {
         // Continue through PATH candidates.
       }
+      if (isFile) return validateExecutable(candidate);
     }
   }
   throw new Error(`PTY command was not found on PATH: ${command}`);
@@ -306,7 +323,23 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     ...fixture.env,
   };
   const command = resolvePtyCommand(fixture.command, cwd, childEnvironment);
+  const useExitWrapper =
+    process.platform === "win32" ||
+    process.env.ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER === "1";
+  const exitMarkerToken = useExitWrapper ? randomBytes(16).toString("hex") : "";
+  const exitMarkerPrefix = `\x1b]777;astroshot-exit-${exitMarkerToken}=`;
+  const spawnedCommand = useExitWrapper ? process.execPath : command;
+  const spawnedArgs = useExitWrapper
+    ? [
+        fileURLToPath(new URL("./pty-exit-wrapper.js", import.meta.url)),
+        exitMarkerToken,
+        command,
+        ...(fixture.args ?? []),
+      ]
+    : (fixture.args ?? []);
   let writes = Promise.resolve();
+  let markerBuffer = "";
+  let wrappedExitCode: number | null = null;
   let child: IPty | null = null;
   let exited: { exitCode: number; signal?: number } | null = null;
   let resolveExit: (() => void) | null = null;
@@ -348,7 +381,7 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
         { cause: error },
       );
     }
-    child = spawnPty(command, fixture.args ?? [], {
+    child = spawnPty(spawnedCommand, spawnedArgs, {
       name: "xterm-256color",
       cols,
       rows,
@@ -356,6 +389,18 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
       env: childEnvironment,
     });
     child.onData((data) => {
+      if (useExitWrapper && wrappedExitCode === null) {
+        markerBuffer = (markerBuffer + data).slice(-4_096);
+        const markerStart = markerBuffer.lastIndexOf(exitMarkerPrefix);
+        if (markerStart !== -1) {
+          const valueStart = markerStart + exitMarkerPrefix.length;
+          const markerEnd = markerBuffer.indexOf("\x07", valueStart);
+          if (markerEnd !== -1) {
+            const value = markerBuffer.slice(valueStart, markerEnd);
+            if (/^\d+$/.test(value)) wrappedExitCode = Number(value);
+          }
+        }
+      }
       writes = writes.then(() => writeTerminal(terminal, data));
     });
     child.onExit((event) => {
@@ -388,9 +433,20 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     await writes;
     const plainFrame = screen();
     const completed = exitState();
-    if (completed && completed.exitCode !== 0 && !fixture.allowNonZeroExit) {
+    if (useExitWrapper && completed && wrappedExitCode === null) {
       throw new Error(
-        `PTY program exited with code ${completed.exitCode} before capture. ` +
+        "The PTY status wrapper exited without reporting the program exit code.",
+      );
+    }
+    const completedExitCode = wrappedExitCode ?? completed?.exitCode;
+    if (
+      completedExitCode !== undefined &&
+      completedExitCode !== null &&
+      completedExitCode !== 0 &&
+      !fixture.allowNonZeroExit
+    ) {
+      throw new Error(
+        `PTY program exited with code ${completedExitCode} before capture. ` +
           "Set allowNonZeroExit: true only when documenting an intentional failure state. " +
           `Visible frame:\n${plainFrame.slice(0, 1_200)}`,
       );
