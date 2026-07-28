@@ -51,11 +51,12 @@ No project picker — project is a badge on each row. Configure one or more watc
 | What the frame must prove | Tool |
 |---------------------------|------|
 | Fixed React component state | `@archastro/astroshot react` from npmjs and the **react-shot** skill |
-| Fixed Ink terminal state | `@archastro/astroshot tui` from npmjs and the **tui-shot** skill |
+| Fixed Ink terminal state | `@archastro/astroshot ink` from npmjs and the **tui-shot** skill |
+| Interactive Ratatui or arbitrary terminal process | `@archastro/astroshot pty` from npmjs and the **tui-shot** skill |
 | Routing, auth, live data, or full browser shell | `agent-browser` and the **agent-browser** skill |
 | Live human review of any resulting PNG | `astroshot-capture` from this skill |
 
-The two npm modes generate deterministic images. This skill describes how to
+The npm modes generate deterministic images. This skill describes how to
 stream any generated image into the macOS app.
 
 ---
@@ -268,7 +269,7 @@ FEATURE="install-wizard"
 Without agent-browser (copy an existing PNG):
 
 ```bash
-# Generate the source with react-shot, tui-shot, or any image tool.
+# Generate the source with astroshot react, ink, pty, or any image tool.
 "$CAPTURE" \
   --feature "$FEATURE" \
   --slug signed-in \
@@ -383,7 +384,7 @@ Astroshots will never see them.
   `npx skills add ArchAstro/astroshots --skill screenshot -g -y`
 - **react-shot** skill — deterministic React component PNGs
   `npx skills add ArchAstro/astroshots --skill react-shot -g -y`
-- **tui-shot** skill — deterministic Ink terminal PNGs
+- **tui-shot** skill — deterministic Ink and arbitrary PTY terminal PNGs
   `npx skills add ArchAstro/astroshots --skill tui-shot -g -y`
 - **agent-browser** skill — drive the browser CLI  
   `npx skills add ArchAstro/astroshots --skill agent-browser -g -y`

@@ -153,16 +153,22 @@ decision and comments do not carry forward, even when the image bytes match.
 ## Screenshot tools
 
 Astroshots publishes one fixture-driven CLI,
-[`@archastro/astroshot`](packages/astroshot), with React and terminal modes.
+[`@archastro/astroshot`](packages/astroshot), with React, Ink, and PTY modes.
 It creates deterministic documentation and review images without requiring a
 running application:
 
 | Mode | Use it for | Command |
 |------|------------|---------|
 | `react` | React components, dialogs, forms, and other isolated UI states | `astroshot react <fixture> -o <image>` |
-| `tui` | Ink terminal components rendered through a real terminal model | `astroshot tui <fixture> -o <image>` |
+| `ink` | Ink terminal components rendered through a real terminal model | `astroshot ink <fixture> -o <image>` |
+| `pty` | Arbitrary terminal executables such as Ratatui, Bubble Tea, or curses | `astroshot pty <fixture> -o <image>` |
 
-Install Chromium once for both modes:
+Generate a typed or declarative starting fixture with `astroshot init react`,
+`astroshot init ink`, or `astroshot init pty`. Existing files are preserved
+unless `--force` is explicit. The former `tui` command remains an alias for
+`ink`.
+
+Install Chromium once for all modes:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
@@ -182,13 +188,23 @@ npx --@archastro:registry=https://registry.npmjs.org \
 Capture an Ink fixture:
 
 ```bash
+npm install --save-dev ink@^7.1 react@^19
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
+  @archastro/astroshot ink ./fixtures/install-wizard.tsx \
   -o ./screenshots/install-wizard.png
 ```
 
-Both modes also accept `batch <manifest.yaml|json>`. Their fixture APIs,
-configuration, and manifest formats are documented in the package READMEs.
+Capture a real Ratatui or other terminal executable through a pseudoterminal:
+
+```bash
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot pty ./fixtures/ratatui.yaml \
+  -o ./screenshots/ratatui.png
+```
+
+React and Ink modes also accept `batch <manifest.yaml|json>`. Their fixture
+APIs, PTY action contract, configuration, and manifest formats are documented
+in the package READMEs.
 Use a component tool when fixed props can express the state. Use a browser
 journey when the screenshot must prove routing, authentication, live data, or
 the complete application shell.
@@ -213,7 +229,7 @@ npx --@archastro:registry=https://registry.npmjs.org \
   --source /tmp/account-dialog.png
 ```
 
-The npm CLI runs independently of the macOS viewer; CI verifies both modes on
+The npm CLI runs independently of the macOS viewer; CI verifies all modes on
 Linux with the minimum supported Node.js release and Node.js 24 LTS. The live
 viewer remains a macOS application.
 
@@ -257,7 +273,7 @@ This repo ships **six** skills. Install them with the [skills](https://github.co
 | **astroshots** | Write live screenshot streams under `.astroshot/` |
 | **screenshot** | Plan, generate, review, and maintain documentation image sets |
 | **react-shot** | Capture deterministic React fixtures with `@archastro/astroshot react` |
-| **tui-shot** | Capture deterministic Ink fixtures with `@archastro/astroshot tui` |
+| **tui-shot** | Capture deterministic Ink fixtures and arbitrary PTY programs with `@archastro/astroshot ink` or `pty` |
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
 

@@ -1,9 +1,11 @@
 {
   "name": "@archastro/tui-shot",
   "version": "0.1.0",
-  "description": "Fixture-driven PNG screenshots of real Ink terminal UI states",
+  "description": "Deterministic PNG screenshots of Ink fixtures and arbitrary PTY programs",
   "keywords": [
     "ink",
+    "pty",
+    "ratatui",
     "terminal",
     "screenshot",
     "testing",
@@ -61,9 +63,20 @@
     "tsx": "^4.20.0",
     "yaml": "^2.8.0"
   },
+  "optionalDependencies": {
+    "node-pty": "1.2.0-beta.14"
+  },
   "peerDependencies": {
     "ink": "^7.1.0",
     "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ink": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

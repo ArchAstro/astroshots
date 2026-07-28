@@ -108,7 +108,7 @@ async function loadFixture(fixturePath: string): Promise<FixtureContext> {
   };
 }
 
-function validPositive(
+export function validPositive(
   value: number,
   name: string,
   options: { integer?: boolean; maximum: number },
@@ -124,6 +124,107 @@ function validPositive(
     );
   }
   return value;
+}
+
+export interface TerminalCaptureRequest {
+  terminalRows: string;
+  outPath: string;
+  headed?: boolean;
+  cols: number;
+  rows: number;
+  scale: number;
+  background: string;
+  foreground: string;
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  padding: number;
+  borderRadius: number;
+}
+
+export async function captureTerminalHtml(
+  request: TerminalCaptureRequest,
+): Promise<string> {
+  const {
+    terminalRows,
+    cols,
+    rows,
+    scale,
+    background,
+    foreground,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    padding,
+    borderRadius,
+  } = request;
+  const cssWidth = Math.ceil(cols * fontSize * 0.62 + padding * 2);
+  const cssHeight = Math.ceil(rows * fontSize * lineHeight + padding * 2);
+  const outPath = path.resolve(request.outPath);
+  if (path.extname(outPath).toLowerCase() !== ".png") {
+    throw new Error(`Output must use a .png extension: ${outPath}`);
+  }
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+
+  const browser = await browserFor(Boolean(request.headed));
+  let page;
+  try {
+    page = await browser.newPage({
+      viewport: { width: cssWidth + 32, height: cssHeight + 32 },
+      deviceScaleFactor: scale,
+    });
+  } catch (error) {
+    await closeBrowserNow();
+    throw error;
+  }
+  try {
+    await page.setContent(
+      `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            html, body { margin: 0; padding: 0; background: transparent; }
+            body { display: inline-block; padding: 16px; }
+            [data-tui-shot] {
+              box-sizing: border-box;
+              width: ${cssWidth}px;
+              height: ${cssHeight}px;
+              overflow: hidden;
+              padding: ${padding}px;
+              border: 1px solid rgba(185, 168, 255, .18);
+              border-radius: ${borderRadius}px;
+              background: ${background};
+              color: ${foreground};
+              box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
+              font-family: ${fontFamily};
+              font-size: ${fontSize}px;
+              font-variant-ligatures: none;
+              font-weight: 400;
+              line-height: ${lineHeight};
+              text-rendering: geometricPrecision;
+            }
+            .tui-row {
+              height: ${lineHeight}em;
+              overflow: hidden;
+              white-space: pre;
+            }
+          </style>
+        </head>
+        <body>
+          <div data-tui-shot role="img" aria-label="Terminal screenshot">${terminalRows}</div>
+        </body>
+      </html>`,
+      { waitUntil: "load" },
+    );
+    await page.locator("[data-tui-shot]").screenshot({
+      path: outPath,
+      omitBackground: true,
+    });
+  } finally {
+    await page.close();
+  }
+  return outPath;
 }
 
 async function takeIsolatedTuiShot(request: TuiShotRequest): Promise<string> {
@@ -204,80 +305,32 @@ async function renderTuiShot(
     foreground,
     background,
   });
-  const cssWidth = Math.ceil(cols * fontSize * 0.62 + padding * 2);
-  const cssHeight = Math.ceil(rows * fontSize * lineHeight + padding * 2);
-  const outPath = path.resolve(request.outPath);
-  if (path.extname(outPath).toLowerCase() !== ".png") {
-    throw new Error(`Output must use a .png extension: ${outPath}`);
-  }
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-
-  const browser = await browserFor(Boolean(request.headed));
-  let page;
-  try {
-    page = await browser.newPage({
-      viewport: { width: cssWidth + 32, height: cssHeight + 32 },
-      deviceScaleFactor: scale,
-    });
-  } catch (error) {
-    await closeBrowserNow();
-    throw error;
-  }
-  try {
-    await page.setContent(
-      `<!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <style>
-            html, body { margin: 0; padding: 0; background: transparent; }
-            body { display: inline-block; padding: 16px; }
-            [data-tui-shot] {
-              box-sizing: border-box;
-              width: ${cssWidth}px;
-              height: ${cssHeight}px;
-              overflow: hidden;
-              padding: ${padding}px;
-              border: 1px solid rgba(185, 168, 255, .18);
-              border-radius: ${borderRadius}px;
-              background: ${background};
-              color: ${foreground};
-              box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
-              font-family: ${fontFamily};
-              font-size: ${fontSize}px;
-              font-variant-ligatures: none;
-              font-weight: 400;
-              line-height: ${lineHeight};
-              text-rendering: geometricPrecision;
-            }
-            .tui-row {
-              height: ${lineHeight}em;
-              overflow: hidden;
-              white-space: pre;
-            }
-          </style>
-        </head>
-        <body>
-          <div data-tui-shot role="img" aria-label="Terminal screenshot">${terminalRows}</div>
-        </body>
-      </html>`,
-      { waitUntil: "load" },
-    );
-    await page.locator("[data-tui-shot]").screenshot({
-      path: outPath,
-      omitBackground: true,
-    });
-  } finally {
-    await page.close();
-  }
-  return outPath;
+  return captureTerminalHtml({
+    terminalRows,
+    outPath: request.outPath,
+    headed: request.headed,
+    cols,
+    rows,
+    scale,
+    background,
+    foreground,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    padding,
+    borderRadius,
+  });
 }
 
-export function takeTuiShot(request: TuiShotRequest): Promise<string> {
-  const shot = shotQueue.then(() => takeIsolatedTuiShot(request));
+export function queueTerminalShot<T>(task: () => Promise<T>): Promise<T> {
+  const shot = shotQueue.then(task);
   shotQueue = shot.then(
     () => undefined,
     () => undefined,
   );
   return shot;
+}
+
+export function takeTuiShot(request: TuiShotRequest): Promise<string> {
+  return queueTerminalShot(() => takeIsolatedTuiShot(request));
 }

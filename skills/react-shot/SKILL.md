@@ -15,7 +15,7 @@ UI whose state can be expressed with fixed props and local providers.
 
 Use **agent-browser** instead when the image must prove authentication,
 routing, live backend data, or a complete application shell. Use
-**tui-shot** for Ink terminal UI.
+**tui-shot** for Ink and arbitrary PTY terminal UI.
 
 ## Run with npx
 
@@ -142,6 +142,6 @@ what the frame proves, and whether it was added to an Astroshots stream.
 
 - **screenshot** — documentation image planning, review, and asset conventions
 - **astroshots** — live `.astroshot/` streams and manifests
-- **tui-shot** — deterministic Ink terminal fixtures
+- **tui-shot** — deterministic Ink and arbitrary PTY terminal fixtures
 - **agent-browser** — real browser journeys against a running app
 - **browser-ui-harness** — repeatable end-to-end browser harnesses

@@ -1,68 +1,57 @@
 ---
 name: tui-shot
 description: >
-  Capture deterministic PNG screenshots of Ink terminal components with the
-  tui mode of the unified @archastro/astroshot CLI. Use for terminal UI
-  documentation, wizard states, command-center views, and repeatable
-  fixture-driven TUI images.
+  Capture deterministic PNG screenshots of terminal interfaces with the
+  unified @archastro/astroshot CLI. Use Ink fixtures for synthetic component
+  states and PTY fixtures for arbitrary interactive executables including
+  Ratatui, Bubble Tea, Textual, and curses programs.
 ---
 
-# astroshot tui
+# Capture terminal screenshots
 
-`@archastro/astroshot tui` renders a real Ink tree, interprets its ANSI output
-with a terminal model, and screenshots the styled terminal grid in Chromium.
-Prefer it for fixed terminal states that should not depend on a PTY, timing,
-or a running service.
+Choose the boundary deliberately:
 
-Use **react-shot** for browser React components. Use a real PTY or end-to-end
-harness when the image must prove keyboard interaction, process lifecycle, or
-live network behavior.
+| Need | Mode |
+|---|---|
+| Fixed state expressible as an Ink/React tree | `astroshot ink` |
+| Real executable, raw mode, alternate screen, or keyboard interaction | `astroshot pty` |
+| Browser React component | Read the **react-shot** skill |
+| Full browser journey | Read the **agent-browser** skill |
 
-## Run with npx
+`pty` is the correct mode for Ratatui. It launches the program in a real
+pseudoterminal, sends its VT stream through xterm, scripts input, and captures
+the final grid in Chromium. Do not attempt to import a Ratatui program into an
+Ink fixture.
 
-No global install is required:
+## Set up
+
+No global Astroshot install is required. For Ink capture, install its
+project-local peers; PTY-only projects do not need them:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot tui --help
-```
-
-Install the Playwright browser once on a new machine:
-
-```bash
+npm install --save-dev ink@^7.1 react@^19
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot --help
 npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
 ```
 
-`npx` downloads and executes the package. Pin an exact package version in CI
-or other security-sensitive automation, and review its npm provenance before
-first use. Browser installation downloads a Chromium build; on Linux CI,
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser --with-deps`
-may also install
-operating-system packages and should run only in an expected build environment.
+Pin an exact package version in CI. On Linux images missing browser libraries,
+use `install-browser --with-deps`.
 
-Capture one fixture:
+## Capture Ink
+
+Generate a starting fixture:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
-  -o ./screenshots/install-wizard.png
+  @archastro/astroshot init ink ./fixtures/install-wizard.tsx
 ```
 
-Capture a manifest:
-
-```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui batch ./shots.yaml
-```
-
-## Fixture design
-
-A fixture default-exports the Ink element and terminal metadata. Import the
-public type from the package:
+Edit the generated TSX to render the intended production component and state:
 
 ```tsx
 import React from "react";
 import { Box, Text } from "ink";
-import type { TuiShotFixture } from "@archastro/astroshot/tui";
+import type { InkShotFixture } from "@archastro/astroshot/ink";
 
 export default {
   cols: 72,
@@ -74,70 +63,109 @@ export default {
       <Text color="cyan">Continue</Text>
     </Box>
   ),
-} satisfies TuiShotFixture;
+} satisfies InkShotFixture;
 ```
 
-Keep fixtures deterministic:
-
-- render a specific state instead of replaying input;
-- use synthetic values and stable terminal dimensions;
-- assert distinctive `expectText` so the wrong state fails loudly;
-- avoid clocks, spinners, random IDs, and live network calls;
-- inspect the PNG for wrapping, clipping, color contrast, and private data.
-
-See the package README for the complete fixture and batch manifest contracts.
-
-## Trust boundary
-
-Fixtures and every module they import are executable code with the current
-user's permissions; Chromium does not sandbox the Node-side fixture load.
-Review untrusted pull requests and downloaded manifests before running them,
-and never put credentials or private customer data in a fixture or shipped
-PNG.
-
-## Send the PNG to Astroshots
+Capture it:
 
 ```bash
-# Install the astroshots skill first:
-# npx skills add ArchAstro/astroshots --skill astroshots -g -y
-CAPTURE="$(ls -d \
-  ~/.agents/skills/astroshots/scripts/astroshot-capture \
-  ~/.claude/skills/astroshots/scripts/astroshot-capture \
-  ~/.codex/skills/astroshots/scripts/astroshot-capture \
-  2>/dev/null | head -1)"
-test -x "$CAPTURE" || {
-  echo "Install the astroshots skill or set CAPTURE to ./bin/astroshot-capture" >&2
-  exit 1
-}
-
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui ./fixtures/install-wizard.tsx \
-  -o /tmp/install-wizard.png
+  @archastro/astroshot ink ./fixtures/install-wizard.tsx \
+  -o ./screenshots/install-wizard.png
+```
 
+Use `ink batch <manifest.yaml|json>` for maintained fixture sets.
+
+## Capture an arbitrary PTY program
+
+Build the program first, then generate and edit a declarative fixture:
+
+```bash
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot init pty ./fixtures/install-wizard.yaml
+```
+
+```yaml
+version: 1
+command: ./target/debug/install-wizard
+args: []
+cwd: ..
+cols: 100
+rows: 30
+timeoutMs: 15000
+actions:
+  - waitFor: Choose an option
+  - key: down
+  - key: enter
+  - waitFor: Ready
+expectText:
+  - Ready
+```
+
+`cwd` resolves relative to the fixture. The command launches directly without
+a shell. Actions may use:
+
+- `waitFor` and optional `timeoutMs`;
+- `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or
+  `ctrl-d`;
+- `text` for literal input;
+- `pauseMs` only when no visible readiness signal exists.
+
+Prefer `waitFor` over timing. End with distinctive `expectText` so a wrong
+screen fails instead of becoming documentation.
+
+Use this path for text and ANSI/VT applications. It does not currently model
+mouse input, mid-run resize actions, Sixel, or Kitty graphics.
+
+Nonzero child exit fails capture by default. Use `allowNonZeroExit: true` only
+when the documentation intentionally demonstrates a failure state.
+
+```bash
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot pty ./fixtures/install-wizard.yaml \
+  -o ./screenshots/install-wizard.png
+```
+
+## Make documentation reproducible
+
+- Commit fixture sources beside the documentation.
+- Use synthetic data and fixed terminal dimensions.
+- Avoid clocks, spinners, random IDs, and live services unless they are the
+  behavior being documented.
+- Inspect wrapping, clipping, colors, and private data in the PNG.
+- Record the fixture, command, output path, and terminal dimensions.
+
+## Send the PNG to Astroshots review
+
+Read the **astroshots** skill, locate its `astroshot-capture` helper, then:
+
+```bash
 "$CAPTURE" \
   --feature terminal-install \
   --slug install-wizard \
   --title "Install wizard" \
   --description "The confirmation step is ready." \
-  --source /tmp/install-wizard.png
+  --source ./screenshots/install-wizard.png
 ```
 
-Finalize a review journey with:
+Finalize the run only after all documentation states are captured:
 
 ```bash
 "$CAPTURE" --feature terminal-install --status pass --finalize
 ```
 
+Do not manufacture approval or rewrite human review feedback. Read the
+Astroshots review state and regenerate the source fixture when comments request
+changes.
+
+## Trust boundary
+
+Ink fixtures, imports, and PTY commands execute with the current user's
+permissions. A pseudoterminal is not a security sandbox. Review untrusted
+changes before capture and use a container for untrusted programs.
+
 ## Report
 
-Tell the human which fixture and command produced the image, its output path,
-what terminal dimensions were used, and whether it was added to an Astroshots
-stream.
-
-## Related skills
-
-- **screenshot** — documentation image planning, review, and asset conventions
-- **astroshots** — live `.astroshot/` streams and manifests
-- **react-shot** — deterministic browser component fixtures
-- **agent-browser** — real browser journeys against a running app
-- **browser-ui-harness** — repeatable end-to-end browser harnesses
+Tell the human which mode, fixture, and command produced the image; the output
+path and terminal dimensions; the final text assertion; and whether it was
+added to an Astroshots review stream.

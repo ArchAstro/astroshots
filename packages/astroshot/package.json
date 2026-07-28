@@ -5,6 +5,8 @@
   "keywords": [
     "react",
     "ink",
+    "pty",
+    "ratatui",
     "terminal",
     "screenshot",
     "visual-testing"
@@ -28,6 +30,14 @@
       "types": "./react.d.ts",
       "import": "./react.js"
     },
+    "./ink": {
+      "types": "./ink.d.ts",
+      "import": "./ink.js"
+    },
+    "./pty": {
+      "types": "./pty.d.ts",
+      "import": "./pty.js"
+    },
     "./tui": {
       "types": "./tui.d.ts",
       "import": "./tui.js"
@@ -37,6 +47,10 @@
     "bin",
     "react.d.ts",
     "react.js",
+    "ink.d.ts",
+    "ink.js",
+    "pty.d.ts",
+    "pty.js",
     "tui.d.ts",
     "tui.js",
     "README.md"

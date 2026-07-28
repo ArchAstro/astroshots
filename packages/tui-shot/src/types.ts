@@ -28,6 +28,60 @@ export interface TuiShotRequest {
   scale?: number;
 }
 
+export type PtyKey =
+  | "enter"
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "tab"
+  | "escape"
+  | "backspace"
+  | "space"
+  | "ctrl-c"
+  | "ctrl-d";
+
+export type PtyAction =
+  | { waitFor: string; timeoutMs?: number }
+  | { key: PtyKey }
+  | { text: string }
+  | { pauseMs: number };
+
+export interface PtyShotFixture {
+  version: 1;
+  /** Executable launched directly, without an intermediary shell. */
+  command: string;
+  args?: string[];
+  /** Working directory, relative to the fixture file by default. */
+  cwd?: string;
+  env?: Record<string, string>;
+  cols?: number;
+  rows?: number;
+  timeoutMs?: number;
+  settleMs?: number;
+  /** Permit a child that exits nonzero before capture. Defaults to false. */
+  allowNonZeroExit?: boolean;
+  actions?: PtyAction[];
+  expectText?: string[];
+  background?: string;
+  foreground?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  lineHeight?: number;
+  padding?: number;
+  borderRadius?: number;
+  scale?: number;
+}
+
+export interface PtyShotRequest {
+  fixturePath: string;
+  outPath: string;
+  headed?: boolean;
+  cols?: number;
+  rows?: number;
+  scale?: number;
+}
+
 export interface BatchEntry {
   fixture: string;
   out: string;
