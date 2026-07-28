@@ -43,6 +43,7 @@ export type PtyKey =
 
 export type PtyAction =
   | { waitFor: string; timeoutMs?: number }
+  | { waitForExit: true; timeoutMs?: number }
   | { key: PtyKey }
   | { text: string }
   | { pauseMs: number };

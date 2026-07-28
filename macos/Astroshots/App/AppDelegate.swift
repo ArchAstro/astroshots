@@ -24,7 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if let trayPath = ProcessInfo.processInfo.environment[
             "ASTROSHOTS_UI_TEST_TRAY_PATH"
         ] {
-            DispatchQueue.main.async {
+            // Give AppKit one pass to attach the status item to the menu bar.
+            // Showing an NSPopover before its anchor has a window is a no-op.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 controller.openTray(atImagePath: trayPath)
             }
         }

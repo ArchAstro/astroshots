@@ -107,6 +107,8 @@ a shell. On Windows, select the underlying `.exe`; `.cmd` and `.bat` scripts
 are rejected because they require a shell. Actions may use:
 
 - `waitFor` and optional `timeoutMs`;
+- `waitForExit: true` and optional `timeoutMs` when the program must terminate
+  before capture;
 - `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or
   `ctrl-d`;
 - `text` for literal input;
@@ -119,7 +121,9 @@ Use this path for text and ANSI/VT applications. It does not currently model
 mouse input, mid-run resize actions, Sixel, or Kitty graphics.
 
 Nonzero child exit fails capture by default. Use `allowNonZeroExit: true` only
-when the documentation intentionally demonstrates a failure state.
+when the documentation intentionally demonstrates a failure state. If
+completion is part of the intended state, finish with `waitForExit: true` so
+capture waits for the authoritative child status.
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
