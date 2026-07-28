@@ -1,7 +1,7 @@
 name: Release DMG
 
 # Signed + notarized DMG only for version tags (and optional manual re-run).
-# PRs and branch pushes do not build a DMG — see ci.yml for tests only.
+# PRs and branch pushes exercise the same layout with an ad-hoc build in CI.
 on:
   push:
     tags: ["v*"]

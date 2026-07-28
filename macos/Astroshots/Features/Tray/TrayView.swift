@@ -24,13 +24,16 @@ struct TrayView: View {
     private var header: some View {
         HStack(spacing: 8) {
             HStack(spacing: 8) {
-                Text("◆")
-                    .font(.system(size: 10, weight: .heavy))
+                Image("AstroshotsMark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
                     .foregroundStyle(.white)
+                    .padding(5)
                     .frame(width: 24, height: 24)
                     .background(
                         LinearGradient(
-                            colors: [Color(hex: 0x1F6A55), Color(hex: 0x2F9D7D)],
+                            colors: [Theme.green, Theme.purple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
