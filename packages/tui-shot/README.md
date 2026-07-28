@@ -1,42 +1,44 @@
 # @archastro/tui-shot
 
-Create deterministic PNG screenshots of real
-[Ink](https://github.com/vadimdemedes/ink) components from typed TSX fixtures.
-`tui-shot` renders the actual Ink tree, interprets its ANSI output with xterm,
-and captures the styled terminal grid in Chromium.
+The terminal rendering engine behind `@archastro/astroshot`. It supports two
+capture boundaries:
 
-This package is the terminal rendering engine. Use the unified
-`@archastro/astroshot` package for command-line capture.
+- Ink fixture trees rendered in-process and interpreted with xterm.
+- Arbitrary executables launched in a real pseudoterminal, driven by scripted
+  input, interpreted with the same xterm model, and captured in Chromium.
+
+Use the unified `@archastro/astroshot` package for command-line capture.
 
 ## Quick start
 
-Run these commands from an Ink project using Node.js 22.14 or newer:
+Run from a Node.js 22.14 or newer project. Install the project-local peers only
+when using Ink mode:
 
 ```bash
+npm install --save-dev ink@^7.1 react@^19
 npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui ./screenshots/welcome.tsx \
-  -o ./screenshots/welcome.png
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot init ink
+npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot init pty
 ```
 
-The first command installs the Chromium build pinned by this package. If capture
-reports that Chromium is missing, run it again in the same environment and user
-account as the capture command.
-
-On Linux hosts that do not already have Chromium's system libraries, install
-both the browser and OS dependencies:
+Then capture either boundary:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot install-browser --with-deps
+  @archastro/astroshot ink ./ink.shot.tsx -o ./ink.png
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot pty ./pty.shot.yaml -o ./ratatui.png
 ```
 
-## Fixture contract
+On Linux hosts missing Chromium's system libraries, install the browser with
+`install-browser --with-deps`.
+
+## Ink fixture contract
 
 ```tsx
 import { Box, Text } from "ink";
 import React from "react";
-import type { TuiShotFixture } from "@archastro/astroshot/tui";
+import type { InkShotFixture } from "@archastro/astroshot/ink";
 
 export default {
   cols: 80,
@@ -49,68 +51,91 @@ export default {
       <Text color="#b9a8ff">Ready to deploy</Text>
     </Box>
   ),
-} satisfies TuiShotFixture;
+} satisfies InkShotFixture;
 ```
 
-`expectText` is recommended: capture fails unless every listed string is
-present in the rendered terminal frame. Fixture values control terminal
-columns, rows, colors, font, spacing, border radius, and PNG scale. The
-`--cols`, `--rows`, and `--scale` options override their fixture equivalents.
+`expectText` makes capture fail unless every listed string exists in the final
+terminal screen. `--cols`, `--rows`, and `--scale` override fixture values.
+Ink capture also supports `batch <manifest.yaml|json>`; manifest paths resolve
+relative to the manifest.
 
-Fixture modules are executable code loaded into the `tui-shot` process. Only
-capture fixtures you trust; they have the same filesystem and environment
-access as any script you run locally.
+## PTY fixture contract
 
-## Batch capture
-
-Paths are resolved relative to the YAML or JSON manifest:
+PTY fixtures work with any executable that behaves like a terminal program:
 
 ```yaml
-shots:
-  - fixture: fixtures/01-select.tsx
-    out: output/01-select.png
-  - fixture: fixtures/02-configure.tsx
-    out: output/02-configure.png
+version: 1
+command: ./target/debug/my-ratatui-app
+args: []
+cwd: .
+cols: 100
+rows: 30
+timeoutMs: 15000
+settleMs: 100
+actions:
+  - waitFor: Choose an option
+  - key: down
+  - key: enter
+  - waitFor: Ready
+expectText:
+  - Ready
 ```
 
-```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui batch ./screenshots/journey.yaml
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot tui batch ./screenshots/journey.yaml \
-  --out-dir ./artifacts
-```
+The child receives `TERM=xterm-256color`, a fixed terminal grid, and the
+fixture environment. `command` is spawned directly—not through a shell—and
+`cwd` resolves relative to the fixture. Supported actions are:
 
-With `--out-dir`, each manifest output keeps its relative subdirectory beneath
-the selected directory. Absolute paths, parent traversal, and duplicate
-destinations are rejected before capture begins.
+- `waitFor` with an optional per-action `timeoutMs`;
+- `key`: `enter`, arrows, `tab`, `escape`, `backspace`, `space`, `ctrl-c`, or
+  `ctrl-d`;
+- `text` for literal input;
+- `pauseMs` for a bounded delay.
 
-Use `--headed` with either capture command to show Chromium while debugging.
-Run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot tui --help`
-for all options.
+Actions run in order. The final xterm screen must contain every `expectText`
+value before Chromium captures it. Astroshot terminates a still-running child
+after the screenshot.
 
-## Reproducibility
+A child that exits nonzero before capture fails by default, even when expected
+text rendered. Set `allowNonZeroExit: true` only to document an intentional
+failure state.
 
-Playwright is pinned so each package release selects one Chromium version.
-PNG bytes can still differ across operating systems because the default stage
-uses the host's monospace fonts. Set `fontFamily` to an installed font and run
-capture in a consistent OS/container when pixel-level baselines matter.
+The renderer targets text and ANSI/VT terminal interfaces. Mouse events,
+mid-journey resize actions, and terminal graphics protocols such as Sixel or
+Kitty images are not currently modeled.
 
-For stable state, fixtures should render exported production components with
-realistic deterministic data. Use a PTY-driven test instead when the behavior
-under test is process startup, keystrokes, signals, or terminal lifecycle.
+`node-pty` is an optional, lazily loaded native dependency so React and Ink
+capture still work on an unsupported PTY host. This release pins the exact
+official `1.2.0-beta.14` build; PTY capture reports an actionable error if its
+native addon is unavailable.
+
+## Reproducibility and trust
+
+Playwright is pinned so each release selects one Chromium version. PNG bytes
+can still differ across operating systems because the default stage uses host
+fonts. Set `fontFamily` and use a consistent OS/container for pixel baselines.
+
+Ink fixture modules and PTY commands are executable code with the current
+user's permissions. Only capture trusted repositories. A PTY is an I/O
+boundary, not a security sandbox; use a container for untrusted programs.
 
 ## Programmatic API
 
 ```ts
-import { closeSharedBrowser, takeTuiShot } from "@archastro/tui-shot";
+import {
+  closeSharedBrowser,
+  takePtyShot,
+  takeTuiShot,
+} from "@archastro/tui-shot";
 
 await takeTuiShot({
   fixturePath: "./screenshots/welcome.tsx",
   outPath: "./screenshots/welcome.png",
 });
+await takePtyShot({
+  fixturePath: "./screenshots/ratatui.yaml",
+  outPath: "./screenshots/ratatui.png",
+});
 await closeSharedBrowser();
 ```
 
-The package supports Ink 7 and React 19 as peer dependencies.
+Ink fixtures support Ink 7 and React 19 as peer dependencies.

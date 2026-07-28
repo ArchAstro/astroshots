@@ -3,7 +3,7 @@
  * Pack the unified public CLI and its two rendering engines, install their
  * tarballs into a clean consumer, and exercise the one executable users run.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -87,7 +87,6 @@ try {
     "npm",
     [
       "install",
-      "--ignore-scripts",
       "--no-audit",
       "--no-fund",
       reactTarball,
@@ -106,7 +105,10 @@ try {
   run("npx", ["--no-install", "astroshot", "react", "--help"], {
     cwd: consumerDir,
   });
-  run("npx", ["--no-install", "astroshot", "tui", "--help"], {
+  run("npx", ["--no-install", "astroshot", "ink", "--help"], {
+    cwd: consumerDir,
+  });
+  run("npx", ["--no-install", "astroshot", "pty", "--help"], {
     cwd: consumerDir,
   });
   run(
@@ -116,9 +118,11 @@ try {
       "-e",
       `
         const react = await import("@archastro/astroshot/react");
-        const tui = await import("@archastro/astroshot/tui");
+        const ink = await import("@archastro/astroshot/ink");
+        const pty = await import("@archastro/astroshot/pty");
         if (typeof react.takeShot !== "function") throw new Error("missing React API");
-        if (typeof tui.takeTuiShot !== "function") throw new Error("missing TUI API");
+        if (typeof ink.takeTuiShot !== "function") throw new Error("missing Ink API");
+        if (typeof pty.takePtyShot !== "function") throw new Error("missing PTY API");
       `,
     ],
     { cwd: consumerDir },
@@ -135,6 +139,10 @@ try {
     "bin/astroshot.mjs",
     "react.d.ts",
     "react.js",
+    "ink.d.ts",
+    "ink.js",
+    "pty.d.ts",
+    "pty.js",
     "tui.d.ts",
     "tui.js",
   ]) {
@@ -174,42 +182,46 @@ try {
   }
 
   if (process.env.ASTROSHOTS_VERIFY_PACKAGES_CAPTURE === "1") {
+    // Prove clean consumers can generate the public React and Ink contracts
+    // and immediately capture both without reaching into an engine package.
+    run("npx", ["--no-install", "astroshot", "init", "react", "react-fixture.tsx"], {
+      cwd: consumerDir,
+    });
+    run("npx", ["--no-install", "astroshot", "init", "ink", "ink-fixture.tsx"], {
+      cwd: consumerDir,
+    });
+    run("npx", ["--no-install", "astroshot", "init", "pty", "generated-pty.yaml"], {
+      cwd: consumerDir,
+    });
+
     fs.writeFileSync(
-      path.join(consumerDir, "react-fixture.tsx"),
-      `import React from "react";
-export default {
-  width: 420,
-  height: 160,
-  selector: "[data-pack-proof]",
-  waitFor: "text=Packed React CLI",
-  component: React.createElement("div", {
-    "data-pack-proof": true,
-    style: { padding: "24px", background: "#111827", color: "white" }
-  }, "Packed React CLI")
-};
+      path.join(consumerDir, "pty-program.mjs"),
+      `process.stdin.setEncoding("utf8");
+process.stdin.setRawMode(true);
+function render(status = "Choose") {
+  process.stdout.write("\\u001b[?1049h\\u001b[2J\\u001b[HPTY package proof\\r\\n" + status);
+}
+process.stdin.on("data", data => {
+  if (data.includes("\\r")) render("Ready");
+});
+process.on("SIGHUP", () => process.exit(0));
+render();
+process.stdin.resume();
 `,
     );
     fs.writeFileSync(
-      path.join(consumerDir, "tui-fixture.tsx"),
-      `import React, { useState } from "react";
-import { Box, Text } from "ink";
-
-function PackProof() {
-  const [label] = useState("Packed terminal CLI");
-  return React.createElement(
-    Box,
-    { borderStyle: "round", paddingX: 1 },
-    React.createElement(Text, { color: "cyan" }, label)
-  );
-}
-
-export default {
-  cols: 36,
-  rows: 5,
-  scale: 1,
-  expectText: ["Packed terminal CLI"],
-  component: React.createElement(PackProof)
-};
+      path.join(consumerDir, "pty-fixture.yaml"),
+      `version: 1
+command: node
+args: [pty-program.mjs]
+cols: 36
+rows: 5
+scale: 1
+actions:
+  - waitFor: Choose
+  - key: enter
+  - waitFor: Ready
+expectText: [PTY package proof, Ready]
 `,
     );
 
@@ -230,19 +242,83 @@ export default {
       [
         "--no-install",
         "astroshot",
-        "tui",
-        "./tui-fixture.tsx",
+        "ink",
+        "./ink-fixture.tsx",
         "-o",
-        "./tui-proof.png",
+        "./ink-proof.png",
+      ],
+      { cwd: consumerDir },
+    );
+    run(
+      "npx",
+      [
+        "--no-install",
+        "astroshot",
+        "pty",
+        "./pty-fixture.yaml",
+        "-o",
+        "./pty-proof.png",
       ],
       { cwd: consumerDir },
     );
 
-    for (const image of ["react-proof.png", "tui-proof.png"]) {
+    for (const image of ["react-proof.png", "ink-proof.png", "pty-proof.png"]) {
       const imagePath = path.join(consumerDir, image);
       if (!fs.existsSync(imagePath) || fs.statSync(imagePath).size === 0) {
         throw new Error(`clean consumer did not generate ${image}`);
       }
+    }
+
+    // Simulate an unsupported optional native addon. React and Ink must remain
+    // usable, while PTY reports the promised setup error instead of crashing
+    // during package import.
+    fs.rmSync(path.join(consumerDir, "node_modules", "node-pty"), {
+      recursive: true,
+      force: true,
+    });
+    run(
+      "npx",
+      [
+        "--no-install",
+        "astroshot",
+        "react",
+        "./react-fixture.tsx",
+        "-o",
+        "./react-without-pty.png",
+      ],
+      { cwd: consumerDir },
+    );
+    run(
+      "npx",
+      [
+        "--no-install",
+        "astroshot",
+        "ink",
+        "./ink-fixture.tsx",
+        "-o",
+        "./ink-without-pty.png",
+      ],
+      { cwd: consumerDir },
+    );
+    const unavailablePty = spawnSync(
+      "npx",
+      [
+        "--no-install",
+        "astroshot",
+        "pty",
+        "./pty-fixture.yaml",
+        "-o",
+        "./unavailable-pty.png",
+      ],
+      { cwd: consumerDir, encoding: "utf8", env: process.env },
+    );
+    if (unavailablePty.status === 0) {
+      throw new Error("PTY capture unexpectedly succeeded without node-pty");
+    }
+    if (!unavailablePty.stderr.includes("optional node-pty native addon")) {
+      throw new Error(
+        `PTY capture did not report its optional dependency: ${unavailablePty.stderr}`,
+      );
     }
   }
 

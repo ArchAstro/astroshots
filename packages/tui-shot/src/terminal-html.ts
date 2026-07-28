@@ -7,6 +7,8 @@ const { Terminal } = xtermHeadless as unknown as {
   Terminal: typeof TerminalType;
 };
 
+export type HeadlessTerminal = TerminalType;
+
 const ANSI_16 = [
   "#2b2f3a", "#f0727a", "#54e0a0", "#f0b86e",
   "#7aa2f7", "#b9a8ff", "#5bd6e0", "#e8e8f2",
@@ -112,59 +114,90 @@ export interface TerminalHtmlOptions {
   background: string;
 }
 
+export function createHeadlessTerminal(
+  cols: number,
+  rows: number,
+): HeadlessTerminal {
+  return new Terminal({
+    cols,
+    rows,
+    allowProposedApi: true,
+    convertEol: true,
+    scrollback: 0,
+  });
+}
+
+export function writeTerminal(
+  terminal: HeadlessTerminal,
+  data: string,
+): Promise<void> {
+  return new Promise<void>((resolve) => terminal.write(data, resolve));
+}
+
+export function terminalPlainText(
+  terminal: HeadlessTerminal,
+  rows: number,
+): string {
+  const buffer = terminal.buffer.active;
+  const lines: string[] = [];
+  for (let y = 0; y < rows; y++) {
+    const line = buffer.getLine(buffer.viewportY + y);
+    lines.push(line?.translateToString(true) ?? "");
+  }
+  return lines.join("\n").trimEnd();
+}
+
+export function terminalToHtml(
+  terminal: HeadlessTerminal,
+  options: TerminalHtmlOptions,
+): string {
+  const buffer = terminal.buffer.active;
+  const rows: string[] = [];
+  for (let y = 0; y < options.rows; y++) {
+    const line = buffer.getLine(buffer.viewportY + y);
+    const runs: Array<{ key: string; style: CellStyle; text: string }> = [];
+    for (let x = 0; x < options.cols; x++) {
+      const cell = line?.getCell(x);
+      if (cell?.getWidth() === 0) continue;
+      const style = cell
+        ? cellStyle(cell, options.foreground, options.background)
+        : {
+            foreground: options.foreground,
+            background: options.background,
+            bold: false,
+            dim: false,
+            italic: false,
+            underline: false,
+            strike: false,
+            invisible: false,
+          };
+      const key = JSON.stringify(style);
+      const text = cell?.getChars() || " ";
+      const previous = runs.at(-1);
+      if (previous?.key === key) previous.text += text;
+      else runs.push({ key, style, text });
+    }
+    rows.push(
+      `<div class="tui-row">${runs
+        .map(
+          (run) =>
+            `<span style="${styleAttribute(run.style)}">${escapeHtml(run.text)}</span>`,
+        )
+        .join("")}</div>`,
+    );
+  }
+  return rows.join("");
+}
+
 /** Interpret a real ANSI frame and return styled HTML rows from xterm's cells. */
 export async function ansiFrameToHtml(
   ansi: string,
   options: TerminalHtmlOptions,
 ): Promise<string> {
-  const terminal = new Terminal({
-    cols: options.cols,
-    rows: options.rows,
-    allowProposedApi: true,
-    convertEol: true,
-    scrollback: 0,
-  });
+  const terminal = createHeadlessTerminal(options.cols, options.rows);
   try {
-    await new Promise<void>((resolve) =>
-      terminal.write(`\x1b[?7l${ansi}`, resolve),
-    );
-
-    const buffer = terminal.buffer.active;
-    const rows: string[] = [];
-    for (let y = 0; y < options.rows; y++) {
-      const line = buffer.getLine(buffer.viewportY + y);
-      const runs: Array<{ key: string; style: CellStyle; text: string }> = [];
-      for (let x = 0; x < options.cols; x++) {
-        const cell = line?.getCell(x);
-        if (cell?.getWidth() === 0) continue;
-        const style = cell
-          ? cellStyle(cell, options.foreground, options.background)
-          : {
-              foreground: options.foreground,
-              background: options.background,
-              bold: false,
-              dim: false,
-              italic: false,
-              underline: false,
-              strike: false,
-              invisible: false,
-            };
-        const key = JSON.stringify(style);
-        const text = cell?.getChars() || " ";
-        const previous = runs.at(-1);
-        if (previous?.key === key) previous.text += text;
-        else runs.push({ key, style, text });
-      }
-      rows.push(
-        `<div class="tui-row">${runs
-          .map(
-            (run) =>
-              `<span style="${styleAttribute(run.style)}">${escapeHtml(run.text)}</span>`,
-          )
-          .join("")}</div>`,
-      );
-    }
-    return rows.join("");
+    await writeTerminal(terminal, `\x1b[?7l${ansi}`);
+    return terminalToHtml(terminal, options);
   } finally {
     terminal.dispose();
   }
