@@ -17,7 +17,7 @@ final class AppState {
     var pane: TrayPane = .stream
     var unreadCount = 0
     var isWatching = true
-    /// True while a background full scan of the watch root is running.
+    /// True while a background full scan of the watched roots is running.
     var isScanning = false
     var toast: String?
     /// AppKit owns the chromeless review window; SwiftUI and overlays request it
@@ -26,12 +26,13 @@ final class AppState {
 
     var overlayEnabled: Bool
     var autoDismiss: Bool
-    var watchRootPath: String
+    var watchRootPaths: [String]
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher
+    private let preferences: Preferences
     private let reviewStore = ReviewStore()
-    private let overlayController = OverlayController()
+    private let overlayController: OverlayController
     /// When true, skip overlay (e.g. initial scan).
     private var suppressOverlay = true
     private var didStartWatching = false
@@ -43,9 +44,13 @@ final class AppState {
 
     var isEmpty: Bool { shots.isEmpty }
 
-    init() {
-        let prefs = Preferences.shared
-        let rootPath = prefs.watchRootPath
+    init(
+        preferences: Preferences = .shared,
+        watcher: AstroshotWatcher? = nil,
+        overlayController: OverlayController = OverlayController(),
+        automaticallyStartsWatching: Bool = true
+    ) {
+        let rootPaths = preferences.watchRootPaths
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         let isReviewUITest =
@@ -54,25 +59,30 @@ final class AppState {
         #else
         let isReviewUITest = false
         #endif
-        overlayEnabled = prefs.overlayEnabled
-        autoDismiss = prefs.autoDismiss
-        watchRootPath = rootPath
+        self.preferences = preferences
+        self.overlayController = overlayController
+        overlayEnabled = preferences.overlayEnabled
+        autoDismiss = preferences.autoDismiss
+        watchRootPaths = rootPaths
 
-        let watcher = AstroshotWatcher(
-            configuration: .init(roots: [URL(fileURLWithPath: rootPath, isDirectory: true)])
+        self.watcher = watcher ?? AstroshotWatcher(
+            configuration: .init(
+                roots: rootPaths.map {
+                    URL(fileURLWithPath: $0, isDirectory: true)
+                }
+            )
         )
-        self.watcher = watcher
 
-        watcher.onShotsChanged = { [weak self] shots in
+        self.watcher.onShotsChanged = { [weak self] shots in
             self?.applyFullShotList(shots)
         }
-        watcher.onFeatureShotsChanged = { [weak self] directoryPath, shots in
+        self.watcher.onFeatureShotsChanged = { [weak self] directoryPath, shots in
             self?.applyFeatureShotList(directoryPath: directoryPath, shots: shots)
         }
-        watcher.onNewShot = { [weak self] shot in
+        self.watcher.onNewShot = { [weak self] shot in
             self?.handleNewShot(shot)
         }
-        watcher.onScanStateChanged = { [weak self] scanning in
+        self.watcher.onScanStateChanged = { [weak self] scanning in
             self?.isScanning = scanning
         }
 
@@ -83,7 +93,7 @@ final class AppState {
         // Defer filesystem work so the status item can appear immediately.
         // Scanning ~/archastro (or any large tree) on the main thread made the
         // app look like it crashed: no status item until the walk finished.
-        if !isReviewUITest {
+        if automaticallyStartsWatching && !isReviewUITest {
             Task { @MainActor in
                 self.startWatching()
             }
@@ -146,7 +156,7 @@ final class AppState {
         }
 
         guard isNewPath, !suppressOverlay, overlayEnabled else { return }
-        let seconds = Preferences.shared.autoDismissSeconds
+        let seconds = preferences.autoDismissSeconds
         overlayController.show(
             shot: shot,
             autoDismiss: autoDismiss,
@@ -236,38 +246,68 @@ final class AppState {
 
     func setOverlayEnabled(_ enabled: Bool) {
         overlayEnabled = enabled
-        Preferences.shared.overlayEnabled = enabled
+        preferences.overlayEnabled = enabled
     }
 
     func setAutoDismiss(_ enabled: Bool) {
         autoDismiss = enabled
-        Preferences.shared.autoDismiss = enabled
+        preferences.autoDismiss = enabled
     }
 
-    func setWatchRoot(_ path: String) {
-        let expanded = (path as NSString).expandingTildeInPath
-        watchRootPath = expanded
-        Preferences.shared.watchRootPath = expanded
+    func addWatchRoots(_ paths: [String]) {
+        setWatchRoots(watchRootPaths + paths)
+    }
+
+    func removeWatchRoot(_ path: String) {
+        guard watchRootPaths.count > 1 else {
+            showToast("Keep at least one watched folder")
+            return
+        }
+        setWatchRoots(watchRootPaths.filter { $0 != path })
+    }
+
+    private func setWatchRoots(_ paths: [String]) {
+        preferences.watchRootPaths = paths
+        watchRootPaths = preferences.watchRootPaths
+        shots.removeAll {
+            !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
+        }
+        if let selectedShotID,
+           !shots.contains(where: { $0.id == selectedShotID })
+        {
+            self.selectedShotID = shots.first?.id
+        }
         suppressOverlay = true
         didStartWatching = true
-        watcher.updateRoots([URL(fileURLWithPath: expanded, isDirectory: true)])
+        watcher.updateRoots(
+            watchRootPaths.map {
+                URL(fileURLWithPath: $0, isDirectory: true)
+            }
+        )
         Task {
             try? await Task.sleep(nanoseconds: 800_000_000)
             self.suppressOverlay = false
         }
-        showToast("Watching \(displayPath(expanded))")
+        showToast(
+            watchRootPaths.count == 1
+                ? "Watching \(displayPath(watchRootPaths[0]))"
+                : "Watching \(watchRootPaths.count) folders"
+        )
     }
 
-    func chooseWatchRoot() {
+    func chooseWatchRoots() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(fileURLWithPath: watchRootPath, isDirectory: true)
-        panel.message = "Choose a folder to scan for .astroshot directories"
-        panel.prompt = "Watch"
-        if panel.runModal() == .OK, let url = panel.url {
-            setWatchRoot(url.path)
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(
+            fileURLWithPath: watchRootPaths.first ?? Preferences.defaultWatchRoot.path,
+            isDirectory: true
+        )
+        panel.message = "Choose one or more folders to scan for .astroshot directories"
+        panel.prompt = "Add"
+        if panel.runModal() == .OK {
+            addWatchRoots(panel.urls.map(\.path))
         }
     }
 

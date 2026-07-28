@@ -26,6 +26,7 @@
 		A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */; };
 		B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDC12CB9342C5E685FD8A25 /* DetailView.swift */; };
 		BB6D913C2F3291617685815E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A6D30FE0070BBC23546100 /* OverlayController.swift */; };
+		CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26844F440291050990A83490 /* PreferencesTests.swift */; };
 		CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823B8B4248FDCBE1985DECAE /* Shot.swift */; };
 		D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5089282794B5A6E6B3636886 /* ShotPathTests.swift */; };
 		DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA84FE9C55670A027F3776D /* SettingsPane.swift */; };
@@ -61,6 +62,7 @@
 		182E7298047007414ABC9862 /* ReviewFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFlowUITests.swift; sourceTree = "<group>"; };
 		239B5944E0638F1D931913A7 /* ShotIndexCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCache.swift; sourceTree = "<group>"; };
 		254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		26844F440291050990A83490 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
 		2788CCB47877372A7EF96688 /* Manifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manifest.swift; sourceTree = "<group>"; };
 		278FA85768F47F8222B1B495 /* ReviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowController.swift; sourceTree = "<group>"; };
 		2B08FD45A80670CAD9391ADB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -98,6 +100,7 @@
 			children = (
 				39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */,
 				A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */,
+				26844F440291050990A83490 /* PreferencesTests.swift */,
 				F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */,
 				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
@@ -354,6 +357,7 @@
 			files = (
 				F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */,
 				F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */,
+				CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */,
 				FF7CB55DF3385E5F06077544 /* ReviewStoreTests.swift in Sources */,
 				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,

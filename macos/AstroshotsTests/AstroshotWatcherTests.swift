@@ -4,6 +4,123 @@ import Testing
 
 struct AstroshotWatcherTests {
     @Test @MainActor
+    func appStateStreamsAndReconfiguresTwoUnrelatedWatchRoots() async throws {
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "astroshots-multiple-roots-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let firstRoot = temporary.appendingPathComponent(
+            "first-workspace",
+            isDirectory: true
+        )
+        let secondRoot = temporary.appendingPathComponent(
+            "second-workspace",
+            isDirectory: true
+        )
+        let firstFeature = firstRoot.appendingPathComponent(
+            ".astroshot/first-feature",
+            isDirectory: true
+        )
+        let secondFeature = secondRoot.appendingPathComponent(
+            ".astroshot/second-feature",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: firstFeature,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: secondFeature,
+            withIntermediateDirectories: true
+        )
+        try Data("first screenshot".utf8).write(
+            to: firstFeature.appendingPathComponent("0001-first.png")
+        )
+        try Data("second screenshot".utf8).write(
+            to: secondFeature.appendingPathComponent("0001-second.png")
+        )
+        defer { try? FileManager.default.removeItem(at: temporary) }
+
+        let suiteName = "astroshots-multiple-roots-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+        preferences.watchRootPaths = [firstRoot.path]
+        let cacheURL = ShotIndexCache.cacheFileURL()
+        let cacheBackup = try? Data(contentsOf: cacheURL)
+        defer {
+            if let cacheBackup {
+                try? cacheBackup.write(to: cacheURL, options: .atomic)
+            } else {
+                ShotIndexCache.clear()
+            }
+        }
+        let watcher = AstroshotWatcher(
+            configuration: .init(roots: [firstRoot])
+        )
+        defer { watcher.stop() }
+
+        // Cross the persisted configuration and real recursive watcher
+        // boundaries with the initial top-level folder.
+        let state = AppState(
+            preferences: preferences,
+            watcher: watcher,
+            automaticallyStartsWatching: false
+        )
+        state.startWatching()
+        for _ in 0..<100 where state.shots.map(\.worktree) != ["first-workspace"] {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(state.shots.map(\.worktree) == ["first-workspace"])
+
+        // Add an unrelated root through the same AppState action used by
+        // Settings, then observe both filesystems merged into one stream.
+        state.addWatchRoots([secondRoot.path])
+        for _ in 0..<100 where state.shots.count != 2 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        #expect(Set(state.shots.map(\.worktree)) == [
+            "first-workspace",
+            "second-workspace",
+        ])
+        #expect(state.watchRootPaths == [firstRoot.path, secondRoot.path])
+
+        // Cross the live-event and partial-write-settling boundary after both
+        // roots are active, proving either tree can update the unified stream.
+        let firstLiveImage = firstFeature.appendingPathComponent("0002-first-live.png")
+        let secondLiveImage = secondFeature.appendingPathComponent("0002-second-live.png")
+        try Data("first live screenshot".utf8).write(to: firstLiveImage)
+        try Data("second live screenshot".utf8).write(to: secondLiveImage)
+        watcher.handleFSEvents(paths: [firstLiveImage.path, secondLiveImage.path])
+        for _ in 0..<100 where state.shots.count != 4 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(
+            Dictionary(grouping: state.shots, by: \.worktree)
+                .mapValues(\.count)
+                == [
+                    "first-workspace": 2,
+                    "second-workspace": 2,
+                ]
+        )
+
+        // Removing a top-level root must immediately evict its existing frames,
+        // then remain correct after the replacement full scan completes.
+        state.removeWatchRoot(firstRoot.path)
+        #expect(Set(state.shots.map(\.worktree)) == ["second-workspace"])
+        #expect(state.shots.count == 2)
+        for _ in 0..<100 where state.isScanning {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        #expect(Set(state.shots.map(\.worktree)) == ["second-workspace"])
+        #expect(state.shots.count == 2)
+        #expect(preferences.watchRootPaths == [secondRoot.path])
+    }
+
+    @Test @MainActor
     func reviewAndImageEventsRefreshTheOpenReviewState() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("astroshots-live-review-\(UUID().uuidString)", isDirectory: true)
