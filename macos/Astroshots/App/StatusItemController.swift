@@ -97,12 +97,14 @@ final class StatusItemController: NSObject {
         showPopover()
     }
 
+    #if DEBUG
     /// Shows the production overlay without auto-dismiss so UI automation can
     /// prove the entire card opens review.
     func openOverlay(atImagePath path: String) {
         guard let shot = loadTestShot(atImagePath: path) else { return }
         appState.showOverlayForTesting(shot)
     }
+    #endif
 
     private func loadTestShot(atImagePath path: String) -> Shot? {
         let imageURL = URL(fileURLWithPath: path)
