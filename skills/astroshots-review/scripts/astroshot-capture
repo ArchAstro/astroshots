@@ -284,6 +284,7 @@ acquire_lock() {
   local waited_tenths=0
   local timeout_tenths
   local owner=""
+  local suspected_stale_owner=""
 
   if [[ ! "$timeout" =~ ^[0-9]+$ ]] || [[ "$timeout" == "0" ]]; then
     echo "error: ASTROSHOT_LOCK_TIMEOUT_SECONDS must be a positive integer" >&2
@@ -295,9 +296,19 @@ acquire_lock() {
     if [[ -f "$LOCK_DIR/pid" ]]; then
       owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
       if [[ "$owner" =~ ^[0-9]+$ ]] && ! kill -0 "$owner" 2>/dev/null; then
-        echo "error: stale capture lock from dead pid $owner: $LOCK_DIR; remove it and retry" >&2
-        exit 1
+        # The owner can exit between our failed mkdir and its EXIT trap
+        # removing the lock. Confirm the same dead owner on a later poll so a
+        # normal handoff is not misreported as a stale lock.
+        if [[ "$suspected_stale_owner" == "$owner" ]]; then
+          echo "error: stale capture lock from dead pid $owner: $LOCK_DIR; remove it and retry" >&2
+          exit 1
+        fi
+        suspected_stale_owner="$owner"
+      else
+        suspected_stale_owner=""
       fi
+    else
+      suspected_stale_owner=""
     fi
 
     if (( waited_tenths >= timeout_tenths )); then
