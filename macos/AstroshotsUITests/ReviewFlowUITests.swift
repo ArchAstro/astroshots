@@ -132,7 +132,7 @@ final class ReviewFlowUITests: XCTestCase {
         XCTAssertTrue(waitForDecision("seen", in: sidecar, timeout: 5))
         XCTAssertFalse(compact.waitForExistence(timeout: 1))
         XCTAssertTrue(
-            app.buttons["stream.detail.0001-settings.png"]
+            app.descendants(matching: .any)["stream.seen.empty"]
                 .waitForExistence(timeout: 3)
         )
     }
