@@ -202,6 +202,8 @@ private struct ReviewedStreamView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("stream.seen.empty")
     }
 }
 
