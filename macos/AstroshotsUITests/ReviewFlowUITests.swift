@@ -342,6 +342,7 @@ final class ReviewFlowUITests: XCTestCase {
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 
+    @MainActor
     private func screenshot(
         _ screenshot: XCUIScreenshot,
         contains predicate: (_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> Bool
