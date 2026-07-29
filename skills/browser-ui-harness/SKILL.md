@@ -1,11 +1,13 @@
 ---
 name: browser-ui-harness
 description: >
-  Design and implement browser UI test harnesses (especially Bash + agent-browser):
-  runner vs case split, named sessions, bounded waits, product assertions, evidence
-  (screenshots, snapshots, reports), cleanup, and live review via .astroshot/.
-  Use when building smoke/e2e harnesses, writing run.sh + cases/, or defining UI
-  testing best practices for agents driving real browsers.
+  Design and implement reusable browser UI smoke/e2e harnesses, especially
+  Bash plus agent-browser: runner/case separation, named sessions, bounded
+  waits, product assertions, evidence, cleanup, and optional .astroshot review
+  streams. Use when building or revising run.sh plus cases/, or defining a
+  repeatable real-browser testing contract. For a one-off browser journey use
+  agent-browser; for isolated component captures use astroshot;
+  for documentation image-set planning use screenshot.
 ---
 
 # Browser UI harness best practices
@@ -29,7 +31,7 @@ Pair with:
 
 ```bash
 npx skills add ArchAstro/astroshots --skill agent-browser -g -y
-npx skills add ArchAstro/astroshots --skill astroshots -g -y   # live screenshot stream
+npx skills add ArchAstro/astroshots --skill astroshots-review -g -y
 ```
 
 ---
@@ -45,7 +47,7 @@ npx skills add ArchAstro/astroshots --skill astroshots -g -y   # live screenshot
 | Keep cases **thin** | No env discovery or browser lifecycle inside case files |
 | Support **live review** | Write frames under `.astroshot/<feature>/` for Astroshots |
 
-Unit/component tests (Playwright fixtures, react-shot, etc.) stay separate.
+Unit/component tests (Playwright fixtures, Astroshot fixtures, etc.) stay separate.
 This skill is for **end-to-end journeys against a running app**.
 
 ---
@@ -150,7 +152,7 @@ smoke_capture "destination-default" \
 Also dual-write for live review when Astroshots is in play:
 
 ```bash
-# Prefer astroshot-capture after install of the astroshots skill
+# Prefer astroshot-capture after install of the astroshots-review skill
 astroshot-capture --feature "$CASE_NAME" --slug "$slug" \
   --description "$description" \
   --status running \
@@ -159,7 +161,7 @@ astroshot-capture --feature "$CASE_NAME" --slug "$slug" \
 astroshot-capture --feature "$CASE_NAME" --status pass --finalize
 ```
 
-Layout (see **astroshots** skill):
+Layout (see **astroshots-review** skill):
 
 ```text
 $REPO_ROOT/.astroshot/<feature>/
@@ -267,7 +269,6 @@ strict CI parallelism.
 
 - **screenshot** skill — documentation asset planning and visual review
 - **agent-browser** skill — CLI loop, snapshot, screenshots  
-- **astroshots** skill — `.astroshot/` layout + `astroshot-capture`  
-- **react-shot** skill — deterministic React component fixtures
-- **tui-shot** skill — deterministic Ink and arbitrary PTY terminal fixtures
+- **astroshots-review** skill — `.astroshot/` layout + `astroshot-capture`
+- **astroshot** skill — deterministic React, Ink, and arbitrary PTY fixtures
 - CLI deep dive: `agent-browser skills get core --full`
