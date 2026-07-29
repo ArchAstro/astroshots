@@ -19,6 +19,7 @@
 		59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */; };
 		601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */; };
 		6646659397470D89CDBB4DAC /* ReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91C394D6B3C96C99B77EDD7 /* ReviewModels.swift */; };
+		699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */; };
 		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
 		87D9D684AF70B41C69A9A1C7 /* ReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D528EB0C9FF62471B7103498 /* ReviewStore.swift */; };
 		8F2395DC60D12581FB418608 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9976B5034C36AABFDFD4B2C8 /* AppState.swift */; };
@@ -82,6 +83,7 @@
 		7B7EC0C57ADC991AFD3F512A /* AstroshotsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		823B8B4248FDCBE1985DECAE /* Shot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shot.swift; sourceTree = "<group>"; };
 		84934BBEECF7545EB5C02073 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamGroupingTests.swift; sourceTree = "<group>"; };
 		8F2AB8506FCE8107DD28D547 /* Astroshots.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Astroshots.entitlements; sourceTree = "<group>"; };
 		976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotWatcher.swift; sourceTree = "<group>"; };
 		9976B5034C36AABFDFD4B2C8 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 				F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */,
 				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
+				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
 			);
 			path = AstroshotsTests;
 			sourceTree = "<group>";
@@ -365,6 +368,7 @@
 				FF7CB55DF3385E5F06077544 /* ReviewStoreTests.swift in Sources */,
 				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
+				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
