@@ -1,222 +1,127 @@
 ---
 name: agent-browser
 description: >
-  Drive real browsers with the agent-browser CLI — open pages, snapshot the
-  accessibility tree, click/fill via @refs, wait for network idle, take
-  screenshots. Use when exploring or testing a web UI, automating a browser
-  journey, capturing UI states, or when the user mentions agent-browser,
-  browser automation, snapshot -i, or headed browser debugging.
+  Drive one persistent real-browser session with the agent-browser CLI: open
+  pages, inspect the accessibility tree, act through refs or selectors, debug,
+  and capture screenshots. Use when the user requests agent-browser or a
+  shell-driven browser journey, or when testing live routing, authentication,
+  backend data, or application chrome. For reusable smoke/e2e harness
+  architecture use browser-ui-harness; for isolated React or terminal fixtures
+  use astroshot; for documentation image-set planning use screenshot.
 ---
 
-# agent-browser
+# Agent-browser journeys
 
-`agent-browser` is a CLI for AI agents: a **persistent browser session** you
-drive with short commands (navigate, snapshot, click, fill, screenshot).
-
-## Install agent-browser (the CLI)
-
-```bash
-# npm (global)
-npm install -g agent-browser
-
-# or one-off
-npx agent-browser --help
-```
-
-Confirm:
+Use `agent-browser` for states that only a running application can prove. The
+CLI ships its own version-matched command guide; load it instead of relying on
+a copied command reference:
 
 ```bash
-agent-browser --help
-# Prefer version-matched guides shipped with the CLI:
+agent-browser --version
 agent-browser skills get core --full
 ```
 
-Install browsers if the CLI prompts you (Playwright-backed; follow its install
-instructions for Chromium).
-
-### Install this skill
+Install the CLI only when it is missing:
 
 ```bash
-# Global (all projects)
-npx skills add ArchAstro/astroshots --skill agent-browser -g -y
-
-# This git project only
-cd /path/to/your/project
-npx skills add ArchAstro/astroshots --skill agent-browser -y
+npm install -g agent-browser
+agent-browser install
 ```
 
-Sibling skills in the same package:
+## Choose the boundary
 
-```bash
-npx skills add ArchAstro/astroshots --skill astroshots -g -y
-npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
-```
+| Proof | Tool |
+|---|---|
+| Routing, authentication, live data, or complete browser shell | `agent-browser` |
+| Isolated React, Ink, or terminal executable state | **astroshot** |
+| Reusable multi-case browser smoke harness | **browser-ui-harness** |
+| Documentation image set and rendered-page verification | **screenshot** |
+| Live review of an existing capture | **astroshots-review** |
 
----
+## Journey loop
 
-## Core model
-
-1. **Named session** — cookies, tabs, and history persist across commands.
-2. **navigate → wait → snapshot → act → verify** — never click blind.
-3. **`snapshot -i`** — interactive tree with `@eN` refs; primary inspection tool.
-4. **`wait --load networkidle`** before asserting or screenshotting SPAs.
-
-### Session naming
-
-Scope sessions so parallel agents/worktrees do not stomp each other:
+Create a session name unique to the repository and run:
 
 ```bash
 REPO="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
 SESSION="browse-${REPO}-$$"
-# reuse SESSION for every agent-browser call in this journey
-```
 
----
-
-## Command loop
-
-```bash
 agent-browser --session "$SESSION" open "https://example.com/app"
 agent-browser --session "$SESSION" wait --load networkidle
 agent-browser --session "$SESSION" snapshot -i
-
-# Use @refs from the snapshot
-agent-browser --session "$SESSION" click @e5
-agent-browser --session "$SESSION" fill @e3 "text"
-agent-browser --session "$SESSION" press Enter
-
-agent-browser --session "$SESSION" wait --load networkidle
-agent-browser --session "$SESSION" snapshot -i
 ```
 
-### Viewport
+Then repeat:
+
+1. Inspect with `snapshot -i` or a scoped snapshot.
+2. Act through a current `@eN` ref or a stable semantic selector.
+3. Wait for a product-level ready condition.
+4. Snapshot again and assert the outcome.
+5. Capture only meaningful states.
+
+Do not click a stale ref or guess a selector. `find` performs an action and
+defaults to clicking, so name its action explicitly:
 
 ```bash
-agent-browser --session "$SESSION" set viewport 1280 800
-# taller for modals / long forms:
-agent-browser --session "$SESSION" set viewport 1280 1100
+agent-browser --session "$SESSION" find role button click --name "Submit"
+agent-browser --session "$SESSION" find label "Email" fill "user@example.com"
 ```
 
-### Screenshots
+Use read-only commands for inspection:
 
 ```bash
-agent-browser --session "$SESSION" wait --load networkidle
-agent-browser --session "$SESSION" screenshot /tmp/page.png
-agent-browser --session "$SESSION" screenshot --full /tmp/full.png
-agent-browser --session "$SESSION" screenshot '[role=dialog]' /tmp/modal.png
-agent-browser --session "$SESSION" screenshot /tmp/annotated.png --annotate
+agent-browser --session "$SESSION" snapshot -s 'main'
+agent-browser --session "$SESSION" is visible 'button:has-text("Save")'
+agent-browser --session "$SESSION" get count 'button'
+agent-browser --session "$SESSION" get url
 ```
 
-Always `networkidle` (or an explicit ready condition) before capture so you do
-not freeze loading skeletons.
+`networkidle` is a useful transport settle, not proof that the product state is
+ready. Wait for distinctive text, a selector, URL, or JavaScript condition
+before asserting or capturing.
 
-For an isolated React component, Ink state, or arbitrary PTY program, do not
-start a full application journey: use the npmjs-pinned
-`@archastro/astroshot react`, `ink`, or `pty` modes from their sibling skills. Use agent-browser
-when the frame must prove the running application's routing, auth, data, or
-shell.
-
-### Live review with Astroshots
-
-When a human is watching (or you want a durable project stream), prefer the
-**astroshots** skill — write under `.astroshot/<feature>/`, not only `/tmp`:
+## Capture and diagnose
 
 ```bash
-# After installing: npx skills add ArchAstro/astroshots --skill astroshots -g -y
-CAPTURE="$(ls -d ~/.agents/skills/astroshots/scripts/astroshot-capture \
-  ~/.claude/skills/astroshots/scripts/astroshot-capture 2>/dev/null | head -1)"
+agent-browser --session "$SESSION" set viewport 1280 900
+agent-browser --session "$SESSION" screenshot ./page.png
+agent-browser --session "$SESSION" screenshot --full ./full-page.png
+agent-browser --session "$SESSION" screenshot '[role=dialog]' ./dialog.png
 
+agent-browser --session "$SESSION" errors
+agent-browser --session "$SESSION" console
+agent-browser --session "$SESSION" network requests --filter "/api/"
+```
+
+Use a focused crop when surrounding chrome is not part of the proof. Never
+capture a loading skeleton, credentials, tokens, or customer data.
+
+## Stream a frame to Astroshots
+
+Read the **astroshots-review** skill and use its helper after the page reaches the
+intended state:
+
+```bash
 "$CAPTURE" --feature my-journey --slug step-name \
   --title "Step name" \
   --description "What this frame proves." \
   --from-agent-browser "$SESSION"
 ```
 
-### Forms and keys
+Astroshots is optional review transport; it does not replace product
+assertions and does not make a capture human-approved.
 
-```bash
-agent-browser --session "$SESSION" fill 'input[name="email"]' "user@example.com"
-agent-browser --session "$SESSION" type @e3 "appended"
-agent-browser --session "$SESSION" click 'button[type="submit"]'
-agent-browser --session "$SESSION" press Tab
-agent-browser --session "$SESSION" select @e4 "value"
-agent-browser --session "$SESSION" check @e6
-agent-browser --session "$SESSION" scroll down 500
-agent-browser --session "$SESSION" scrollintoview '.target'
-```
+## Local applications and cleanup
 
-### Read state
+Discover the base URL from the target repository's configuration or
+documentation. Health-check it before opening a session; do not invent a port.
+If the journey mutates data, prefer loopback targets and run-unique values.
 
-```bash
-agent-browser --session "$SESSION" get url
-agent-browser --session "$SESSION" get title
-agent-browser --session "$SESSION" get text @e2
-agent-browser --session "$SESSION" get attr href @e5
-agent-browser --session "$SESSION" eval "document.body.innerText.includes('Ready')"
-```
-
-### Diagnostics
-
-```bash
-agent-browser --session "$SESSION" errors
-agent-browser --session "$SESSION" console
-agent-browser --session "$SESSION" network requests
-agent-browser --session "$SESSION" network requests --filter "/api/"
-```
-
-### Headed debugging
-
-```bash
-agent-browser --session "$SESSION" --headed open "$URL"
-```
-
-### Cleanup
+Close the session unless the human asked to keep it for debugging:
 
 ```bash
 agent-browser --session "$SESSION" close
-# or all sessions:
-agent-browser --session "$SESSION" close --all
 ```
 
----
-
-## Local apps
-
-1. Discover base URL from the project’s env / docs — do not invent ports.
-2. Health-check before opening the browser (`curl -sf "$URL/health"` or equivalent).
-3. If the stack is down, tell the human how to start it; do not silently fail.
-4. Prefer loopback URLs for harnesses that create or mutate data.
-
----
-
-## Finding elements when snapshot is not enough
-
-```bash
-agent-browser --session "$SESSION" snapshot          # full tree
-agent-browser --session "$SESSION" snapshot -s 'main'
-agent-browser --session "$SESSION" is visible 'button:has-text("Save")'
-agent-browser --session "$SESSION" find text "Submit"
-agent-browser --session "$SESSION" find role button
-```
-
----
-
-## Report to the human
-
-After a journey:
-
-- What you verified (product outcome, not only “clicked button”)
-- Screenshot / `.astroshot` paths if any
-- Failures, console errors, unexpected URLs
-- Whether the session is still open (`SMOKE_HOLD`-style) or closed
-
----
-
-## Related
-
-- CLI self-docs: `agent-browser skills get core --full`
-- Documentation image workflow: **screenshot** skill (`npx skills add ArchAstro/astroshots --skill screenshot -g -y`)
-- Live streams: **astroshots** skill (`npx skills add ArchAstro/astroshots --skill astroshots -g -y`)
-- React fixtures: **react-shot** skill (`npx skills add ArchAstro/astroshots --skill react-shot -g -y`)
-- Ink and arbitrary PTY fixtures: **tui-shot** skill (`npx skills add ArchAstro/astroshots --skill tui-shot -g -y`)
-- Bash harness design: **browser-ui-harness** skill
+Report the product outcome, unexpected URLs or diagnostics, capture paths,
+Astroshots feature if used, and whether the browser session remains open.

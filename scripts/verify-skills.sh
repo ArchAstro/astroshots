@@ -14,7 +14,7 @@ require_reference() {
   local file="$1"
   local text="$2"
   [[ -f "$file" ]] || fail "missing $file"
-  grep -Fq "$text" "$file" ||
+  grep -Fq -- "$text" "$file" ||
     fail "$file does not document: $text"
 }
 
@@ -22,20 +22,33 @@ require_reference() {
 # skills.
 require_reference "packages/astroshot/package.json" '"name": "@archastro/astroshot"'
 for file in README.md packages/astroshot/README.md \
-  skills/react-shot/SKILL.md skills/tui-shot/SKILL.md; do
+  skills/astroshot/SKILL.md; do
   require_reference "$file" "npx --@archastro:registry=https://registry.npmjs.org"
   require_reference "$file" "@archastro/astroshot"
 done
 
-for skill in astroshots screenshot react-shot tui-shot agent-browser browser-ui-harness; do
+for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness; do
   require_reference "skills/$skill/SKILL.md" "name: $skill"
 done
 
+# Guard the two easy-to-miss safety properties in the browser guidance:
+# inspection examples must not use agent-browser's default-clicking `find`
+# form, and the reusable runner must preserve failure status in Astroshots.
+if grep -Eq 'agent-browser .* find (text|role) [^ ]+ *$' skills/agent-browser/SKILL.md; then
+  fail "agent-browser inspection examples must not use find without an explicit action"
+fi
+require_reference "skills/browser-ui-harness/references/runner-skeleton.sh" \
+  'astroshot_status="fail"'
+require_reference "skills/browser-ui-harness/references/runner-skeleton.sh" \
+  '--status "$astroshot_status" --run-id "$RUN_ID" --finalize'
+require_reference "skills/browser-ui-harness/references/runner-skeleton.sh" \
+  '--run-id "$RUN_ID"'
+
 for reference in \
-  "@archastro/astroshot" \
+  "**astroshot**" \
   "agent-browser" \
-  "astroshot-capture" \
-  "documentation asset directory" \
+  "public asset directory" \
+  "docs build or preview" \
   "alt text"; do
   require_reference "skills/screenshot/SKILL.md" "$reference"
 done
