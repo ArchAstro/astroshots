@@ -58,6 +58,7 @@ final class ReviewFlowUITests: XCTestCase {
 
     @MainActor
     func testOverlayCardOpensReviewFromItsThumbnail() throws {
+        try panoramicFixturePNG().write(to: imageURL, options: .atomic)
         terminateRunningAstroshots()
         let app = XCUIApplication()
         app.launchEnvironment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] = imageURL.path
@@ -65,7 +66,20 @@ final class ReviewFlowUITests: XCTestCase {
 
         let overlay = app.buttons["overlay.open.0001-settings.png"]
         XCTAssertTrue(overlay.waitForExistence(timeout: 8))
-        let proof = XCTAttachment(screenshot: overlay.screenshot())
+        let overlayScreenshot = overlay.screenshot()
+        XCTAssertTrue(
+            screenshot(overlayScreenshot, contains: { red, green, blue in
+                red > 0.8 && green < 0.2 && blue < 0.2
+            }),
+            "The overlay cropped the red left-edge marker from the panoramic fixture."
+        )
+        XCTAssertTrue(
+            screenshot(overlayScreenshot, contains: { red, green, blue in
+                red < 0.2 && green > 0.8 && blue < 0.2
+            }),
+            "The overlay cropped the green right-edge marker from the panoramic fixture."
+        )
+        let proof = XCTAttachment(screenshot: overlayScreenshot)
         proof.name = "Clickable screenshot overlay"
         proof.lifetime = .keepAlways
         add(proof)
@@ -298,6 +312,54 @@ final class ReviewFlowUITests: XCTestCase {
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         } while Date() < deadline
+        return false
+    }
+
+    private func panoramicFixturePNG() throws -> Data {
+        let width = 1_200
+        let height = 400
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = try XCTUnwrap(
+            CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
+        context.setFillColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 100, height: height))
+        context.setFillColor(red: 0, green: 1, blue: 0, alpha: 1)
+        context.fill(CGRect(x: width - 100, y: 0, width: 100, height: height))
+
+        let image = try XCTUnwrap(context.makeImage())
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    }
+
+    private func screenshot(
+        _ screenshot: XCUIScreenshot,
+        contains predicate: (_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> Bool
+    ) -> Bool {
+        guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+            return false
+        }
+
+        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let color = bitmap.colorAt(x: x, y: y)?
+                    .usingColorSpace(.deviceRGB)
+                else { continue }
+                if predicate(color.redComponent, color.greenComponent, color.blueComponent) {
+                    return true
+                }
+            }
+        }
         return false
     }
 
