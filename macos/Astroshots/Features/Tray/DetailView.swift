@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DetailView: View {
@@ -64,8 +65,7 @@ struct DetailView: View {
                         Button {
                             reviewChrome.open(shot)
                         } label: {
-                            ShotThumbnail(path: shot.path)
-                                .aspectRatio(16 / 10, contentMode: .fit)
+                            FittedDetailPreview(path: shot.path, maxHeight: 240)
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -83,8 +83,10 @@ struct DetailView: View {
                         .buttonStyle(.plain)
                         .help("Open full-screen review")
                         .accessibilityLabel("Review \(shot.title) full screen")
+                        .accessibilityIdentifier("detail.preview")
                         .padding(.horizontal, 12)
                         .padding(.top, 12)
+                        .frame(maxWidth: .infinity)
 
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .top, spacing: 8) {
@@ -323,5 +325,66 @@ struct DetailView: View {
 
     private func iso(_ date: Date) -> String {
         Self.isoFormatter.string(from: date)
+    }
+}
+
+private struct FittedDetailPreview: View {
+    let path: String
+    let maxHeight: CGFloat
+
+    var body: some View {
+        AspectFitPreviewLayout(
+            aspectRatio: imageAspectRatio,
+            maxHeight: maxHeight
+        ) {
+            ShotThumbnail(path: path, contentMode: .fit)
+        }
+    }
+
+    private var imageAspectRatio: CGFloat {
+        guard let image = NSImage(contentsOfFile: path) else {
+            return 16 / 10
+        }
+        if let representation = image.representations.first(where: {
+            $0.pixelsWide > 0 && $0.pixelsHigh > 0
+        }) {
+            return CGFloat(representation.pixelsWide) / CGFloat(representation.pixelsHigh)
+        }
+        guard image.size.width > 0, image.size.height > 0 else {
+            return 16 / 10
+        }
+        return image.size.width / image.size.height
+    }
+}
+
+private struct AspectFitPreviewLayout: Layout {
+    let aspectRatio: CGFloat
+    let maxHeight: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let safeAspectRatio = max(aspectRatio, 0.01)
+        let proposedWidth = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let availableWidth = max(0, proposedWidth ?? maxHeight * safeAspectRatio)
+        let width = min(availableWidth, maxHeight * safeAspectRatio)
+        let height = width / safeAspectRatio
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        guard let preview = subviews.first else { return }
+        preview.place(
+            at: bounds.origin,
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+        )
     }
 }
