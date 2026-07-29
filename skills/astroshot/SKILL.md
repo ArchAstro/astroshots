@@ -85,9 +85,9 @@ astroshot ink batch ./terminal-shots.yaml
 - To plan, embed, inventory, and render-check a documentation image set, read
   the **screenshot** skill.
 
-Do not infer approval from `manifest.json.status`; human decisions live in the
-Astroshots `review.json` contract and apply only to the reviewed run and image
-hash.
+Do not infer Seen from `manifest.json.status`; human acknowledgement and
+feedback live in the Astroshots `review.json` contract and apply only to the
+reviewed run and image hash.
 
 ## Trust boundary
 

@@ -3,7 +3,7 @@
 #
 # This validates the documented JSON shape and content-hash invalidation. It
 # does not simulate the Astroshots UI or claim that automation reviewed an
-# image; the approved decision below is a fixture representing human-authored
+# image; the Seen decision below is a fixture representing human-authored
 # state.
 set -euo pipefail
 
@@ -40,20 +40,20 @@ read_review() {
   manifest_run_id="$(jq -r '.run_id // empty' "$MANIFEST" 2>/dev/null || true)"
 
   if [[ ! -f "$REVIEW" ]]; then
-    jq -nc '{state: "pending", comments: []}'
+    jq -nc '{state: "unseen", comments: []}'
     return
   fi
 
   jq -c --arg file "$file" --arg sha "$current_sha" \
     --arg manifest_run_id "$manifest_run_id" '
     if $manifest_run_id != "" and (.run_id // "") != $manifest_run_id then
-      {state: "pending", comments: []}
+      {state: "unseen", comments: []}
     else
       (.reviews[$file] // null) as $review
       | {
           state: (
-            if $review == null then "pending"
-            elif $review.decision == null then "pending"
+            if $review == null then "unseen"
+            elif $review.decision == null then "unseen"
             elif $review.image_sha256 != $sha then "stale"
             else $review.decision
             end
@@ -64,7 +64,7 @@ read_review() {
   ' "$REVIEW"
 }
 
-# The manifest can pass while human review independently requests changes.
+# The manifest can pass while the image remains unseen.
 printf 'review contract image version one\n' >"$IMAGE"
 IMAGE_SHA="$(hash_file "$IMAGE")"
 jq -n '{
@@ -76,8 +76,8 @@ jq -n '{
 }' >"$MANIFEST"
 
 MISSING="$(read_review "0001-dialog.png")"
-[[ "$(jq -r '.state' <<<"$MISSING")" == "pending" ]] ||
-  { echo "expected a missing review sidecar to be pending" >&2; exit 1; }
+[[ "$(jq -r '.state' <<<"$MISSING")" == "unseen" ]] ||
+  { echo "expected a missing review sidecar to be unseen" >&2; exit 1; }
 [[ "$(jq -r '.comments | length' <<<"$MISSING")" == "0" ]] ||
   { echo "expected a missing review sidecar to expose no comments" >&2; exit 1; }
 
@@ -88,7 +88,7 @@ jq -n --arg sha "$IMAGE_SHA" '{
   updated_at: "2026-07-26T17:42:00Z",
   reviews: {
     "0001-dialog.png": {
-      decision: "approved",
+      decision: "seen",
       reviewed_at: "2026-07-26T17:42:00Z",
       image_sha256: $sha,
       comments: [{
@@ -117,8 +117,7 @@ jq -e '
     (.key | test("^[^/]+$"))
     and (
       (.value.decision == null)
-      or (.value.decision == "approved")
-      or (.value.decision == "changes_requested")
+      or (.value.decision == "seen")
     )
     and (
       if .value.decision == null then
@@ -141,26 +140,26 @@ jq -e '
 
 printf 'comment-only image\n' >"$FEATURE_DIR/0002-comment-only.png"
 COMMENT_ONLY="$(read_review "0002-comment-only.png")"
-[[ "$(jq -r '.state' <<<"$COMMENT_ONLY")" == "pending" ]] ||
-  { echo "expected comment-only feedback without a hash to remain pending" >&2; exit 1; }
+[[ "$(jq -r '.state' <<<"$COMMENT_ONLY")" == "unseen" ]] ||
+  { echo "expected comment-only feedback without a hash to remain unseen" >&2; exit 1; }
 [[ "$(jq -r '.comments[0].body' <<<"$COMMENT_ONLY")" == "Check the empty state copy." ]] ||
   { echo "expected agent reader to expose comment-only feedback" >&2; exit 1; }
 
 CURRENT="$(read_review "0001-dialog.png")"
-[[ "$(jq -r '.state' <<<"$CURRENT")" == "approved" ]] ||
-  { echo "expected matching human decision to be approved" >&2; exit 1; }
+[[ "$(jq -r '.state' <<<"$CURRENT")" == "seen" ]] ||
+  { echo "expected matching human acknowledgement to be seen" >&2; exit 1; }
 [[ "$(jq -r '.comments[0].body' <<<"$CURRENT")" == "Keep the focused crop." ]] ||
   { echo "expected agent reader to expose the human comment" >&2; exit 1; }
 
 # The same image bytes in a different capture run are a new review subject.
-# Old run-scoped approval and comments must both be suppressed.
+# Old run-scoped acknowledgement and comments must both be suppressed.
 jq '.run_id = "review-contract-run-2"' "$MANIFEST" >"$MANIFEST.next"
 mv "$MANIFEST.next" "$MANIFEST"
 [[ "$(hash_file "$IMAGE")" == "$IMAGE_SHA" ]] ||
   { echo "new-run proof must keep identical image bytes" >&2; exit 1; }
 NEW_RUN="$(read_review "0001-dialog.png")"
-[[ "$(jq -r '.state' <<<"$NEW_RUN")" == "pending" ]] ||
-  { echo "expected an identical image in a new run to be pending" >&2; exit 1; }
+[[ "$(jq -r '.state' <<<"$NEW_RUN")" == "unseen" ]] ||
+  { echo "expected an identical image in a new run to be unseen" >&2; exit 1; }
 [[ "$(jq -r '.comments | length' <<<"$NEW_RUN")" == "0" ]] ||
   { echo "expected prior-run comments to be suppressed" >&2; exit 1; }
 
@@ -172,16 +171,16 @@ mv "$MANIFEST.next" "$MANIFEST"
 printf 'review contract image version two\n' >"$IMAGE"
 STALE="$(read_review "0001-dialog.png")"
 [[ "$(jq -r '.state' <<<"$STALE")" == "stale" ]] ||
-  { echo "expected changed image bytes to invalidate approval" >&2; exit 1; }
+  { echo "expected changed image bytes to invalidate Seen" >&2; exit 1; }
 [[ "$(jq -r '.comments[0].body' <<<"$STALE")" == "Keep the focused crop." ]] ||
   { echo "expected stale review comments to remain agent-readable" >&2; exit 1; }
 
-# A later human-authored decision for the new hash remains independent of the
+# A later Seen acknowledgement for the new hash remains independent of the
 # successful execution status in manifest.json.
 NEW_SHA="$(hash_file "$IMAGE")"
 jq --arg sha "$NEW_SHA" '
   .updated_at = "2026-07-26T17:44:00Z"
-  | .reviews["0001-dialog.png"].decision = "changes_requested"
+  | .reviews["0001-dialog.png"].decision = "seen"
   | .reviews["0001-dialog.png"].reviewed_at = "2026-07-26T17:44:00Z"
   | .reviews["0001-dialog.png"].image_sha256 = $sha
   | .reviews["0001-dialog.png"].comments += [{
@@ -192,10 +191,10 @@ jq --arg sha "$NEW_SHA" '
 ' "$REVIEW" >"$REVIEW.next"
 mv "$REVIEW.next" "$REVIEW"
 
-REQUESTED="$(read_review "0001-dialog.png")"
-[[ "$(jq -r '.state' <<<"$REQUESTED")" == "changes_requested" ]] ||
-  { echo "expected current human decision to request changes" >&2; exit 1; }
-[[ "$(jq -r '.comments | length' <<<"$REQUESTED")" == "2" ]] ||
+SEEN_AGAIN="$(read_review "0001-dialog.png")"
+[[ "$(jq -r '.state' <<<"$SEEN_AGAIN")" == "seen" ]] ||
+  { echo "expected current human acknowledgement to be seen" >&2; exit 1; }
+[[ "$(jq -r '.comments | length' <<<"$SEEN_AGAIN")" == "2" ]] ||
   { echo "expected ordered feedback history to remain readable" >&2; exit 1; }
 [[ "$(jq -r '.status' "$MANIFEST")" == "pass" ]] ||
   { echo "execution manifest must remain independent of review decision" >&2; exit 1; }

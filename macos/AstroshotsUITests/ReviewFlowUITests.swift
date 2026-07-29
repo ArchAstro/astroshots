@@ -57,7 +57,29 @@ final class ReviewFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testCompactDetailSupportsApproveAndRequestChangesWithoutClipping() throws {
+    func testOverlayCardOpensReviewFromItsThumbnail() throws {
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] = imageURL.path
+        app.launch()
+
+        let overlay = app.buttons["overlay.open.0001-settings.png"]
+        XCTAssertTrue(overlay.waitForExistence(timeout: 8))
+        let proof = XCTAttachment(screenshot: overlay.screenshot())
+        proof.name = "Clickable screenshot overlay"
+        proof.lifetime = .keepAlways
+        add(proof)
+
+        // Click in the image region, away from the textual affordance.
+        overlay.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.64)).click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["review.takeover"]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
+    @MainActor
+    func testCompactDetailSupportsSeenAndFeedbackWithoutClipping() throws {
         // Setup boundary: seed and open the production tray popover with a
         // filesystem-backed frame whose temporary path is intentionally long.
         let app = launchTrayApp()
@@ -86,49 +108,37 @@ final class ReviewFlowUITests: XCTestCase {
         visualProof.name = "Compact detail review controls"
         visualProof.lifetime = .keepAlways
         add(visualProof)
-        let requestChanges = app.buttons["detail.review.requestChanges"]
-        XCTAssertTrue(requestChanges.exists)
-        XCTAssertFalse(requestChanges.isEnabled)
-
-        // Human action: approve directly in the compact detail without opening
-        // the takeover, then observe the persisted sidecar and live badge.
-        let approve = app.buttons["detail.review.approve"]
-        XCTAssertTrue(approve.waitForExistence(timeout: 3))
-        approve.click()
-
         let sidecar = featureDirectory.appendingPathComponent("review.json")
-        XCTAssertTrue(waitForDecision("approved", in: sidecar, timeout: 5))
-        XCTAssertTrue(
-            app.descendants(matching: .any)["review.status.approved"]
-                .waitForExistence(timeout: 3)
-        )
-
-        // Human correction: enter required feedback and request changes from
-        // the same compact surface, proving both decisions cross the real store.
-        let note = app.descendants(matching: .any)["detail.review.note"]
+        let note = app.descendants(matching: .any)["detail.feedback.note"]
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.click()
         note.typeText("Keep the primary action above the fold.")
-        XCTAssertTrue(requestChanges.isEnabled)
-        requestChanges.click()
-
-        XCTAssertTrue(
-            waitForDecision("changes_requested", in: sidecar, timeout: 5)
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["review.status.changesRequested"]
-                .waitForExistence(timeout: 3)
-        )
+        let sendFeedback = app.buttons["detail.feedback.send"]
+        XCTAssertTrue(sendFeedback.isEnabled)
+        sendFeedback.click()
+        XCTAssertTrue(waitForFile(sidecar, timeout: 5))
         let review = try reviewEntry(from: sidecar)
+        XCTAssertNil(review["decision"])
         let comments = try XCTUnwrap(review["comments"] as? [[String: Any]])
         XCTAssertEqual(
             comments.last?["body"] as? String,
             "Keep the primary action above the fold."
         )
+
+        // Acknowledging from detail persists Seen and returns to the stream.
+        let seen = app.buttons["detail.seen"]
+        XCTAssertTrue(seen.waitForExistence(timeout: 3))
+        seen.click()
+        XCTAssertTrue(waitForDecision("seen", in: sidecar, timeout: 5))
+        XCTAssertFalse(compact.waitForExistence(timeout: 1))
+        XCTAssertTrue(
+            app.buttons["stream.detail.0001-settings.png"]
+                .waitForExistence(timeout: 3)
+        )
     }
 
     @MainActor
-    func testReviewerCommentsApprovesAndRequestsChangesAcrossRevision() throws {
+    func testReviewerFeedbackAndSeenAcrossRevision() throws {
         // Setup and process boundary: launch the real LSUIElement application
         // directly into its production review window with a filesystem frame.
         let app = launchReviewApp()
@@ -148,9 +158,9 @@ final class ReviewFlowUITests: XCTestCase {
         editor.click()
         editor.typeText("The save button is clipped at the bottom.")
 
-        let addComment = app.buttons["review.comment.add"]
-        XCTAssertTrue(addComment.isEnabled)
-        addComment.click()
+        let sendFeedback = app.buttons["review.feedback.send"]
+        XCTAssertTrue(sendFeedback.isEnabled)
+        sendFeedback.click()
 
         let sidecar = featureDirectory.appendingPathComponent("review.json")
         XCTAssertTrue(waitForFile(sidecar, timeout: 5))
@@ -171,21 +181,18 @@ final class ReviewFlowUITests: XCTestCase {
             app.descendants(matching: .any)["review.status.pending"].exists
         )
 
-        // A separate human action approves the exact current image bytes.
-        let approve = app.buttons["review.approve"]
-        XCTAssertTrue(approve.isEnabled)
-        approve.click()
-        XCTAssertTrue(waitForDecision("approved", in: sidecar, timeout: 5))
-        XCTAssertTrue(
-            app.descendants(matching: .any)["review.status.approved"]
-                .waitForExistence(timeout: 3)
-        )
+        // Seen acknowledges the exact current image bytes and closes review.
+        let seen = app.buttons["review.seen"]
+        XCTAssertTrue(seen.isEnabled)
+        seen.click()
+        XCTAssertTrue(waitForDecision("seen", in: sidecar, timeout: 5))
+        XCTAssertFalse(takeover.waitForExistence(timeout: 1))
         review = try reviewEntry(from: sidecar)
-        XCTAssertEqual(review["decision"] as? String, "approved")
-        let approvedHash = try XCTUnwrap(review["image_sha256"] as? String)
+        XCTAssertEqual(review["decision"] as? String, "seen")
+        let seenHash = try XCTUnwrap(review["image_sha256"] as? String)
 
         // Inject a new revision through the real filesystem boundary. The next
-        // app launch must preserve same-run feedback but revoke approval.
+        // app launch must preserve same-run feedback but revoke Seen.
         app.terminate()
         var revised = try Data(contentsOf: imageURL)
         revised.append(0)
@@ -205,38 +212,28 @@ final class ReviewFlowUITests: XCTestCase {
                 .waitForExistence(timeout: 3)
         )
 
-        // Human action on the replacement: request changes with a required
-        // new comment, replacing the stale approval for the new image hash.
+        // Seen can carry new feedback for the replacement in the same action.
         let revisedEditor = revisedApp.textViews["review.comment.editor"]
         XCTAssertTrue(revisedEditor.waitForExistence(timeout: 3))
         revisedEditor.click()
         revisedEditor.typeText("Restore the missing primary action.")
-        let requestChanges = revisedApp.buttons["review.requestChanges"]
-        XCTAssertTrue(requestChanges.isEnabled)
-        requestChanges.click()
-        XCTAssertTrue(
-            waitForDecision("changes_requested", in: sidecar, timeout: 5)
-        )
-        XCTAssertTrue(
-            revisedApp.descendants(matching: .any)["review.status.changesRequested"]
-                .waitForExistence(timeout: 3)
+        let revisedSeen = revisedApp.buttons["review.seen"]
+        XCTAssertTrue(revisedSeen.isEnabled)
+        revisedSeen.click()
+        XCTAssertTrue(waitForDecision("seen", in: sidecar, timeout: 5))
+        XCTAssertFalse(
+            revisedApp.descendants(matching: .any)["review.takeover"]
+                .waitForExistence(timeout: 1)
         )
 
         review = try reviewEntry(from: sidecar)
-        XCTAssertEqual(review["decision"] as? String, "changes_requested")
-        XCTAssertNotEqual(review["image_sha256"] as? String, approvedHash)
+        XCTAssertEqual(review["decision"] as? String, "seen")
+        XCTAssertNotEqual(review["image_sha256"] as? String, seenHash)
         comments = try XCTUnwrap(review["comments"] as? [[String: Any]])
         XCTAssertEqual(comments.count, 2)
         XCTAssertEqual(
             comments.last?["body"] as? String,
             "Restore the missing primary action."
-        )
-
-        // Window lifecycle boundary: the chromeless X closes the takeover.
-        revisedApp.buttons["review.close"].click()
-        XCTAssertFalse(
-            revisedApp.descendants(matching: .any)["review.takeover"]
-                .waitForExistence(timeout: 1)
         )
     }
 
