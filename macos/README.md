@@ -29,12 +29,13 @@ xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platfo
   for `**/.astroshot/<feature>/*.{png,jpg,…}` and `manifest.json`.
 - **No project picker**: every project under the watched roots streams into one
   newest-first list. Project name is a badge on each row / overlay.
-- **Desktop overlay**: new frames float above all windows; Open jumps to detail.
+- **Desktop overlay**: new frames float above all windows; clicking anywhere on
+  a card opens its full-screen review.
 - **Tray**: stream → click for detail → gear for settings. Pin keeps a floating window.
 - **Review**: clicking a screenshot opens a chromeless, screen-sized takeover
-  with a dim gray stage, close control, comment history, and approve/request
-  changes actions. Feedback is saved beside the execution manifest so an agent
-  can read it without an app-specific API.
+  with a dim gray stage, close control, comment history, feedback composer, and
+  Seen acknowledgement. Feedback is saved beside the execution manifest so an
+  agent can read it without an app-specific API.
 
 The unsigned `Astroshots` scheme contains the focused model and storage tests.
 The real-window review proof is isolated in `AstroshotsReviewUITests` because
@@ -81,8 +82,8 @@ Example `manifest.json`:
 ```
 
 `manifest.json.status` belongs to the harness: `running`, `pass`, `fail`, or
-`idle` describes execution, not human acceptance. Astroshots stores human
-feedback separately in `review.json`:
+`idle` describes execution, not whether a human has seen the image. Astroshots
+stores human acknowledgement and feedback separately in `review.json`:
 
 ```json
 {
@@ -91,7 +92,7 @@ feedback separately in `review.json`:
   "updated_at": "2026-07-26T17:42:00Z",
   "reviews": {
     "0002-configure.png": {
-      "decision": "approved",
+      "decision": "seen",
       "reviewed_at": "2026-07-26T17:42:00Z",
       "image_sha256": "a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1",
       "comments": [
@@ -106,15 +107,15 @@ feedback separately in `review.json`:
 }
 ```
 
-Review entries use exact image filenames. A decision is current only when its
+Review entries use exact image filenames. Seen is current only when its
 `image_sha256` matches the file's SHA-256. If a harness or agent replaces the
-image, Astroshots treats the prior decision as stale/pending while preserving
+image, Astroshots treats it as unseen while preserving
 comments as agent-readable feedback. A comment may exist without a decision;
-such pending entries may omit `reviewed_at` and `image_sha256`.
+such unseen entries may omit `reviewed_at` and `image_sha256`.
 
 When a manifest supplies `run_id`, Astroshots only applies feedback from a
 `review.json` with the same run id. A missing or different review run is
-pending, and its prior decision and comments are not shown for the current run.
+unseen, and its prior acknowledgement and comments are not shown for the current run.
 
 ## Architecture
 

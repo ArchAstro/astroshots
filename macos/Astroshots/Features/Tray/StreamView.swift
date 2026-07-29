@@ -10,7 +10,7 @@ struct StreamView: View {
         } else {
             VStack(spacing: 0) {
                 Picker("Review filter", selection: $filter) {
-                    Text("To review (\(pendingCount))").tag(StreamFilter.toReview)
+                    Text("Unseen (\(pendingCount))").tag(StreamFilter.toReview)
                     Text("All (\(appState.shots.count))").tag(StreamFilter.all)
                 }
                 .pickerStyle(.segmented)
@@ -43,14 +43,14 @@ struct StreamView: View {
     private var filteredShots: [Shot] {
         switch filter {
         case .toReview:
-            appState.shots.filter { ($0.review?.state ?? .pending) != .approved }
+            appState.shots.filter { ($0.review?.state ?? .pending) != .seen }
         case .all:
             appState.shots
         }
     }
 
     private var pendingCount: Int {
-        appState.shots.filter { ($0.review?.state ?? .pending) != .approved }.count
+        appState.shots.filter { ($0.review?.state ?? .pending) != .seen }.count
     }
 }
 
@@ -146,17 +146,15 @@ struct ShotRow: View {
 
     private var reviewLabel: String {
         switch reviewState {
-        case .pending: "To review"
-        case .approved: "Approved"
-        case .changesRequested: "Changes requested"
+        case .pending: "Unseen"
+        case .seen: "Seen"
         }
     }
 
     private var reviewColor: Color {
         switch reviewState {
         case .pending: Theme.amber
-        case .approved: Theme.green
-        case .changesRequested: Theme.red
+        case .seen: Theme.blue
         }
     }
 
@@ -191,10 +189,10 @@ private struct ReviewedStreamView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 24))
                 .foregroundStyle(Theme.green)
-            Text("Review inbox is clear")
+            Text("You’re all caught up")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("Every current frame is approved.")
+            Text("Every current frame has been seen.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
             Button("Show all frames", action: showAll)

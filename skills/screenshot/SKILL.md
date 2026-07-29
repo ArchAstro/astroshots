@@ -80,11 +80,10 @@ Read the **astroshots-review** skill and stream the documentation assets under a
 run-unique feature so old frames cannot be mistaken for the current set.
 Astroshots is optional review transport, not proof that a human saw the files.
 
-Only report `approved` when the current run and image hash match a human
-decision in `review.json`. Address every applicable comment and regenerate the
-source. If the repository or task requires sign-off, wait for approval before
-commit or publication. Otherwise report review as pending or unavailable and
-follow the repository's normal policy.
+Only report `seen` when the current run and image hash match a human
+acknowledgement in `review.json`. Address every applicable comment and
+regenerate the source. Seen is not approval or sign-off; follow the repository's
+normal policy for commit or publication.
 
 On non-macOS systems or when Astroshots is unavailable, visual inspection of
 every PNG is still required.

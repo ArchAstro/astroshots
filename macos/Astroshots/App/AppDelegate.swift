@@ -17,7 +17,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.install()
 
         #if DEBUG
-        if let reviewPath = ProcessInfo.processInfo.environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] {
+        if let overlayPath = ProcessInfo.processInfo.environment[
+            "ASTROSHOTS_UI_TEST_OVERLAY_PATH"
+        ] {
+            DispatchQueue.main.async {
+                controller.openOverlay(atImagePath: overlayPath)
+            }
+        } else if let reviewPath = ProcessInfo.processInfo.environment[
+            "ASTROSHOTS_UI_TEST_REVIEW_PATH"
+        ] {
             DispatchQueue.main.async {
                 controller.openReview(atImagePath: reviewPath)
             }
