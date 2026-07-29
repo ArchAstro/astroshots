@@ -5,8 +5,9 @@ import Foundation
 /// Callbacks are always delivered on the main queue.
 ///
 /// Startup:
-/// 1. **Warm** — re-scan `.astroshot` dirs from a persistent index (fast).
-/// 2. **Full** — recursive discovery walk; rewrites the index.
+/// 1. **Indexed** — re-scan `.astroshot` dirs from a persistent index (fast).
+/// 2. **Recovery** — recursively discover only when the index is missing,
+///    empty, stale, or the user explicitly requests a rescan.
 ///
 /// Full scans run on a background queue so the menu-bar status item can appear
 /// immediately even when a watched root is a large monorepo.
@@ -15,6 +16,8 @@ final class AstroshotWatcher: @unchecked Sendable {
         var roots: [URL]
         /// Wait for partial PNG writes to settle before ingesting.
         var settleNanos: UInt64 = 250_000_000
+        /// Injectable so tests never read or write the user's live index.
+        var cacheFileURL: URL = ShotIndexCache.cacheFileURL()
     }
 
     private struct ScanResult: Sendable {
@@ -37,6 +40,8 @@ final class AstroshotWatcher: @unchecked Sendable {
     private var knownAstroshotDirs: Set<String> = []
     /// Durable newest-arrival-first image paths from `shot-index.json`.
     private var arrivalOrder: [String] = []
+    /// Most recent FSEvent represented by the in-memory/indexed state.
+    private var lastEventID: FSEventStreamEventId?
     private var settleWorkItems: [String: DispatchWorkItem] = [:]
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
@@ -70,11 +75,26 @@ final class AstroshotWatcher: @unchecked Sendable {
         start()
     }
 
-    /// Non-blocking: FSEvents first, then warm cache + full discovery.
+    /// Non-blocking: FSEvents first, then indexed startup or recovery discovery.
     func start() {
         stop()
-        startFSEvents()
+        lock.lock()
+        let roots = configuration.roots
+        let cacheFileURL = configuration.cacheFileURL
+        lock.unlock()
+        let cachedEventID = ShotIndexCache.load(
+            for: roots,
+            cacheFileURL: cacheFileURL
+        )?.lastEventID
+        // Legacy indexes have no cursor. Establish one before scanning known
+        // directories so the event stream closes the scan/startup race without
+        // forcing a one-time recursive walk during this upgrade.
+        let resumeEventID = cachedEventID ?? FSEventsGetCurrentEventId()
+        lock.lock()
+        lastEventID = resumeEventID
+        lock.unlock()
         scheduleStartupScan()
+        startFSEvents(since: resumeEventID)
     }
 
     func stop() {
@@ -103,12 +123,16 @@ final class AstroshotWatcher: @unchecked Sendable {
         scanGeneration += 1
         let generation = scanGeneration
         let roots = configuration.roots
+        let cacheFileURL = configuration.cacheFileURL
         lock.unlock()
 
         emitScanState(true)
         queue.async { [weak self] in
             guard let self else { return }
-            let cache = ShotIndexCache.load(for: roots)
+            let cache = ShotIndexCache.load(
+                for: roots,
+                cacheFileURL: cacheFileURL
+            )
             let cachedArrivalOrder = cache?.arrivalOrder ?? []
             self.lock.lock()
             if self.scanGeneration == generation {
@@ -116,7 +140,8 @@ final class AstroshotWatcher: @unchecked Sendable {
             }
             self.lock.unlock()
 
-            // Phase 1 — warm: only directories we already found last session.
+            // A non-empty, internally consistent index is authoritative at
+            // launch. FSEvents keeps it current after the stream starts.
             if let cache, !cache.astroshotDirs.isEmpty {
                 let warm = self.scanKnownAstroshotDirs(cache.astroshotDirs)
                 let warmOrder = ShotIndexCache.reconciledArrivalOrder(
@@ -130,7 +155,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                     self.knownAstroshotDirs = Set(warm.astroshotDirs)
                 }
                 self.lock.unlock()
-                if stillCurrent, !warm.shots.isEmpty {
+                if stillCurrent {
                     self.emitShots(
                         ShotIndexCache.orderedShots(
                             warm.shots,
@@ -138,11 +163,27 @@ final class AstroshotWatcher: @unchecked Sendable {
                         )
                     )
                 }
+                guard stillCurrent else { return }
+
+                // Missing indexed directories mean the filesystem moved while
+                // Astroshots was closed. Recover once instead of preserving a
+                // silently incomplete index.
+                if warm.astroshotDirs.count == cache.astroshotDirs.count {
+                    ShotIndexCache.save(
+                        roots: roots,
+                        astroshotDirs: warm.astroshotDirs,
+                        arrivalOrder: warmOrder,
+                        lastEventID: self.currentLastEventID(),
+                        cacheFileURL: cacheFileURL
+                    )
+                    self.emitScanState(false)
+                    return
+                }
             }
 
             guard self.isScanCurrent(generation) else { return }
 
-            // Phase 2 — full recursive discovery; source of truth + cache rewrite.
+            // Missing, empty, or stale index: recover with one full discovery.
             let full = self.scanAllCollectingDirs()
             let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
                 existing: cachedArrivalOrder,
@@ -167,7 +208,9 @@ final class AstroshotWatcher: @unchecked Sendable {
             ShotIndexCache.save(
                 roots: roots,
                 astroshotDirs: full.astroshotDirs,
-                arrivalOrder: reconciledOrder
+                arrivalOrder: reconciledOrder,
+                lastEventID: self.currentLastEventID(),
+                cacheFileURL: cacheFileURL
             )
             self.emitScanState(false)
         }
@@ -178,6 +221,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         scanGeneration += 1
         let generation = scanGeneration
         let roots = configuration.roots
+        let cacheFileURL = configuration.cacheFileURL
         lock.unlock()
 
         emitScanState(true)
@@ -210,7 +254,9 @@ final class AstroshotWatcher: @unchecked Sendable {
                 ShotIndexCache.save(
                     roots: roots,
                     astroshotDirs: full.astroshotDirs,
-                    arrivalOrder: reconciledOrder
+                    arrivalOrder: reconciledOrder,
+                    lastEventID: self.currentLastEventID(),
+                    cacheFileURL: cacheFileURL
                 )
             }
             self.emitScanState(false)
@@ -221,6 +267,12 @@ final class AstroshotWatcher: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return scanGeneration == generation
+    }
+
+    private func currentLastEventID() -> UInt64? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastEventID
     }
 
     // MARK: Scan
@@ -390,7 +442,7 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     // MARK: FSEvents
 
-    private func startFSEvents() {
+    private func startFSEvents(since lastEventID: FSEventStreamEventId?) {
         lock.lock()
         let rootPaths = configuration.roots.map(\.path)
         lock.unlock()
@@ -405,12 +457,28 @@ final class AstroshotWatcher: @unchecked Sendable {
             copyDescription: nil
         )
 
-        let callback: FSEventStreamCallback = { _, info, numEvents, eventPaths, _, _ in
+        let callback: FSEventStreamCallback = {
+            _, info, numEvents, eventPaths, eventFlags, eventIDs in
             guard let info else { return }
             let watcher = Unmanaged<AstroshotWatcher>.fromOpaque(info).takeUnretainedValue()
             let paths = unsafeBitCast(eventPaths, to: NSArray.self) as? [String] ?? []
             let limited = Array(paths.prefix(numEvents))
-            watcher.handleFSEvents(paths: limited)
+            let flags = Array(
+                UnsafeBufferPointer(start: eventFlags, count: numEvents)
+            )
+            let ids = Array(
+                UnsafeBufferPointer(start: eventIDs, count: numEvents)
+            )
+            let recoveryFlags =
+                FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)
+                | FSEventStreamEventFlags(kFSEventStreamEventFlagUserDropped)
+                | FSEventStreamEventFlags(kFSEventStreamEventFlagKernelDropped)
+                | FSEventStreamEventFlags(kFSEventStreamEventFlagEventIdsWrapped)
+            watcher.handleFSEvents(
+                paths: limited,
+                latestEventID: ids.max(),
+                requiresFullScan: flags.contains { $0 & recoveryFlags != 0 }
+            )
         }
 
         guard let stream = FSEventStreamCreate(
@@ -418,7 +486,7 @@ final class AstroshotWatcher: @unchecked Sendable {
             callback,
             &context,
             paths,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            lastEventID ?? FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             0.4,
             FSEventStreamCreateFlags(
                 kFSEventStreamCreateFlagFileEvents
@@ -436,7 +504,21 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     /// Internal so focused tests can exercise settle/cancellation behavior
     /// without relying on the host FSEvents daemon.
-    func handleFSEvents(paths: [String]) {
+    func handleFSEvents(
+        paths: [String],
+        latestEventID: FSEventStreamEventId? = nil,
+        requiresFullScan: Bool = false
+    ) {
+        if let latestEventID {
+            lock.lock()
+            lastEventID = max(lastEventID ?? 0, latestEventID)
+            lock.unlock()
+        }
+        if requiresFullScan {
+            scheduleFullScan(persistCache: true)
+            return
+        }
+
         var featureDirectories = Set<String>()
         for eventPath in paths {
             let path = Self.canonicalPath(eventPath)
@@ -568,6 +650,8 @@ final class AstroshotWatcher: @unchecked Sendable {
         arrivalOrder.removeAll { $0 == path }
         arrivalOrder.insert(path, at: 0)
         let roots = configuration.roots
+        let cacheFileURL = configuration.cacheFileURL
+        let lastEventID = self.lastEventID
         let dirsSnapshot = Array(knownAstroshotDirs)
         let orderSnapshot = arrivalOrder
         lock.unlock()
@@ -575,7 +659,9 @@ final class AstroshotWatcher: @unchecked Sendable {
         ShotIndexCache.save(
             roots: roots,
             astroshotDirs: dirsSnapshot,
-            arrivalOrder: orderSnapshot
+            arrivalOrder: orderSnapshot,
+            lastEventID: lastEventID,
+            cacheFileURL: cacheFileURL
         )
 
         // Do not re-walk the whole tree for every PNG — emit the shot and let
