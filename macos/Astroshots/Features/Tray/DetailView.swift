@@ -164,9 +164,8 @@ struct DetailView: View {
 
     private func reviewLabel(for shot: Shot) -> String {
         switch shot.review?.state ?? .pending {
-        case .pending: "Pending"
-        case .approved: "Approved"
-        case .changesRequested: "Changes requested"
+        case .pending: "Unseen"
+        case .seen: "Seen"
         }
     }
 
@@ -196,7 +195,7 @@ struct DetailView: View {
     private func compactReviewControls(for shot: Shot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(
-                "Feedback — required when requesting changes",
+                "Share feedback…",
                 text: $reviewNote,
                 axis: .vertical
             )
@@ -212,8 +211,8 @@ struct DetailView: View {
                     .stroke(Theme.lineStrong, lineWidth: 1)
             )
             .accessibilityLabel("Compact review feedback")
-            .accessibilityHint("Feedback is required when requesting changes.")
-            .accessibilityIdentifier("detail.review.note")
+            .accessibilityHint("Share optional feedback about this screenshot.")
+            .accessibilityIdentifier("detail.feedback.note")
 
             if let submissionError {
                 Label(submissionError, systemImage: "exclamationmark.circle.fill")
@@ -225,23 +224,23 @@ struct DetailView: View {
 
             HStack(spacing: 8) {
                 Button {
-                    submitDecision(.approved, for: shot)
+                    submitFeedback(for: shot)
                 } label: {
-                    Label("Approve", systemImage: "checkmark")
+                    Label("Send Feedback", systemImage: "arrow.up.circle")
+                }
+                .buttonStyle(ReviewActionButtonStyle(tone: .quiet))
+                .disabled(isSubmitting || trimmedReviewNote.isEmpty)
+                .accessibilityIdentifier("detail.feedback.send")
+
+                Button {
+                    markSeen(for: shot)
+                } label: {
+                    Label("Seen", systemImage: "checkmark.circle.fill")
                 }
                 .buttonStyle(ReviewActionButtonStyle(tone: .primary))
                 .disabled(isSubmitting)
-                .accessibilityIdentifier("detail.review.approve")
-
-                Button {
-                    submitDecision(.changesRequested, for: shot)
-                } label: {
-                    Label("Request changes", systemImage: "exclamationmark.bubble")
-                }
-                .buttonStyle(ReviewActionButtonStyle(tone: .destructive))
-                .disabled(isSubmitting || trimmedReviewNote.isEmpty)
-                .accessibilityHint("Requires feedback in the field above.")
-                .accessibilityIdentifier("detail.review.requestChanges")
+                .accessibilityHint("Marks this screenshot as seen and returns to the stream.")
+                .accessibilityIdentifier("detail.seen")
             }
 
             if isSubmitting {
@@ -266,13 +265,31 @@ struct DetailView: View {
         reviewNote.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func submitDecision(_ decision: ReviewDecision, for shot: Shot) {
+    private func submitFeedback(for shot: Shot) {
         let note = trimmedReviewNote
-        if case .changesRequested = decision, note.isEmpty {
-            submissionError = "Explain what needs to change before requesting changes."
-            return
+        guard !note.isEmpty else { return }
+        performSubmission(for: shot) {
+            try await appState.addReviewComment(note, to: shot)
+            reviewNote = ""
         }
+    }
 
+    private func markSeen(for shot: Shot) {
+        let note = trimmedReviewNote
+        performSubmission(for: shot) {
+            try await appState.markSeen(
+                note: note.isEmpty ? nil : note,
+                for: shot
+            )
+            reviewNote = ""
+            appState.backToStream()
+        }
+    }
+
+    private func performSubmission(
+        for shot: Shot,
+        operation: @escaping @MainActor () async throws -> Void
+    ) {
         guard !isSubmitting else { return }
         let submissionID = UUID()
         activeSubmissionID = submissionID
@@ -287,16 +304,7 @@ struct DetailView: View {
                 }
             }
             do {
-                try await appState.setReviewDecision(
-                    decision,
-                    note: note.isEmpty ? nil : note,
-                    for: shot
-                )
-                if activeSubmissionID == submissionID,
-                   appState.selectedShotID == shot.id
-                {
-                    reviewNote = ""
-                }
+                try await operation()
             } catch {
                 if activeSubmissionID == submissionID,
                    appState.selectedShotID == shot.id

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Owns the chromeless, screen-sized review surface.
 ///
-/// The tray and desktop overlays remain lightweight entry points. Deliberate
-/// decisions and feedback happen here, in a key window that can accept text.
+/// The tray and desktop overlays remain lightweight entry points. Feedback and
+/// Seen acknowledgement happen here, in a key window that can accept text.
 @MainActor
 final class ReviewWindowController {
     private let appState: AppState

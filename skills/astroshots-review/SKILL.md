@@ -108,8 +108,7 @@ finalize call. Finalize execution state when the journey ends:
 # use --status fail when the journey failed
 ```
 
-`pass` means capture execution succeeded. It never means a human approved the
-image.
+`pass` means capture execution succeeded. It never means a human has seen the image.
 
 ## Read review feedback
 
@@ -124,13 +123,13 @@ The resulting state is:
 
 | Condition | State |
 |---|---|
-| Missing file, review file, entry, or decision | `pending` |
-| Review run differs from manifest run | `pending`; suppress old comments |
+| Missing file, review file, entry, or decision | `unseen` |
+| Review run differs from manifest run | `unseen`; suppress old comments |
 | Decision hash differs from current bytes | `stale`; comments remain guidance |
-| Matching current-run decision and hash | `approved` or `changes_requested` |
+| Matching current-run `seen` decision and hash | `seen` |
 
-Never edit `review.json` to approve your own work. After addressing requested
-changes, capture new bytes and wait for review of the new hash.
+Never edit `review.json` to mark your own work Seen. Address feedback, capture
+new bytes, and let the human review the new hash.
 
 ## Operate and troubleshoot the app
 

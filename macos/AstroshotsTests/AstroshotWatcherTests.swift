@@ -138,15 +138,14 @@ struct AstroshotWatcherTests {
         )
         defer { watcher.stop() }
         let store = ReviewStore()
-        _ = try await store.setDecision(
-            .approved,
+        _ = try await store.markSeen(
             forImage: image,
             featureDirectory: feature,
             runID: "review-run-1"
         )
 
         // Sidecar boundary: the same targeted refresh used by FSEvents must
-        // rehydrate the feature with its persisted approval.
+        // rehydrate the feature with its persisted Seen state.
         var refreshedShots: [Shot]?
         watcher.onFeatureShotsChanged = { _, shots in
             refreshedShots = shots
@@ -157,10 +156,10 @@ struct AstroshotWatcherTests {
         for _ in 0..<40 where refreshedShots == nil {
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(refreshedShots?.first?.review?.state == .approved)
+        #expect(refreshedShots?.first?.review?.state == .seen)
 
         // Image boundary: replacing bytes at the same path must emit a new
-        // snapshot whose approval is stale while the feedback record remains.
+        // snapshot whose acknowledgement is stale while feedback remains.
         var replacement: Shot?
         watcher.onNewShot = { shot in replacement = shot }
         try Data("image revision two".utf8).write(to: image, options: .atomic)

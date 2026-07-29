@@ -51,7 +51,7 @@ Path: `<worktree>/.astroshot/<feature>/review.json`
   "updated_at": "2026-07-26T17:42:00Z",
   "reviews": {
     "0002-configure.png": {
-      "decision": "approved",
+      "decision": "seen",
       "reviewed_at": "2026-07-26T17:42:00Z",
       "image_sha256": "a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1",
       "comments": [
@@ -79,23 +79,23 @@ Path: `<worktree>/.astroshot/<feature>/review.json`
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `decision` | string | no | Human decision: `approved` or `changes_requested` |
-| `reviewed_at` | string | conditional | Required with `decision`; absent for comment-only pending feedback |
+| `decision` | string | no | Human acknowledgement: `seen` |
+| `reviewed_at` | string | conditional | Required with `decision`; absent for comment-only unseen feedback |
 | `image_sha256` | string | conditional | Required with `decision`; lowercase SHA-256 of the reviewed file bytes |
 | `comments` | array | yes | Ordered agent-readable feedback |
 
 Each comment has required string fields `id`, `body`, and `created_at`.
 
 Review validity is content-addressed. Consumers first check whether `decision`
-exists. Without one, the entry is pending even if it contains comments and
+exists. Without one, the entry is unseen even if it contains comments and
 omits `image_sha256`. With a decision, consumers calculate the current image
 SHA-256 and compare it with `image_sha256`; a missing or mismatched hash
-invalidates the decision to pending/stale while comments remain readable. A
-missing file or missing review entry is also pending.
+invalidates the decision to unseen/stale while comments remain readable. A
+missing file or missing review entry is also unseen.
 
 Reviews are also run-scoped. When `manifest.json` has a `run_id`, a
 `review.json` with a missing or different `run_id` belongs to another run.
-Consumers report pending and suppress that other run's decision and comments,
+Consumers report unseen and suppress that other run's decision and comments,
 even if the image bytes are identical. This matches the app and prevents an old
-approval from carrying into a new execution. `manifest.status` must never be
+Seen acknowledgement from carrying into a new execution. `manifest.status` must never be
 used as a substitute for human review.

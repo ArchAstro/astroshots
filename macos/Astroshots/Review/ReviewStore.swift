@@ -8,7 +8,6 @@ actor ReviewStore {
     enum StoreError: Error, Equatable {
         case unsupportedVersion(Int)
         case emptyComment
-        case changesRequestedRequiresNote
         case invalidImageFileName
     }
 
@@ -79,14 +78,12 @@ actor ReviewStore {
     }
 
     @discardableResult
-    func setDecision(
-        _ decision: ReviewDecision,
+    func markSeen(
         note: String?,
         for shot: Shot
     ) throws -> ReviewSnapshot {
         let imageURL = URL(fileURLWithPath: shot.path)
-        return try setDecision(
-            decision,
+        return try markSeen(
             forImage: imageURL,
             featureDirectory: imageURL.deletingLastPathComponent(),
             runID: shot.runID,
@@ -95,18 +92,12 @@ actor ReviewStore {
     }
 
     @discardableResult
-    func setDecision(
-        _ decision: ReviewDecision,
+    func markSeen(
         forImage imageURL: URL,
         featureDirectory: URL,
         runID: String?,
         commentBody: String? = nil
     ) throws -> ReviewSnapshot {
-        if decision == .changesRequested,
-           commentBody?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
-            throw StoreError.changesRequestedRequiresNote
-        }
-
         let fileName = try validatedFileName(for: imageURL)
         let imageHash = try Self.imageSHA256(at: imageURL)
         var document = try loadDocument(featureDirectory: featureDirectory)
@@ -116,7 +107,7 @@ actor ReviewStore {
         if let commentBody {
             review.comments.append(try makeComment(body: commentBody))
         }
-        review.decision = decision
+        review.decision = .seen
         review.reviewedAt = Self.timestamp()
         review.imageSHA256 = imageHash
         document.updatedAt = Self.timestamp()
