@@ -66,6 +66,7 @@ struct DetailView: View {
                         } label: {
                             ShotThumbnail(path: shot.path)
                                 .aspectRatio(16 / 10, contentMode: .fit)
+                                .frame(maxWidth: .infinity)
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -85,6 +86,7 @@ struct DetailView: View {
                         .accessibilityLabel("Review \(shot.title) full screen")
                         .padding(.horizontal, 12)
                         .padding(.top, 12)
+                        .frame(maxWidth: .infinity)
 
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .top, spacing: 8) {
@@ -138,10 +140,10 @@ struct DetailView: View {
                             .accessibilityElement(children: .contain)
                             .accessibilityIdentifier("detail.metadata")
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14)
                         .padding(.top, 12)
                         .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .contain)

@@ -18,11 +18,15 @@ final class ReviewFlowUITests: XCTestCase {
             withIntermediateDirectories: true
         )
 
+        let image = NSImage(size: NSSize(width: 1_600, height: 900))
+        image.lockFocus()
+        NSColor(calibratedRed: 0.16, green: 0.22, blue: 0.31, alpha: 1).setFill()
+        NSRect(x: 0, y: 0, width: 1_600, height: 900).fill()
+        image.unlockFocus()
+        let tiff = try XCTUnwrap(image.tiffRepresentation)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff))
         let png = try XCTUnwrap(
-            Data(
-                base64Encoded:
-                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-            )
+            bitmap.representation(using: .png, properties: [:])
         )
         try png.write(to: imageURL)
         try manifestJSON().write(
@@ -59,7 +63,7 @@ final class ReviewFlowUITests: XCTestCase {
     @MainActor
     func testCompactDetailSupportsApproveAndRequestChangesWithoutClipping() throws {
         // Setup boundary: seed and open the production tray popover with a
-        // filesystem-backed frame whose temporary path is intentionally long.
+        // wide filesystem-backed frame whose temporary path is intentionally long.
         let app = launchTrayApp()
         let detailEntry = app.buttons["stream.detail.0001-settings.png"]
         XCTAssertTrue(detailEntry.waitForExistence(timeout: 8))
@@ -79,6 +83,12 @@ final class ReviewFlowUITests: XCTestCase {
         XCTAssertLessThanOrEqual(metadata.frame.maxX, compact.frame.maxX + 1)
         XCTAssertGreaterThanOrEqual(controls.frame.minX, compact.frame.minX - 1)
         XCTAssertLessThanOrEqual(controls.frame.maxX, compact.frame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(compact.frame.minX, viewport.frame.minX - 1)
+        XCTAssertLessThanOrEqual(compact.frame.maxX, viewport.frame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(metadata.frame.minX, viewport.frame.minX - 1)
+        XCTAssertLessThanOrEqual(metadata.frame.maxX, viewport.frame.maxX + 1)
+        XCTAssertGreaterThanOrEqual(controls.frame.minX, viewport.frame.minX - 1)
+        XCTAssertLessThanOrEqual(controls.frame.maxX, viewport.frame.maxX + 1)
         XCTAssertGreaterThanOrEqual(controls.frame.minY, viewport.frame.minY - 1)
         XCTAssertLessThanOrEqual(controls.frame.maxY, viewport.frame.maxY + 1)
         XCTAssertTrue(controls.isHittable)
