@@ -1,0 +1,4 @@
+interface:
+  display_name: "Astroshot Capture"
+  short_description: "Capture deterministic React and terminal PNGs"
+  default_prompt: "Use $astroshot to capture a deterministic UI screenshot with the right React, Ink, or PTY mode."

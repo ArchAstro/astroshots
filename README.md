@@ -262,18 +262,18 @@ astroshot-capture --feature install-wizard --slug configure \
   --from-agent-browser "$SESSION"
 ```
 
-The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) → [`skills/astroshots/scripts/astroshot-capture`](skills/astroshots/scripts/astroshot-capture).
+The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) →
+[`skills/astroshots-review/scripts/astroshot-capture`](skills/astroshots-review/scripts/astroshot-capture).
 
 ### Agent skills
 
-This repo ships **six** skills. Install them with the [skills](https://github.com/vercel-labs/skills) CLI.
+This repo ships **five** skills. Install them with the [skills](https://github.com/vercel-labs/skills) CLI.
 
 | Skill | What it teaches |
 |-------|-----------------|
-| **astroshots** | Write live screenshot streams under `.astroshot/` |
+| **astroshots-review** | Stream captures under `.astroshot/` and read human feedback |
 | **screenshot** | Plan, generate, review, and maintain documentation image sets |
-| **react-shot** | Capture deterministic React fixtures with `@archastro/astroshot react` |
-| **tui-shot** | Capture deterministic Ink fixtures and arbitrary PTY programs with `@archastro/astroshot ink` or `pty` |
+| **astroshot** | Capture deterministic React, Ink, and PTY fixtures with the unified CLI |
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
 
@@ -292,17 +292,18 @@ cd /path/to/your/project
 npx skills add ArchAstro/astroshots --skill '*' -y
 ```
 
-`--skill '*'` installs **every** skill in this repo (`astroshots`, `screenshot`, `react-shot`, `tui-shot`, `agent-browser`, `browser-ui-harness`).
-Using a single name (e.g. only `--skill astroshots`) installs just that one.
+`--skill '*'` installs **every** skill in this repo (`astroshot`,
+`astroshots-review`, `screenshot`, `agent-browser`, and
+`browser-ui-harness`). Using a single name (for example,
+`--skill astroshots-review`) installs just that one.
 
 #### Install one skill
 
 ```bash
 # Global
-npx skills add ArchAstro/astroshots --skill astroshots -g -y
+npx skills add ArchAstro/astroshots --skill astroshots-review -g -y
 npx skills add ArchAstro/astroshots --skill screenshot -g -y
-npx skills add ArchAstro/astroshots --skill react-shot -g -y
-npx skills add ArchAstro/astroshots --skill tui-shot -g -y
+npx skills add ArchAstro/astroshots --skill astroshot -g -y
 npx skills add ArchAstro/astroshots --skill agent-browser -g -y
 npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
 

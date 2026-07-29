@@ -19,7 +19,7 @@
   },
   "scripts": {
     "test": "npm run test --workspaces --if-present && npm run test:capture-helper && npm run test:review-contract",
-    "test:capture-helper": "bash skills/astroshots/scripts/test-astroshot-capture",
+    "test:capture-helper": "bash skills/astroshots-review/scripts/test-astroshot-capture",
     "test:review-contract": "bash scripts/test-review-contract.sh",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run typecheck && npm test && npm run verify:skills && npm run pack:check",
