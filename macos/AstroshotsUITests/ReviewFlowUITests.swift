@@ -18,13 +18,8 @@ final class ReviewFlowUITests: XCTestCase {
             withIntermediateDirectories: true
         )
 
-        let png = try XCTUnwrap(
-            Data(
-                base64Encoded:
-                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-            )
-        )
-        try png.write(to: imageURL)
+        try fixturePNG(width: 1_600, height: 900)
+            .write(to: imageURL, options: .atomic)
         try manifestJSON().write(
             to: featureDirectory.appendingPathComponent("manifest.json"),
             atomically: true,
@@ -58,7 +53,8 @@ final class ReviewFlowUITests: XCTestCase {
 
     @MainActor
     func testOverlayCardOpensReviewFromItsThumbnail() throws {
-        try panoramicFixturePNG().write(to: imageURL, options: .atomic)
+        try fixturePNG(width: 1_200, height: 400, showsEdgeMarkers: true)
+            .write(to: imageURL, options: .atomic)
         terminateRunningAstroshots()
         let app = XCUIApplication()
         app.launchEnvironment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] = imageURL.path
@@ -105,12 +101,18 @@ final class ReviewFlowUITests: XCTestCase {
         // real 400-point popover instead of expanding around the long path.
         let viewport = app.descendants(matching: .any)["detail.viewport"]
         let compact = app.descendants(matching: .any)["detail.compact"]
+        let preview = app.buttons["detail.preview"]
         let metadata = app.descendants(matching: .any)["detail.metadata"]
         let controls = app.descendants(matching: .any)["detail.review.controls"]
         XCTAssertTrue(viewport.waitForExistence(timeout: 3))
         XCTAssertTrue(compact.waitForExistence(timeout: 3))
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
         XCTAssertTrue(metadata.waitForExistence(timeout: 3))
         XCTAssertTrue(controls.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(preview.frame.width, compact.frame.width - 26)
+        XCTAssertLessThanOrEqual(preview.frame.height, 241)
+        XCTAssertEqual(preview.frame.width / preview.frame.height, 16 / 9, accuracy: 0.08)
+        XCTAssertGreaterThanOrEqual(controls.frame.minY, preview.frame.maxY - 1)
         XCTAssertGreaterThanOrEqual(metadata.frame.minX, compact.frame.minX - 1)
         XCTAssertLessThanOrEqual(metadata.frame.maxX, compact.frame.maxX + 1)
         XCTAssertGreaterThanOrEqual(controls.frame.minX, compact.frame.minX - 1)
@@ -118,7 +120,9 @@ final class ReviewFlowUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(controls.frame.minY, viewport.frame.minY - 1)
         XCTAssertLessThanOrEqual(controls.frame.maxY, viewport.frame.maxY + 1)
         XCTAssertTrue(controls.isHittable)
-        let visualProof = XCTAttachment(screenshot: viewport.screenshot())
+        let visualProof = XCTAttachment(
+            screenshot: viewport.screenshot()
+        )
         visualProof.name = "Compact detail review controls"
         visualProof.lifetime = .keepAlways
         add(visualProof)
@@ -149,6 +153,35 @@ final class ReviewFlowUITests: XCTestCase {
             app.descendants(matching: .any)["stream.seen.empty"]
                 .waitForExistence(timeout: 3)
         )
+    }
+
+    @MainActor
+    func testCompactPortraitDetailFitsThePreviewBox() throws {
+        try fixturePNG(width: 900, height: 1_600)
+            .write(to: imageURL, options: .atomic)
+
+        let app = launchTrayApp()
+        let detailEntry = app.buttons["stream.detail.0001-settings.png"]
+        XCTAssertTrue(detailEntry.waitForExistence(timeout: 8))
+        detailEntry.click()
+
+        let compact = app.descendants(matching: .any)["detail.compact"]
+        let preview = app.buttons["detail.preview"]
+        XCTAssertTrue(compact.waitForExistence(timeout: 3))
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
+        XCTAssertLessThanOrEqual(preview.frame.height, 241)
+        XCTAssertEqual(preview.frame.width / preview.frame.height, 9 / 16, accuracy: 0.08)
+        XCTAssertGreaterThan(preview.frame.minX, compact.frame.minX + 12)
+        XCTAssertLessThan(preview.frame.maxX, compact.frame.maxX - 12)
+
+        let viewport = app.descendants(matching: .any)["detail.viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        let visualProof = XCTAttachment(
+            screenshot: viewport.screenshot()
+        )
+        visualProof.name = "Compact portrait detail preview"
+        visualProof.lifetime = .keepAlways
+        add(visualProof)
     }
 
     @MainActor
@@ -315,9 +348,11 @@ final class ReviewFlowUITests: XCTestCase {
         return false
     }
 
-    private func panoramicFixturePNG() throws -> Data {
-        let width = 1_200
-        let height = 400
+    private func fixturePNG(
+        width: Int,
+        height: Int,
+        showsEdgeMarkers: Bool = false
+    ) throws -> Data {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let context = try XCTUnwrap(
             CGContext(
@@ -332,10 +367,12 @@ final class ReviewFlowUITests: XCTestCase {
         )
         context.setFillColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
-        context.fill(CGRect(x: 0, y: 0, width: 100, height: height))
-        context.setFillColor(red: 0, green: 1, blue: 0, alpha: 1)
-        context.fill(CGRect(x: width - 100, y: 0, width: 100, height: height))
+        if showsEdgeMarkers {
+            context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: height))
+            context.setFillColor(red: 0, green: 1, blue: 0, alpha: 1)
+            context.fill(CGRect(x: width - 100, y: 0, width: 100, height: height))
+        }
 
         let image = try XCTUnwrap(context.makeImage())
         let bitmap = NSBitmapImageRep(cgImage: image)
