@@ -357,6 +357,8 @@ Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](doc
 Maintainers: **Actions → Cut release** only prepares the macOS app release and
 DMG. It does not bump or publish the npm CLI. macOS signing secrets are
 documented in [`docs/SIGNING.md`](docs/SIGNING.md).
+For the exact human checklist, use
+[`docs/GO-LIVE-CHECKLIST.md`](docs/GO-LIVE-CHECKLIST.md).
 
 The npm packages use GitHub Actions OIDC trusted publishing, so normal releases
 need no long-lived npm token. npm requires a package to exist before a trusted

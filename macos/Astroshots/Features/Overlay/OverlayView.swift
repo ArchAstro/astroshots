@@ -46,7 +46,7 @@ struct OverlayView: View {
                 }
                 .padding(12)
 
-                ShotThumbnail(path: shot.path)
+                ShotThumbnail(path: shot.path, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .frame(height: 210)
                     .clipped()
