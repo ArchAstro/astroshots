@@ -77,8 +77,10 @@ macOS signing and notarization are documented separately in
 A macOS release that changes review-window behavior is blocked until a
 maintainer runs the signed `AstroshotsReviewUITests` scheme on a logged-in
 desktop and records the exact command and passing results for
-`testThumbnailTapOpensReviewTakeover` and
-`testReviewerCommentsApprovesAndRequestsChangesAcrossRevision` in the release
-pull request. The first proves the stream-image entry path; the second proves
-feedback, decisions, revision invalidation, and close behavior. If the Xcode
-UI worker cannot start, that is an unverified release—not a pass.
+`testThumbnailTapOpensReviewTakeover`,
+`testOverlayCardOpensReviewFromItsThumbnail`,
+`testReviewerFeedbackAndSeenAcrossRevision`, and
+`testCompactDetailSupportsSeenAndFeedbackWithoutClipping` in the release pull
+request. Together they prove the stream and overlay entry paths, feedback,
+Seen acknowledgement, revision invalidation, and close or return behavior. If
+the Xcode UI worker cannot start, that is an unverified release—not a pass.
