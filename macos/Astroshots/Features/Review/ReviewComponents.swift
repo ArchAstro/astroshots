@@ -6,19 +6,16 @@ struct ReviewBadge: View {
     private var presentation: (title: String, symbol: String, foreground: Color, background: Color) {
         switch state {
         case .pending:
-            return ("Pending review", "circle.dashed", Theme.amber, Theme.amberSoft)
-        case .approved:
-            return ("Approved", "checkmark.circle.fill", Theme.green, Theme.greenSoft)
-        case .changesRequested:
-            return ("Changes requested", "exclamationmark.bubble.fill", Theme.red, Theme.redSoft)
+            return ("Unseen", "circle.dashed", Theme.amber, Theme.amberSoft)
+        case .seen:
+            return ("Seen", "checkmark.circle.fill", Theme.blue, Theme.blue.opacity(0.1))
         }
     }
 
     private var stateIdentifier: String {
         switch state {
         case .pending: "pending"
-        case .approved: "approved"
-        case .changesRequested: "changesRequested"
+        case .seen: "seen"
         }
     }
 
@@ -101,7 +98,6 @@ struct ReviewActionButtonStyle: ButtonStyle {
     enum Tone {
         case quiet
         case primary
-        case destructive
     }
 
     let tone: Tone
@@ -127,7 +123,7 @@ struct ReviewActionButtonStyle: ButtonStyle {
     private var foreground: Color {
         switch tone {
         case .quiet: Theme.ink2
-        case .primary, .destructive: .white
+        case .primary: .white
         }
     }
 
@@ -136,9 +132,7 @@ struct ReviewActionButtonStyle: ButtonStyle {
         case .quiet:
             return configuration.isPressed ? Theme.surface : Color.white.opacity(0.7)
         case .primary:
-            return Theme.green
-        case .destructive:
-            return Theme.red
+            return Theme.blue
         }
     }
 
@@ -150,8 +144,7 @@ struct ReviewActionButtonStyle: ButtonStyle {
 #Preview("Review badges") {
     HStack(spacing: 10) {
         ReviewBadge(state: .pending)
-        ReviewBadge(state: .approved)
-        ReviewBadge(state: .changesRequested)
+        ReviewBadge(state: .seen)
     }
     .padding(20)
     .background(Theme.paper)

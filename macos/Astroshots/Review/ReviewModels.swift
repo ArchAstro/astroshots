@@ -1,14 +1,15 @@
 import Foundation
 
 enum ReviewDecision: String, Codable, Sendable, Hashable {
+    case seen
+    // Kept for decoding review files written by Astroshots 0.1.x.
     case approved
     case changesRequested = "changes_requested"
 }
 
 enum ReviewState: Sendable, Hashable {
     case pending
-    case approved
-    case changesRequested
+    case seen
 }
 
 struct ReviewComment: Codable, Identifiable, Sendable, Hashable {
@@ -70,10 +71,10 @@ struct ReviewSnapshot: Sendable, Hashable {
         self.review = review
 
         switch effectiveDecision {
-        case .approved:
-            state = .approved
+        case .seen, .approved:
+            state = .seen
         case .changesRequested:
-            state = .changesRequested
+            state = .pending
         case nil:
             state = .pending
         }

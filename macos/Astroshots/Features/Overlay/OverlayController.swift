@@ -13,10 +13,6 @@ final class OverlayController {
         let panel = OverlayPanel()
         let root = OverlayView(
             shot: shot,
-            onDismiss: { [weak self, weak panel] in
-                guard let panel else { return }
-                self?.dismiss(panel)
-            },
             onOpen: { [weak self, weak panel] in
                 guard let panel else { return }
                 self?.onOpen?(shot)
@@ -30,6 +26,10 @@ final class OverlayController {
 
         position(panel, index: 0)
         panel.orderFrontRegardless()
+
+        #if DEBUG
+        captureDebugSnapshotIfRequested(from: panel)
+        #endif
 
         // Stack existing downward.
         for (i, existing) in panels.enumerated() {
@@ -74,6 +74,27 @@ final class OverlayController {
         panel.setFrameOrigin(NSPoint(x: x, y: y))
         panel.alphaValue = index == 0 ? 1 : 0.92
     }
+
+    #if DEBUG
+    private func captureDebugSnapshotIfRequested(from panel: NSPanel) {
+        guard let outputPath = ProcessInfo.processInfo.environment[
+            "ASTROSHOTS_UI_TEST_OVERLAY_CAPTURE_PATH"
+        ] else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let view = panel.contentView else { return }
+            let bounds = view.bounds
+            guard bounds.width > 0, bounds.height > 0,
+                  let bitmap = view.bitmapImageRepForCachingDisplay(in: bounds)
+            else { return }
+            view.cacheDisplay(in: bounds, to: bitmap)
+            guard let data = bitmap.representation(using: .png, properties: [:]) else {
+                return
+            }
+            try? data.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
+        }
+    }
+    #endif
 }
 
 final class OverlayPanel: NSPanel {

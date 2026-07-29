@@ -62,8 +62,8 @@ Details: [`macos/README.md`](macos/README.md).
 3. **See** — New frames flash on the desktop; open the tray for the full
    stream. Click a row for detail.
 4. **Review** — Click a screenshot for a chromeless, screen-sized review
-   takeover. A human can comment, approve, or request changes; Astroshots
-   writes that feedback to `review.json` for agents and harnesses to read.
+   takeover. A human can send feedback or mark the current image Seen;
+   Astroshots writes that state to `review.json` for agents and harnesses.
 
 ### The tray
 
@@ -111,8 +111,8 @@ Example `manifest.json`:
 Project name is inferred from the folder that contains `.astroshot`. Feature is the directory name under it.
 
 `manifest.json.status` reports only whether the capture journey is running,
-passed, or failed. It is never a human approval signal. Human decisions and
-comments live separately in `review.json`, keyed by the exact image filename:
+passed, or failed. It is never a human acknowledgement. Seen state and feedback
+live separately in `review.json`, keyed by the exact image filename:
 
 ```json
 {
@@ -121,7 +121,7 @@ comments live separately in `review.json`, keyed by the exact image filename:
   "updated_at": "2026-07-26T17:42:00Z",
   "reviews": {
     "0002-configure.png": {
-      "decision": "changes_requested",
+      "decision": "seen",
       "reviewed_at": "2026-07-26T17:42:00Z",
       "image_sha256": "a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1a3b1",
       "comments": [
@@ -136,17 +136,16 @@ comments live separately in `review.json`, keyed by the exact image filename:
 }
 ```
 
-An absent decision means pending review; comment-only entries may also omit
-`reviewed_at` and `image_sha256`. `approved` and `changes_requested` apply only
-while `image_sha256` matches the current file bytes. Replacing an image at the
-same path invalidates the decision until a human reviews the new hash; existing
-comments remain readable so an agent can act on them. Agents must not infer
-approval from `manifest.json`, manufacture an approval, or rewrite human
-feedback.
+An absent decision means unseen; comment-only entries may also omit
+`reviewed_at` and `image_sha256`. `seen` applies only while `image_sha256`
+matches the current file bytes. Replacing an image at the same path makes it
+unseen again; existing comments remain readable so an agent can act on them.
+Agents must not infer Seen from `manifest.json`, manufacture an
+acknowledgement, or rewrite human feedback.
 
 Feedback is scoped to `run_id`. When the manifest has a run id, a missing or
-different `review.json.run_id` makes the current run pending; the prior run's
-decision and comments do not carry forward, even when the image bytes match.
+different `review.json.run_id` makes the current run unseen; the prior run's
+acknowledgement and comments do not carry forward, even when the bytes match.
 
 ---
 
@@ -251,8 +250,8 @@ astroshot-capture --feature install-wizard --slug configure \
 astroshot-capture --feature install-wizard --status pass --finalize
 ```
 
-That finalizes capture execution only. It does not approve any screenshot.
-Review decisions are made by a human in Astroshots and persisted in
+That finalizes capture execution only. It does not mark any screenshot Seen.
+Human acknowledgement and feedback are persisted by Astroshots in
 `review.json`.
 
 Or capture from an `agent-browser` CLI session:

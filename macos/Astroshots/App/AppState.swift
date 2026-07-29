@@ -56,6 +56,7 @@ final class AppState {
         let isReviewUITest =
             environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] != nil
                 || environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+                || environment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] != nil
         #else
         let isReviewUITest = false
         #endif
@@ -184,6 +185,12 @@ final class AppState {
         onReviewRequested?(shot)
     }
 
+    #if DEBUG
+    func showOverlayForTesting(_ shot: Shot) {
+        overlayController.show(shot: shot, autoDismiss: false, duration: 0)
+    }
+    #endif
+
     /// Navigate within the same worktree, feature, and run while the takeover
     /// remains open. A missing run id intentionally groups only the feature.
     func reviewSibling(from shotID: String, delta: Int) -> Shot? {
@@ -212,14 +219,13 @@ final class AppState {
         showToast("Comment added")
     }
 
-    func setReviewDecision(
-        _ decision: ReviewDecision,
+    func markSeen(
         note: String?,
         for shot: Shot
     ) async throws {
-        let snapshot = try await reviewStore.setDecision(decision, note: note, for: shot)
+        let snapshot = try await reviewStore.markSeen(note: note, for: shot)
         applyReview(snapshot, to: shot.id)
-        showToast(decision == .approved ? "Approved" : "Changes requested")
+        showToast("Seen")
     }
 
     private func applyReview(_ snapshot: ReviewSnapshot, to shotID: String) {

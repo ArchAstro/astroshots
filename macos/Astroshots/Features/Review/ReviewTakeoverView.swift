@@ -7,7 +7,7 @@ import SwiftUI
 /// - `Shot.review` is an optional `ReviewSnapshot`.
 /// - `ReviewSnapshot` exposes `state`, `comments`, and `isStale`.
 /// - `AppState` performs the async review sidecar writes through
-///   `addReviewComment(_:to:)` and `setReviewDecision(_:note:for:)`.
+///   `addReviewComment(_:to:)` and `markSeen(note:for:)`.
 @MainActor
 struct ReviewTakeoverView: View {
     let shot: Shot
@@ -207,7 +207,7 @@ struct ReviewTakeoverView: View {
             }
 
             if currentShot.review?.isStale == true {
-                Label("A newer image was captured after this review.", systemImage: "clock.arrow.circlepath")
+                Label("A newer image was captured since this was seen.", systemImage: "clock.arrow.circlepath")
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(Theme.amber)
                     .padding(.horizontal, 9)
@@ -293,7 +293,7 @@ struct ReviewTakeoverView: View {
         VStack(alignment: .leading, spacing: 9) {
             ZStack(alignment: .topLeading) {
                 if feedback.isEmpty {
-                    Text("Add specific feedback…")
+                    Text("Share feedback…")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.muted)
                         .padding(.horizontal, 9)
@@ -308,7 +308,7 @@ struct ReviewTakeoverView: View {
                     .padding(5)
                     .focused($composerFocused)
                     .accessibilityLabel("Review feedback")
-                    .accessibilityHint("Feedback is required when requesting changes.")
+                    .accessibilityHint("Share optional feedback about this screenshot.")
                     .accessibilityIdentifier("review.comment.editor")
             }
             .frame(height: 88)
@@ -329,36 +329,24 @@ struct ReviewTakeoverView: View {
             Button {
                 submitComment()
             } label: {
-                Label("Add comment", systemImage: "plus.bubble")
+                Label("Send Feedback", systemImage: "arrow.up.circle")
             }
             .buttonStyle(ReviewActionButtonStyle(tone: .quiet))
             .disabled(isSubmitting || trimmedFeedback.isEmpty)
             .keyboardShortcut(.return, modifiers: [.command])
-            .accessibilityHint("Adds the feedback without changing the review decision.")
-            .accessibilityIdentifier("review.comment.add")
+            .accessibilityHint("Sends feedback and keeps this screenshot open.")
+            .accessibilityIdentifier("review.feedback.send")
 
-            HStack(spacing: 8) {
-                Button {
-                    submitDecision(.approved)
-                } label: {
-                    Label("Approve", systemImage: "checkmark")
-                }
-                .buttonStyle(ReviewActionButtonStyle(tone: .primary))
-                .disabled(isSubmitting)
-                .keyboardShortcut(.return, modifiers: [.command, .option])
-                .accessibilityIdentifier("review.approve")
-
-                Button {
-                    submitDecision(.changesRequested)
-                } label: {
-                    Label("Request changes", systemImage: "exclamationmark.bubble")
-                }
-                .buttonStyle(ReviewActionButtonStyle(tone: .destructive))
-                .disabled(isSubmitting)
-                .keyboardShortcut(.return, modifiers: [.command, .shift])
-                .accessibilityHint("Requires feedback in the comment editor.")
-                .accessibilityIdentifier("review.requestChanges")
+            Button {
+                markSeen()
+            } label: {
+                Label("Seen", systemImage: "checkmark.circle.fill")
             }
+            .buttonStyle(ReviewActionButtonStyle(tone: .primary))
+            .disabled(isSubmitting)
+            .keyboardShortcut(.return, modifiers: [.command, .option])
+            .accessibilityHint("Marks this screenshot as seen and returns to the stream.")
+            .accessibilityIdentifier("review.seen")
 
             if isSubmitting {
                 HStack(spacing: 7) {
@@ -371,7 +359,7 @@ struct ReviewTakeoverView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityIdentifier("review.saving")
             } else {
-                Text("⌘↩ comment  ·  ⌘⌥↩ approve  ·  ⌘⇧↩ request changes")
+                Text("⌘↩ send feedback  ·  ⌘⌥↩ seen")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -439,7 +427,7 @@ struct ReviewTakeoverView: View {
     private func submitComment() {
         let body = trimmedFeedback
         guard !body.isEmpty else {
-            focusFeedback(message: "Write a comment before adding it.")
+            focusFeedback(message: "Write feedback before sending it.")
             return
         }
 
@@ -449,20 +437,16 @@ struct ReviewTakeoverView: View {
         }
     }
 
-    private func submitDecision(_ decision: ReviewDecision) {
+    private func markSeen() {
         let note = trimmedFeedback
-        if case .changesRequested = decision, note.isEmpty {
-            focusFeedback(message: "Explain what needs to change before requesting changes.")
-            return
-        }
 
         performSubmission {
-            try await appState.setReviewDecision(
-                decision,
+            try await appState.markSeen(
                 note: note.isEmpty ? nil : note,
                 for: currentShot
             )
             feedback = ""
+            onClose()
         }
     }
 
