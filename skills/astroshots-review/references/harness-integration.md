@@ -24,7 +24,8 @@ smoke_capture() {
   smoke_browser screenshot --full "$shot" >/dev/null
 
   # Astroshots dual-write (feature = case name)
-  if command -v astroshot-capture >/dev/null 2>&1 || [[ -x "$ASTROSHOT_CAPTURE" ]]; then
+  if command -v astroshot-capture >/dev/null 2>&1 || \
+    [[ -x "${ASTROSHOT_CAPTURE:-}" ]]; then
     local capture="${ASTROSHOT_CAPTURE:-astroshot-capture}"
     "$capture" \
       --root "$REPO_ROOT" \
@@ -42,40 +43,45 @@ smoke_capture() {
 On pass/fail at end of `run.sh`:
 
 ```bash
-astroshot-capture --root "$REPO_ROOT" --feature "$case_name" --status pass --finalize
+astroshot-capture --root "$REPO_ROOT" --feature "$case_name" \
+  --run-id "$SMOKE_RUN_ID" --status pass --finalize
 # or fail
 ```
 
 Install the skill (and helper) first:
 
 ```bash
-npx skills add ArchAstro/astroshots --skill astroshots -g -y
+npx skills add ArchAstro/astroshots --skill astroshots-review -g -y
 ```
 
 Then point harnesses at the installed script (or copy it onto `PATH`):
 
 ```bash
 export ASTROSHOT_CAPTURE="$(ls -d \
-  ~/.agents/skills/astroshots/scripts/astroshot-capture \
-  ~/.claude/skills/astroshots/scripts/astroshot-capture \
+  ~/.agents/skills/astroshots-review/scripts/astroshot-capture \
+  ~/.claude/skills/astroshots-review/scripts/astroshot-capture \
+  ~/.codex/skills/astroshots-review/scripts/astroshot-capture \
   2>/dev/null | head -1)"
 ```
 
 ## Generic Bash harness
 
 ```bash
-npx skills add ArchAstro/astroshots --skill astroshots -g -y
+npx skills add ArchAstro/astroshots --skill astroshots-review -g -y
 
 FEATURE=my-journey
-CAPTURE="$(ls -d ~/.agents/skills/astroshots/scripts/astroshot-capture \
-  ~/.claude/skills/astroshots/scripts/astroshot-capture 2>/dev/null | head -1)"
+RUN_ID="${FEATURE}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+CAPTURE="$(ls -d ~/.agents/skills/astroshots-review/scripts/astroshot-capture \
+  ~/.claude/skills/astroshots-review/scripts/astroshot-capture \
+  ~/.codex/skills/astroshots-review/scripts/astroshot-capture 2>/dev/null | head -1)"
 
 # each step after UI is ready:
 "$CAPTURE" --feature "$FEATURE" --slug step-name \
   --title "Step name" --description "What we proved" \
+  --run-id "$RUN_ID" \
   --from-agent-browser "$SESSION"
 
-"$CAPTURE" --feature "$FEATURE" --status pass --finalize
+"$CAPTURE" --feature "$FEATURE" --run-id "$RUN_ID" --status pass --finalize
 ```
 
 ## Where NOT to write

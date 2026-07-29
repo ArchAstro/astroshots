@@ -12,15 +12,27 @@ case_file="$CASES_DIR/$case_name.sh"
 [[ -f "$case_file" ]] || { echo "unknown case: $case_name" >&2; exit 1; }
 
 # --- configure for your app ---
-APP_BASE_URL="${APP_BASE_URL:-http://127.0.0.1:3000}"
-ARTIFACTS="${SMOKE_ARTIFACTS_DIR:-/tmp/ui-smoke/$(basename "$REPO_ROOT")/${case_name}-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
-SESSION="${SMOKE_SESSION:-ui-$(basename "$REPO_ROOT")-${case_name}-$$}"
+APP_BASE_URL="${APP_BASE_URL:-}"
+[[ -n "$APP_BASE_URL" ]] || {
+  echo "error: discover APP_BASE_URL from this project's config before running" >&2
+  exit 2
+}
+RUN_ID="${SMOKE_RUN_ID:-${case_name}-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+ARTIFACTS="${SMOKE_ARTIFACTS_DIR:-/tmp/ui-smoke/$(basename "$REPO_ROOT")/$RUN_ID}"
+SESSION="${SMOKE_SESSION:-ui-$(basename "$REPO_ROOT")-$RUN_ID}"
 HOLD="${SMOKE_HOLD:-0}"
+ASTROSHOT_CAPTURE="${ASTROSHOT_CAPTURE:-}"
 
 mkdir -p "$ARTIFACTS/screenshots" "$ARTIFACTS/snapshots"
 REPORT="$ARTIFACTS/report.md"
 step_number=0
 browser_started=0
+astroshot_started=0
+run_succeeded=0
+
+if [[ -z "$ASTROSHOT_CAPTURE" ]] && command -v astroshot-capture >/dev/null 2>&1; then
+  ASTROSHOT_CAPTURE="$(command -v astroshot-capture)"
+fi
 
 log() { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$ARTIFACTS/run.log" >&2; }
 
@@ -55,27 +67,48 @@ smoke_capture() {
   smoke_browser wait 400 >/dev/null || true
   smoke_browser screenshot --full "$shot" >/dev/null
   printf -- '- %s\n- Screenshot: `%s`\n' "$description" "$shot" >>"$REPORT"
-  if command -v astroshot-capture >/dev/null 2>&1; then
-    astroshot-capture --root "$REPO_ROOT" --feature "$case_name" --slug "$slug" \
-      --description "$description" --status running --source "$shot" >/dev/null || true
+  if [[ -x "$ASTROSHOT_CAPTURE" ]] && \
+    "$ASTROSHOT_CAPTURE" --root "$REPO_ROOT" --feature "$case_name" --slug "$slug" \
+      --description "$description" --status running --source "$shot" \
+      --run-id "$RUN_ID" >/dev/null; then
+    astroshot_started=1
   fi
   log "captured $shot"
+}
+
+smoke_diagnostics() {
+  [[ -f "$ARTIFACTS/failure.png" ]] ||
+    agent-browser --session "$SESSION" screenshot --full "$ARTIFACTS/failure.png" >/dev/null 2>&1 || true
+  [[ -f "$ARTIFACTS/snapshots/failure.txt" ]] ||
+    agent-browser --session "$SESSION" snapshot >"$ARTIFACTS/snapshots/failure.txt" 2>/dev/null || true
+  [[ -f "$ARTIFACTS/console.txt" ]] ||
+    agent-browser --session "$SESSION" console >"$ARTIFACTS/console.txt" 2>/dev/null || true
+  [[ -f "$ARTIFACTS/errors.txt" ]] ||
+    agent-browser --session "$SESSION" errors >"$ARTIFACTS/errors.txt" 2>/dev/null || true
 }
 
 smoke_fail() {
   log "FAIL: $*"
   printf '\n## Result\n\nFAIL: %s\n' "$*" >>"$REPORT"
-  agent-browser --session "$SESSION" screenshot --full "$ARTIFACTS/failure.png" >/dev/null 2>&1 || true
-  agent-browser --session "$SESSION" console >"$ARTIFACTS/console.txt" 2>/dev/null || true
+  smoke_diagnostics
   exit 1
 }
 
 cleanup() {
+  local exit_code=$?
+  local astroshot_status="fail"
+  if [[ "$exit_code" == "0" && "$run_succeeded" == "1" ]]; then
+    astroshot_status="pass"
+  fi
+  if [[ "$exit_code" != "0" && "$browser_started" == "1" ]]; then
+    smoke_diagnostics
+  fi
   if [[ "$browser_started" == "1" && "$HOLD" != "1" ]]; then
     agent-browser --session "$SESSION" close >/dev/null 2>&1 || true
   fi
-  if command -v astroshot-capture >/dev/null 2>&1; then
-    astroshot-capture --root "$REPO_ROOT" --feature "$case_name" --status pass --finalize >/dev/null 2>&1 || true
+  if [[ "$astroshot_started" == "1" ]]; then
+    "$ASTROSHOT_CAPTURE" --root "$REPO_ROOT" --feature "$case_name" \
+      --status "$astroshot_status" --run-id "$RUN_ID" --finalize >/dev/null 2>&1 || true
   fi
   log "artifacts: $ARTIFACTS"
 }
@@ -91,6 +124,7 @@ cat >"$REPORT" <<EOF
 # UI smoke report
 
 - Case: \`$case_name\`
+- Run: \`$RUN_ID\`
 - App: \`$APP_BASE_URL\`
 - Session: \`$SESSION\`
 EOF
@@ -106,4 +140,5 @@ agent-browser --session "$SESSION" set viewport 1280 900 >/dev/null || true
 
 run_case
 printf '\n## Result\n\nPASS\n' >>"$REPORT"
+run_succeeded=1
 log "PASS: $case_name"

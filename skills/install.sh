@@ -9,7 +9,7 @@ Usage:
   bash ./skills/install.sh <skill-name> <destination>
 
 Example:
-  bash ./skills/install.sh astroshots "$HOME/.agents/skills/astroshots"
+  bash ./skills/install.sh astroshots-review "$HOME/.agents/skills/astroshots-review"
 
 The destination must not already exist. This script creates one symlink from
 the explicit destination to this clone; it never scans or rewrites worktrees.
