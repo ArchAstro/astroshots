@@ -64,6 +64,7 @@ final class ShotIndexCacheTests: XCTestCase {
             from: data
         )
         XCTAssertEqual(decoded.arrivalOrder, [])
+        XCTAssertNil(decoded.lastEventID)
     }
 
     func testReconcilePreservesKnownArrivalOrderAndPrependsDiscoveries() {
@@ -108,19 +109,8 @@ final class ShotIndexCacheTests: XCTestCase {
         XCTAssertNil(ShotIndexCache.astroshotDir(forImagePath: "/tmp/proj/not-a-shot.png"))
     }
 
-    func testSaveAndLoadViaRealCacheFile() throws {
-        // Isolate by writing through the public API then verifying load
-        // filters on root mismatch. Uses the real Application Support path
-        // but restores any pre-existing file afterward.
-        let cacheURL = ShotIndexCache.cacheFileURL()
-        let backup = try? Data(contentsOf: cacheURL)
-        defer {
-            if let backup {
-                try? backup.write(to: cacheURL, options: [.atomic])
-            } else {
-                ShotIndexCache.clear()
-            }
-        }
+    func testSaveAndLoadViaInjectedCacheFile() throws {
+        let cacheURL = tempSupport.appendingPathComponent("shot-index.json")
 
         let root = URL(fileURLWithPath: "/tmp/astroshots-test-root-\(UUID().uuidString)", isDirectory: true)
         let dirs = [
@@ -134,30 +124,25 @@ final class ShotIndexCacheTests: XCTestCase {
         ShotIndexCache.save(
             roots: [root],
             astroshotDirs: dirs,
-            arrivalOrder: order
+            arrivalOrder: order,
+            lastEventID: 42,
+            cacheFileURL: cacheURL
         )
 
-        let loaded = ShotIndexCache.load(for: [root])
+        let loaded = ShotIndexCache.load(for: [root], cacheFileURL: cacheURL)
         XCTAssertEqual(loaded?.astroshotDirs.sorted(), dirs.sorted())
         XCTAssertEqual(loaded?.roots, [root.standardizedFileURL.path])
         XCTAssertEqual(loaded?.arrivalOrder, order)
+        XCTAssertEqual(loaded?.lastEventID, 42)
 
         // Different root → miss.
         let other = URL(fileURLWithPath: "/tmp/other-root", isDirectory: true)
-        XCTAssertNil(ShotIndexCache.load(for: [other]))
+        XCTAssertNil(ShotIndexCache.load(for: [other], cacheFileURL: cacheURL))
     }
 
     @MainActor
     func testWatcherRestoresLiveArrivalOrderAfterRestart() async throws {
-        let cacheURL = ShotIndexCache.cacheFileURL()
-        let backup = try? Data(contentsOf: cacheURL)
-        defer {
-            if let backup {
-                try? backup.write(to: cacheURL, options: [.atomic])
-            } else {
-                ShotIndexCache.clear()
-            }
-        }
+        let cacheURL = tempSupport.appendingPathComponent("restart-index.json")
 
         let root = tempSupport.appendingPathComponent("restart-root", isDirectory: true)
         let feature = root.appendingPathComponent(".astroshot/feature", isDirectory: true)
@@ -179,7 +164,11 @@ final class ShotIndexCacheTests: XCTestCase {
         )
 
         let firstWatcher = AstroshotWatcher(
-            configuration: .init(roots: [root], settleNanos: 10_000_000)
+            configuration: .init(
+                roots: [root],
+                settleNanos: 10_000_000,
+                cacheFileURL: cacheURL
+            )
         )
         var initialOrder: [String] = []
         firstWatcher.onShotsChanged = { shots in
@@ -204,7 +193,10 @@ final class ShotIndexCacheTests: XCTestCase {
         }
         XCTAssertTrue(receivedLiveEvent)
         XCTAssertEqual(
-            ShotIndexCache.load(for: [root])?.arrivalOrder,
+            ShotIndexCache.load(
+                for: [root],
+                cacheFileURL: cacheURL
+            )?.arrivalOrder,
             [older.path, newer.path]
         )
         firstWatcher.stop()
@@ -216,7 +208,11 @@ final class ShotIndexCacheTests: XCTestCase {
         )
 
         let restartedWatcher = AstroshotWatcher(
-            configuration: .init(roots: [root], settleNanos: 10_000_000)
+            configuration: .init(
+                roots: [root],
+                settleNanos: 10_000_000,
+                cacheFileURL: cacheURL
+            )
         )
         defer { restartedWatcher.stop() }
         var restoredOrder: [String] = []
@@ -229,6 +225,76 @@ final class ShotIndexCacheTests: XCTestCase {
         }
 
         XCTAssertEqual(restoredOrder, [older.path, newer.path])
+    }
+
+    @MainActor
+    func testValidIndexSkipsRecursiveDiscoveryUntilExplicitRescan() async throws {
+        let root = tempSupport.appendingPathComponent("indexed-root", isDirectory: true)
+        let indexedFeature = root.appendingPathComponent(
+            "indexed/.astroshot/feature",
+            isDirectory: true
+        )
+        let unindexedFeature = root.appendingPathComponent(
+            "unindexed/.astroshot/feature",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: indexedFeature,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: unindexedFeature,
+            withIntermediateDirectories: true
+        )
+        let indexedImage = indexedFeature.appendingPathComponent("0001-indexed.png")
+        let unindexedImage = unindexedFeature.appendingPathComponent("0001-unindexed.png")
+        try Data("indexed".utf8).write(to: indexedImage)
+        try Data("unindexed".utf8).write(to: unindexedImage)
+
+        let cacheURL = tempSupport.appendingPathComponent("authoritative-index.json")
+        ShotIndexCache.save(
+            roots: [root],
+            astroshotDirs: [
+                indexedFeature.deletingLastPathComponent().path,
+            ],
+            arrivalOrder: [indexedImage.path],
+            cacheFileURL: cacheURL
+        )
+
+        let watcher = AstroshotWatcher(
+            configuration: .init(
+                roots: [root],
+                settleNanos: 10_000_000,
+                cacheFileURL: cacheURL
+            )
+        )
+        defer { watcher.stop() }
+        var observedPaths: [String] = []
+        var isScanning = true
+        watcher.onShotsChanged = { shots in
+            observedPaths = shots.map(\.path)
+        }
+        watcher.onScanStateChanged = { scanning in
+            isScanning = scanning
+        }
+
+        watcher.start()
+        for _ in 0..<100 where isScanning || observedPaths.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(observedPaths, [indexedImage.path])
+        XCTAssertNotNil(
+            ShotIndexCache.load(
+                for: [root],
+                cacheFileURL: cacheURL
+            )?.lastEventID
+        )
+
+        watcher.rescan()
+        for _ in 0..<100 where observedPaths.count != 2 || isScanning {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(Set(observedPaths), [indexedImage.path, unindexedImage.path])
     }
 
     private func makeShot(path: String, capturedAt: Date) -> Shot {

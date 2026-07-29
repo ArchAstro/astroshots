@@ -2,9 +2,9 @@ import Foundation
 
 /// Persists locations of `.astroshot` directories discovered under watched roots.
 ///
-/// Warm start re-scans only these paths (cheap) so the tray fills before a full
-/// recursive walk of a large monorepo finishes. The full scan still runs and
-/// rewrites the cache with any newly found trees.
+/// A valid index is the startup source of truth: launch re-scans only these
+/// paths, while FSEvents adds newly created `.astroshot` directories. A full
+/// recursive walk is reserved for cache misses and explicit rescans.
 struct ShotIndexCacheDocument: Codable, Equatable, Sendable {
     var version: Int
     /// Absolute watch-root paths this index was built for (sorted).
@@ -14,6 +14,9 @@ struct ShotIndexCacheDocument: Codable, Equatable, Sendable {
     /// Image paths newest-arrival-first. Unlike file timestamps, this remains
     /// stable when existing captures are rewritten or metadata changes.
     var arrivalOrder: [String]
+    /// Last filesystem event incorporated into this index. Replaying from this
+    /// cursor discovers captures written while Astroshots was not running.
+    var lastEventID: UInt64?
     var updatedAt: Date
 
     static let currentVersion = 1
@@ -23,17 +26,19 @@ struct ShotIndexCacheDocument: Codable, Equatable, Sendable {
         roots: [String],
         astroshotDirs: [String],
         arrivalOrder: [String] = [],
+        lastEventID: UInt64? = nil,
         updatedAt: Date
     ) {
         self.version = version
         self.roots = roots
         self.astroshotDirs = astroshotDirs
         self.arrivalOrder = arrivalOrder
+        self.lastEventID = lastEventID
         self.updatedAt = updatedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, roots, astroshotDirs, arrivalOrder, updatedAt
+        case version, roots, astroshotDirs, arrivalOrder, lastEventID, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -45,6 +50,7 @@ struct ShotIndexCacheDocument: Codable, Equatable, Sendable {
             [String].self,
             forKey: .arrivalOrder
         ) ?? []
+        lastEventID = try container.decodeIfPresent(UInt64.self, forKey: .lastEventID)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
@@ -79,9 +85,10 @@ enum ShotIndexCache {
     /// Load a cache only when it matches `roots` and the schema version.
     static func load(
         for roots: [URL],
+        cacheFileURL: URL? = nil,
         fileManager: FileManager = .default
     ) -> ShotIndexCacheDocument? {
-        let url = cacheFileURL(fileManager: fileManager)
+        let url = cacheFileURL ?? self.cacheFileURL(fileManager: fileManager)
         guard let data = try? Data(contentsOf: url),
               let doc = try? decoder.decode(ShotIndexCacheDocument.self, from: data)
         else {
@@ -97,27 +104,42 @@ enum ShotIndexCache {
         roots: [URL],
         astroshotDirs: [String],
         arrivalOrder: [String]? = nil,
+        lastEventID: UInt64? = nil,
+        cacheFileURL: URL? = nil,
         fileManager: FileManager = .default
     ) {
         let uniqueDirs = Array(Set(astroshotDirs)).sorted()
+        let existing = load(
+            for: roots,
+            cacheFileURL: cacheFileURL,
+            fileManager: fileManager
+        )
         let resolvedArrivalOrder = uniquePaths(
-            arrivalOrder ?? load(for: roots, fileManager: fileManager)?.arrivalOrder ?? []
+            arrivalOrder ?? existing?.arrivalOrder ?? []
         )
         let doc = ShotIndexCacheDocument(
             version: ShotIndexCacheDocument.currentVersion,
             roots: normalizeRoots(roots),
             astroshotDirs: uniqueDirs,
             arrivalOrder: resolvedArrivalOrder,
+            lastEventID: lastEventID ?? existing?.lastEventID,
             updatedAt: Date()
         )
-        let url = cacheFileURL(fileManager: fileManager)
+        let url = cacheFileURL ?? self.cacheFileURL(fileManager: fileManager)
+        try? fileManager.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         guard let data = try? encoder.encode(doc) else { return }
         try? data.write(to: url, options: [.atomic])
     }
 
     /// Drop the on-disk index (e.g. after a manual “forget” if added later).
-    static func clear(fileManager: FileManager = .default) {
-        let url = cacheFileURL(fileManager: fileManager)
+    static func clear(
+        cacheFileURL: URL? = nil,
+        fileManager: FileManager = .default
+    ) {
+        let url = cacheFileURL ?? self.cacheFileURL(fileManager: fileManager)
         try? fileManager.removeItem(at: url)
     }
 
