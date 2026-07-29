@@ -47,17 +47,12 @@ struct AstroshotWatcherTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [firstRoot.path]
-        let cacheURL = ShotIndexCache.cacheFileURL()
-        let cacheBackup = try? Data(contentsOf: cacheURL)
-        defer {
-            if let cacheBackup {
-                try? cacheBackup.write(to: cacheURL, options: .atomic)
-            } else {
-                ShotIndexCache.clear()
-            }
-        }
+        let cacheURL = temporary.appendingPathComponent("shot-index.json")
         let watcher = AstroshotWatcher(
-            configuration: .init(roots: [firstRoot])
+            configuration: .init(
+                roots: [firstRoot],
+                cacheFileURL: cacheURL
+            )
         )
         defer { watcher.stop() }
 
@@ -134,7 +129,11 @@ struct AstroshotWatcherTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let watcher = AstroshotWatcher(
-            configuration: .init(roots: [root], settleNanos: 20_000_000)
+            configuration: .init(
+                roots: [root],
+                settleNanos: 20_000_000,
+                cacheFileURL: root.appendingPathComponent("shot-index.json")
+            )
         )
         defer { watcher.stop() }
         let store = ReviewStore()
@@ -183,7 +182,10 @@ struct AstroshotWatcherTests {
         defer { try? FileManager.default.removeItem(at: temporary) }
 
         let watcher = AstroshotWatcher(
-            configuration: .init(roots: [temporary])
+            configuration: .init(
+                roots: [temporary],
+                cacheFileURL: temporary.appendingPathComponent("shot-index.json")
+            )
         )
         var emitted = false
         watcher.onNewShot = { _ in emitted = true }
@@ -238,7 +240,8 @@ struct AstroshotWatcherTests {
         let watcher = AstroshotWatcher(
             configuration: .init(
                 roots: [oldRoot],
-                settleNanos: 200_000_000
+                settleNanos: 200_000_000,
+                cacheFileURL: temporary.appendingPathComponent("shot-index.json")
             )
         )
         var emittedPaths: [String] = []

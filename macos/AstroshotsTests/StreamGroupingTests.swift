@@ -55,7 +55,10 @@ struct StreamGroupingTests {
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let watcher = AstroshotWatcher(
-            configuration: .init(roots: [root])
+            configuration: .init(
+                roots: [root],
+                cacheFileURL: root.appendingPathComponent("shot-index.json")
+            )
         )
         defer { watcher.stop() }
         let state = AppState(
@@ -109,7 +112,10 @@ struct StreamGroupingTests {
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let watcher = AstroshotWatcher(
-            configuration: .init(roots: [root])
+            configuration: .init(
+                roots: [root],
+                cacheFileURL: root.appendingPathComponent("shot-index.json")
+            )
         )
         defer { watcher.stop() }
         let state = AppState(

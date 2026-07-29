@@ -7,6 +7,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        // The unit-test bundle is hosted inside Astroshots.app. Do not start a
+        // second production AppState/watcher alongside the objects under test:
+        // it would read and rewrite the user's real Application Support index.
+        if NSClassFromString("XCTestCase") != nil {
+            return
+        }
+        #endif
+
         // Keep the process alive as a menu-bar app with no Dock icon.
         NSApp.setActivationPolicy(.accessory)
 
