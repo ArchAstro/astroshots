@@ -19,6 +19,7 @@ final class AppState {
     var isWatching = true
     /// True while a background full scan of the watched roots is running.
     var isScanning = false
+    var isMarkingSeen = false
     var toast: String?
     /// AppKit owns the chromeless review window; SwiftUI and overlays request it
     /// through this callback without knowing window lifecycle details.
@@ -56,6 +57,7 @@ final class AppState {
         let isReviewUITest =
             environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] != nil
                 || environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+                || environment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
                 || environment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] != nil
         #else
         let isReviewUITest = false
@@ -124,13 +126,26 @@ final class AppState {
 
     private func applyFeatureShotList(directoryPath: String, shots replacement: [Shot]) {
         let directory = URL(fileURLWithPath: directoryPath, isDirectory: true).standardizedFileURL.path
-        shots.removeAll {
-            URL(fileURLWithPath: $0.path)
+        var replacements = Dictionary(
+            uniqueKeysWithValues: replacement.map { ($0.path, $0) }
+        )
+        var updated: [Shot] = []
+        for shot in shots {
+            let shotDirectory = URL(fileURLWithPath: shot.path)
                 .deletingLastPathComponent()
-                .standardizedFileURL.path == directory
+                .standardizedFileURL.path
+            if shotDirectory == directory {
+                if let refreshed = replacements.removeValue(forKey: shot.path) {
+                    updated.append(refreshed)
+                }
+            } else {
+                updated.append(shot)
+            }
         }
-        shots.append(contentsOf: replacement)
-        shots.sort { $0.capturedAt > $1.capturedAt }
+        let newlyDiscovered = replacements.values.sorted {
+            $0.capturedAt > $1.capturedAt
+        }
+        shots = newlyDiscovered + updated
 
         if let selectedShotID, !shots.contains(where: { $0.id == selectedShotID }) {
             self.selectedShotID = shots.first?.id
@@ -226,6 +241,52 @@ final class AppState {
         let snapshot = try await reviewStore.markSeen(note: note, for: shot)
         applyReview(snapshot, to: shot.id)
         showToast("Seen")
+    }
+
+    func markAllSeen(_ candidates: [Shot]) async {
+        guard !isMarkingSeen else { return }
+        let candidateIDs = Set(candidates.map(\.id))
+        let unseen = shots.filter {
+            candidateIDs.contains($0.id)
+                && ($0.review?.state ?? .pending) != .seen
+        }
+        guard !unseen.isEmpty else {
+            showToast("Already seen")
+            return
+        }
+
+        isMarkingSeen = true
+        defer { isMarkingSeen = false }
+
+        var markedCount = 0
+        var failureCount = 0
+        for shot in unseen {
+            do {
+                let snapshot = try await reviewStore.markSeen(
+                    note: nil,
+                    for: shot
+                )
+                applyReview(snapshot, to: shot.id)
+                markedCount += 1
+            } catch {
+                failureCount += 1
+            }
+        }
+
+        if failureCount > 0 {
+            showToast(
+                markedCount == 0
+                    ? "Couldn’t mark frames as seen"
+                    : "Marked \(markedCount) seen; \(failureCount) failed"
+            )
+            return
+        }
+
+        showToast(
+            markedCount == 1
+                ? "Marked 1 frame seen"
+                : "Marked \(markedCount) frames seen"
+        )
     }
 
     private func applyReview(_ snapshot: ReviewSnapshot, to shotID: String) {

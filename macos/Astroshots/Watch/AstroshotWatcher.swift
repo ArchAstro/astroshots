@@ -35,6 +35,8 @@ final class AstroshotWatcher: @unchecked Sendable {
     private var knownPaths: Set<String> = []
     /// `.astroshot` directories known from cache and/or the last full scan.
     private var knownAstroshotDirs: Set<String> = []
+    /// Durable newest-arrival-first image paths from `shot-index.json`.
+    private var arrivalOrder: [String] = []
     private var settleWorkItems: [String: DispatchWorkItem] = [:]
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
@@ -106,10 +108,21 @@ final class AstroshotWatcher: @unchecked Sendable {
         emitScanState(true)
         queue.async { [weak self] in
             guard let self else { return }
+            let cache = ShotIndexCache.load(for: roots)
+            let cachedArrivalOrder = cache?.arrivalOrder ?? []
+            self.lock.lock()
+            if self.scanGeneration == generation {
+                self.arrivalOrder = cachedArrivalOrder
+            }
+            self.lock.unlock()
 
             // Phase 1 — warm: only directories we already found last session.
-            if let cache = ShotIndexCache.load(for: roots), !cache.astroshotDirs.isEmpty {
+            if let cache, !cache.astroshotDirs.isEmpty {
                 let warm = self.scanKnownAstroshotDirs(cache.astroshotDirs)
+                let warmOrder = ShotIndexCache.reconciledArrivalOrder(
+                    existing: cachedArrivalOrder,
+                    shots: warm.shots
+                )
                 self.lock.lock()
                 let stillCurrent = self.scanGeneration == generation
                 if stillCurrent {
@@ -118,7 +131,12 @@ final class AstroshotWatcher: @unchecked Sendable {
                 }
                 self.lock.unlock()
                 if stillCurrent, !warm.shots.isEmpty {
-                    self.emitShots(warm.shots)
+                    self.emitShots(
+                        ShotIndexCache.orderedShots(
+                            warm.shots,
+                            arrivalOrder: warmOrder
+                        )
+                    )
                 }
             }
 
@@ -126,17 +144,31 @@ final class AstroshotWatcher: @unchecked Sendable {
 
             // Phase 2 — full recursive discovery; source of truth + cache rewrite.
             let full = self.scanAllCollectingDirs()
+            let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
+                existing: cachedArrivalOrder,
+                shots: full.shots
+            )
             self.lock.lock()
             let stillCurrent = self.scanGeneration == generation
             if stillCurrent {
                 self.knownPaths = Set(full.shots.map(\.path))
                 self.knownAstroshotDirs = Set(full.astroshotDirs)
+                self.arrivalOrder = reconciledOrder
             }
             self.lock.unlock()
             guard stillCurrent else { return }
 
-            self.emitShots(full.shots)
-            ShotIndexCache.save(roots: roots, astroshotDirs: full.astroshotDirs)
+            self.emitShots(
+                ShotIndexCache.orderedShots(
+                    full.shots,
+                    arrivalOrder: reconciledOrder
+                )
+            )
+            ShotIndexCache.save(
+                roots: roots,
+                astroshotDirs: full.astroshotDirs,
+                arrivalOrder: reconciledOrder
+            )
             self.emitScanState(false)
         }
     }
@@ -153,16 +185,33 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard let self else { return }
             let full = self.scanAllCollectingDirs()
             self.lock.lock()
+            let existingOrder = self.arrivalOrder
+            self.lock.unlock()
+            let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
+                existing: existingOrder,
+                shots: full.shots
+            )
+            self.lock.lock()
             let stillCurrent = self.scanGeneration == generation
             if stillCurrent {
                 self.knownPaths = Set(full.shots.map(\.path))
                 self.knownAstroshotDirs = Set(full.astroshotDirs)
+                self.arrivalOrder = reconciledOrder
             }
             self.lock.unlock()
             guard stillCurrent else { return }
-            self.emitShots(full.shots)
+            self.emitShots(
+                ShotIndexCache.orderedShots(
+                    full.shots,
+                    arrivalOrder: reconciledOrder
+                )
+            )
             if persistCache {
-                ShotIndexCache.save(roots: roots, astroshotDirs: full.astroshotDirs)
+                ShotIndexCache.save(
+                    roots: roots,
+                    astroshotDirs: full.astroshotDirs,
+                    arrivalOrder: reconciledOrder
+                )
             }
             self.emitScanState(false)
         }
@@ -512,25 +561,26 @@ final class AstroshotWatcher: @unchecked Sendable {
             lock.unlock()
             return
         }
-        let isNew = !knownPaths.contains(path)
         knownPaths.insert(path)
-        var shouldPersistDirs = false
-        if let dir = ShotIndexCache.astroshotDir(forImagePath: path),
-           knownAstroshotDirs.insert(dir).inserted {
-            shouldPersistDirs = true
+        if let dir = ShotIndexCache.astroshotDir(forImagePath: path) {
+            knownAstroshotDirs.insert(dir)
         }
+        arrivalOrder.removeAll { $0 == path }
+        arrivalOrder.insert(path, at: 0)
         let roots = configuration.roots
         let dirsSnapshot = Array(knownAstroshotDirs)
+        let orderSnapshot = arrivalOrder
         lock.unlock()
 
-        if shouldPersistDirs {
-            ShotIndexCache.save(roots: roots, astroshotDirs: dirsSnapshot)
-        }
+        ShotIndexCache.save(
+            roots: roots,
+            astroshotDirs: dirsSnapshot,
+            arrivalOrder: orderSnapshot
+        )
 
         // Do not re-walk the whole tree for every PNG — emit the shot and let
         // AppState merge it into the list.
         emitNew(shot, generation: generation)
-        _ = isNew
     }
 
     private func emitShots(_ shots: [Shot]) {

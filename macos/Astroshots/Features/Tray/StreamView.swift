@@ -3,32 +3,76 @@ import SwiftUI
 struct StreamView: View {
     @Environment(AppState.self) private var appState
     @State private var filter: StreamFilter = .toReview
+    @State private var collapsedGroupIDs: Set<String> = []
 
     var body: some View {
         if appState.isEmpty {
             EmptyStreamView()
         } else {
             VStack(spacing: 0) {
-                Picker("Review filter", selection: $filter) {
-                    Text("Unseen (\(pendingCount))").tag(StreamFilter.toReview)
-                    Text("All (\(appState.shots.count))").tag(StreamFilter.all)
+                HStack(spacing: 8) {
+                    Text(
+                        filter == .toReview
+                            ? "Unseen (\(pendingCount))"
+                            : "History (\(seenCount))"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.ink2)
+
+                    Spacer()
+
+                    if filter == .toReview {
+                        SeenAllButton(
+                            count: pendingCount,
+                            isWorking: appState.isMarkingSeen,
+                            accessibilityIdentifier: "stream.seen.all"
+                        ) {
+                            Task {
+                                await appState.markAllSeen(appState.shots)
+                            }
+                        }
+                    }
+
+                    HistoryButton(isActive: filter == .history) {
+                        filter = filter == .history ? .toReview : .history
+                    }
                 }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
 
-                if filteredShots.isEmpty {
-                    ReviewedStreamView {
-                        filter = .all
+                if displayedGroups.isEmpty {
+                    if filter == .history {
+                        EmptyHistoryView {
+                            filter = .toReview
+                        }
+                    } else {
+                        ReviewedStreamView {
+                            filter = .history
+                        }
                     }
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 1) {
-                            ForEach(filteredShots) { shot in
-                                ShotRow(shot: shot) {
-                                    appState.selectShot(shot)
-                                }
+                        LazyVStack(spacing: 8) {
+                            ForEach(displayedGroups) { group in
+                                WorktreeStreamGroup(
+                                    group: group,
+                                    isCollapsed: collapsedGroupIDs.contains(group.id),
+                                    isMarkingSeen: appState.isMarkingSeen,
+                                    showsSeenAction: filter == .toReview,
+                                    toggleCollapsed: {
+                                        if collapsedGroupIDs.contains(group.id) {
+                                            collapsedGroupIDs.remove(group.id)
+                                        } else {
+                                            collapsedGroupIDs.insert(group.id)
+                                        }
+                                    },
+                                    markAllSeen: {
+                                        Task {
+                                            await appState.markAllSeen(group.allShots)
+                                        }
+                                    },
+                                    selectShot: appState.selectShot
+                                )
                             }
                         }
                         .padding(.horizontal, 10)
@@ -40,17 +84,219 @@ struct StreamView: View {
         }
     }
 
-    private var filteredShots: [Shot] {
-        switch filter {
-        case .toReview:
-            appState.shots.filter { ($0.review?.state ?? .pending) != .seen }
-        case .all:
-            appState.shots
+    private var displayedGroups: [StreamShotGroup] {
+        StreamGrouping.contiguousGroups(appState.shots).compactMap { group in
+            let visibleShots: [Shot]
+            switch filter {
+            case .toReview:
+                visibleShots = group.allShots.filter {
+                    ($0.review?.state ?? .pending) != .seen
+                }
+            case .history:
+                visibleShots = group.allShots.filter {
+                    ($0.review?.state ?? .pending) == .seen
+                }
+            }
+            guard !visibleShots.isEmpty else { return nil }
+            return group.withVisibleShots(visibleShots)
         }
     }
 
     private var pendingCount: Int {
         appState.shots.filter { ($0.review?.state ?? .pending) != .seen }.count
+    }
+
+    private var seenCount: Int {
+        appState.shots.count - pendingCount
+    }
+}
+
+struct StreamShotGroup: Identifiable {
+    let id: String
+    let worktree: String
+    let worktreePath: String
+    let allShots: [Shot]
+    let visibleShots: [Shot]
+
+    func withVisibleShots(_ shots: [Shot]) -> StreamShotGroup {
+        StreamShotGroup(
+            id: id,
+            worktree: worktree,
+            worktreePath: worktreePath,
+            allShots: allShots,
+            visibleShots: shots
+        )
+    }
+
+    var worktreeShort: String {
+        allShots[0].worktreeShort
+    }
+
+    var unseenCount: Int {
+        allShots.filter { ($0.review?.state ?? .pending) != .seen }.count
+    }
+}
+
+enum StreamGrouping {
+    static func contiguousGroups(_ shots: [Shot]) -> [StreamShotGroup] {
+        var groups: [StreamShotGroup] = []
+        var current: [Shot] = []
+
+        func appendCurrent() {
+            guard let first = current.first, let stableAnchor = current.last else {
+                return
+            }
+            groups.append(
+                StreamShotGroup(
+                    id: stableAnchor.path,
+                    worktree: first.worktree,
+                    worktreePath: first.worktreePath,
+                    allShots: current,
+                    visibleShots: current
+                )
+            )
+        }
+
+        for shot in shots {
+            if let first = current.first,
+               first.worktreePath != shot.worktreePath
+            {
+                appendCurrent()
+                current = []
+            }
+            current.append(shot)
+        }
+        appendCurrent()
+        return groups
+    }
+}
+
+private struct SeenAllButton: View {
+    let count: Int
+    let isWorking: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if isWorking {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(width: 28, height: 28)
+            .foregroundStyle(count > 0 ? Theme.purple : Theme.muted2)
+            .background(
+                count > 0 ? Theme.purpleSoft : Theme.surface,
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(count == 0 || isWorking)
+        .help(count == 1 ? "Mark 1 frame seen" : "Mark all \(count) unseen frames seen")
+        .accessibilityLabel("Mark all unseen frames as seen")
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
+private struct HistoryButton: View {
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 28, height: 28)
+                .foregroundStyle(isActive ? Theme.purple : Theme.ink2)
+                .background(
+                    isActive ? Theme.purpleSoft : Theme.surface,
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(isActive ? "Return to unseen frames" : "Show seen frame history")
+        .accessibilityLabel(
+            isActive ? "Return to unseen frames" : "Show seen frame history"
+        )
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .accessibilityIdentifier("stream.history")
+    }
+}
+
+private struct WorktreeStreamGroup: View {
+    let group: StreamShotGroup
+    let isCollapsed: Bool
+    let isMarkingSeen: Bool
+    let showsSeenAction: Bool
+    let toggleCollapsed: () -> Void
+    let markAllSeen: () -> Void
+    let selectShot: (Shot) -> Void
+
+    var body: some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 7) {
+                Button(action: toggleCollapsed) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.muted)
+                            .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                        WorktreeChip(label: group.worktreeShort)
+                        Text(group.worktree)
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(1)
+                        Text("\(group.visibleShots.count)")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Theme.muted2)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isCollapsed ? "Expand \(group.worktree)" : "Collapse \(group.worktree)")
+                .accessibilityLabel(
+                    isCollapsed
+                        ? "Expand \(group.worktree)"
+                        : "Collapse \(group.worktree)"
+                )
+                .accessibilityIdentifier("stream.group.toggle")
+
+                Spacer(minLength: 4)
+
+                if showsSeenAction, group.unseenCount > 0 {
+                    SeenAllButton(
+                        count: group.unseenCount,
+                        isWorking: isMarkingSeen,
+                        accessibilityIdentifier: "stream.group.seen",
+                        action: markAllSeen
+                    )
+                }
+            }
+            .padding(.leading, 7)
+            .padding(.trailing, 4)
+            .padding(.vertical, 5)
+            .background(
+                Theme.surface.opacity(0.76),
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("stream.group")
+
+            if !isCollapsed {
+                ForEach(group.visibleShots) { shot in
+                    ShotRow(shot: shot, showsWorktree: false) {
+                        selectShot(shot)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -58,6 +304,7 @@ struct ShotRow: View {
     @Environment(\.reviewChrome) private var reviewChrome
 
     let shot: Shot
+    var showsWorktree = true
     let action: () -> Void
 
     var body: some View {
@@ -90,7 +337,9 @@ struct ShotRow: View {
             Button(action: action) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        WorktreeChip(label: shot.worktreeShort)
+                        if showsWorktree {
+                            WorktreeChip(label: shot.worktreeShort)
+                        }
                         if shot.isFailure {
                             Circle()
                                 .fill(Theme.red)
@@ -177,7 +426,7 @@ struct ShotRow: View {
 
 private enum StreamFilter: Hashable {
     case toReview
-    case all
+    case history
 }
 
 private struct ReviewedStreamView: View {
@@ -195,7 +444,7 @@ private struct ReviewedStreamView: View {
             Text("Every current frame has been seen.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
-            Button("Show all frames", action: showAll)
+            Button("View history", action: showAll)
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.purple)
@@ -204,6 +453,31 @@ private struct ReviewedStreamView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stream.seen.empty")
+    }
+}
+
+private struct EmptyHistoryView: View {
+    let showUnseen: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 24))
+                .foregroundStyle(Theme.muted2)
+            Text("No history yet")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("Frames you mark Seen will appear here.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.muted)
+            Button("Back to unseen", action: showUnseen)
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.purple)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

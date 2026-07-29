@@ -185,6 +185,161 @@ final class ReviewFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testGroupedStreamCollapsesAndMarksSectionsSeen() throws {
+        let groupedRoot = root.appendingPathComponent(
+            "grouped-stream",
+            isDirectory: true
+        )
+        let alphaFeature = groupedRoot.appendingPathComponent(
+            "alpha-wt1/.astroshot/run",
+            isDirectory: true
+        )
+        let betaFeature = groupedRoot.appendingPathComponent(
+            "beta-wt2/.astroshot/run",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: alphaFeature,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: betaFeature,
+            withIntermediateDirectories: true
+        )
+
+        let alphaNewest = alphaFeature.appendingPathComponent("0004-alpha-newest.png")
+        let alphaNext = alphaFeature.appendingPathComponent("0003-alpha-next.png")
+        let beta = betaFeature.appendingPathComponent("0002-beta.png")
+        let alphaOldest = alphaFeature.appendingPathComponent("0001-alpha-oldest.png")
+        for image in [alphaNewest, alphaNext, beta, alphaOldest] {
+            try fixturePNG(width: 800, height: 450)
+                .write(to: image, options: .atomic)
+        }
+        let now = Date()
+        try FileManager.default.setAttributes(
+            [.modificationDate: now],
+            ofItemAtPath: alphaNewest.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-1)],
+            ofItemAtPath: alphaNext.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-2)],
+            ofItemAtPath: beta.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-3)],
+            ofItemAtPath: alphaOldest.path
+        )
+
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] = groupedRoot.path
+        app.launch()
+
+        let toggle = app.buttons.matching(
+            identifier: "stream.group.toggle"
+        ).firstMatch
+        let markGroupSeen = app.buttons.matching(
+            identifier: "stream.group.seen"
+        ).firstMatch
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(markGroupSeen.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["stream.detail.0004-alpha-newest.png"].exists)
+        XCTAssertTrue(app.buttons["stream.detail.0003-alpha-next.png"].exists)
+
+        let visualProof = XCTAttachment(screenshot: app.screenshot())
+        visualProof.name = "Grouped stream controls"
+        visualProof.lifetime = .keepAlways
+        add(visualProof)
+
+        toggle.click()
+        XCTAssertFalse(app.buttons["stream.detail.0004-alpha-newest.png"].exists)
+        XCTAssertFalse(app.buttons["stream.detail.0003-alpha-next.png"].exists)
+        toggle.click()
+        XCTAssertTrue(
+            app.buttons["stream.detail.0004-alpha-newest.png"]
+                .waitForExistence(timeout: 3)
+        )
+
+        markGroupSeen.click()
+        let alphaSidecar = alphaFeature.appendingPathComponent("review.json")
+        XCTAssertTrue(
+            waitForDecision(
+                "seen",
+                fileName: alphaNewest.lastPathComponent,
+                in: alphaSidecar,
+                timeout: 5
+            )
+        )
+        XCTAssertTrue(
+            waitForDecision(
+                "seen",
+                fileName: alphaNext.lastPathComponent,
+                in: alphaSidecar,
+                timeout: 5
+            )
+        )
+        XCTAssertNil(
+            reviewEntryIfPresent(
+                fileName: alphaOldest.lastPathComponent,
+                from: alphaSidecar
+            )
+        )
+
+        let history = app.buttons["stream.history"]
+        XCTAssertTrue(history.waitForExistence(timeout: 3))
+        history.click()
+        XCTAssertTrue(
+            app.buttons["stream.detail.0004-alpha-newest.png"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(app.buttons["stream.detail.0002-beta.png"].exists)
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "stream.group.seen").count,
+            0
+        )
+        history.click()
+        XCTAssertTrue(
+            app.buttons["stream.detail.0002-beta.png"]
+                .waitForExistence(timeout: 3)
+        )
+
+        let markStreamSeen = app.buttons["stream.seen.all"]
+        XCTAssertTrue(markStreamSeen.waitForExistence(timeout: 3))
+        markStreamSeen.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["stream.seen.empty"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            waitForDecision(
+                "seen",
+                fileName: alphaOldest.lastPathComponent,
+                in: alphaSidecar,
+                timeout: 5
+            )
+        )
+        XCTAssertTrue(
+            waitForDecision(
+                "seen",
+                fileName: beta.lastPathComponent,
+                in: betaFeature.appendingPathComponent("review.json"),
+                timeout: 5
+            )
+        )
+
+        XCTAssertTrue(history.waitForExistence(timeout: 3))
+        history.click()
+        XCTAssertTrue(
+            app.buttons["stream.detail.0004-alpha-newest.png"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertTrue(app.buttons["stream.detail.0002-beta.png"].exists)
+    }
+
+    @MainActor
     func testReviewerFeedbackAndSeenAcrossRevision() throws {
         // Setup and process boundary: launch the real LSUIElement application
         // directly into its production review window with a filesystem frame.
@@ -337,9 +492,26 @@ final class ReviewFlowUITests: XCTestCase {
         in sidecar: URL,
         timeout: TimeInterval
     ) -> Bool {
+        waitForDecision(
+            expected,
+            fileName: imageURL.lastPathComponent,
+            in: sidecar,
+            timeout: timeout
+        )
+    }
+
+    private func waitForDecision(
+        _ expected: String,
+        fileName: String,
+        in sidecar: URL,
+        timeout: TimeInterval
+    ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            if let review = try? reviewEntry(from: sidecar),
+            if let review = reviewEntryIfPresent(
+                fileName: fileName,
+                from: sidecar
+            ),
                review["decision"] as? String == expected {
                 return true
             }
@@ -402,10 +574,34 @@ final class ReviewFlowUITests: XCTestCase {
     }
 
     private func reviewEntry(from sidecar: URL) throws -> [String: Any] {
+        try reviewEntry(
+            fileName: imageURL.lastPathComponent,
+            from: sidecar
+        )
+    }
+
+    private func reviewEntry(
+        fileName: String,
+        from sidecar: URL
+    ) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: Data(contentsOf: sidecar))
         let document = try XCTUnwrap(object as? [String: Any])
         let reviews = try XCTUnwrap(document["reviews"] as? [String: Any])
-        return try XCTUnwrap(reviews[imageURL.lastPathComponent] as? [String: Any])
+        return try XCTUnwrap(reviews[fileName] as? [String: Any])
+    }
+
+    private func reviewEntryIfPresent(
+        fileName: String,
+        from sidecar: URL
+    ) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: sidecar),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let document = object as? [String: Any],
+              let reviews = document["reviews"] as? [String: Any]
+        else {
+            return nil
+        }
+        return reviews[fileName] as? [String: Any]
     }
 
     private func manifestJSON() -> String {

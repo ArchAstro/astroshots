@@ -39,7 +39,15 @@ final class StatusItemController: NSObject {
 
         let popover = NSPopover()
         popover.contentSize = NSSize(width: Theme.trayWidth, height: Theme.trayHeight)
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        let isTrayUITest =
+            environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+            || environment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
+        popover.behavior = isTrayUITest ? .applicationDefined : .transient
+        #else
         popover.behavior = .transient
+        #endif
         popover.animates = true
         popover.delegate = self
         self.popover = popover
@@ -94,6 +102,21 @@ final class StatusItemController: NSObject {
     /// same thumbnail interaction a reviewer uses from the menu-bar app.
     func openTray(atImagePath path: String) {
         guard loadTestShot(atImagePath: path) != nil else { return }
+        showPopover()
+    }
+
+    /// Seeds a complete multi-worktree stream for grouped-stream UI proofs.
+    func openTray(atRootPath path: String) {
+        let reader = AstroshotWatcher(
+            configuration: .init(
+                roots: [URL(fileURLWithPath: path, isDirectory: true)]
+            )
+        )
+        let shots = reader.scanAll()
+        guard !shots.isEmpty else { return }
+        for shot in shots.reversed() {
+            appState.handleNewShot(shot)
+        }
         showPopover()
     }
 
