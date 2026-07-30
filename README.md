@@ -31,9 +31,9 @@ No project picker. No account. No cloud. Just files on disk and a camera icon in
 
 ### From a release (recommended)
 
-1. Download the latest versioned **Astroshots-x.y.z.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
+1. Download the latest **Astroshots.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
 2. Open the DMG and drag **Astroshots** into **Applications**.
-3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). After the first run it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
+3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). After the first run it **warms from a local index** of known `.astroshot` folders so the stream appears quickly, then finishes a full discovery walk in the background.
 4. Click the camera icon → gear → add **watched folders** if you want locations beyond the default.
 5. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
 

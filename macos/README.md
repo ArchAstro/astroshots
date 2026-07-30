@@ -167,7 +167,7 @@ the same installer contract before release.
 |----------|------|--------|
 | `.github/workflows/ci.yml` | PRs / pushes | Tests + ad-hoc branded DMG proof |
 | `.github/workflows/cut-release.yml` | Manual: patch / minor / major | `release/vX.Y.Z` branch + tag + PR to main |
-| `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized `Astroshots-X.Y.Z.dmg` on the GitHub Release |
+| `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized DMG on the GitHub Release |
 
 ```bash
 gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
