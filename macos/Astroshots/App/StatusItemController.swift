@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// AppKit status item: left-click toggles the tray popover; right-click shows Quit.
+/// AppKit status item: left-click toggles the tray popover; right-click shows
+/// app actions, settings, version information, and Quit.
 ///
 /// `MenuBarExtra` cannot attach a native context menu, so menu-bar interaction
 /// is owned here instead of SwiftUI's menu-bar extra.
@@ -12,7 +13,7 @@ final class StatusItemController: NSObject {
     private var popover: NSPopover?
     private var pinnedWindow: NSWindow?
     private var reviewWindowController: ReviewWindowController?
-    private var contextMenu: NSMenu?
+    private(set) var contextMenu: NSMenu?
     private var observationTask: Task<Void, Never>?
 
     init(appState: AppState) {
@@ -61,6 +62,25 @@ final class StatusItemController: NSObject {
         )
         openItem.target = self
         menu.addItem(openItem)
+
+        let settingsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openSettingsFromMenu(_:)),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+
+        let versionItem = NSMenuItem(
+            title: Self.versionMenuTitle(),
+            action: nil,
+            keyEquivalent: ""
+        )
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+
         menu.addItem(.separator())
         let quitItem = NSMenuItem(
             title: "Quit Astroshots",
@@ -160,8 +180,31 @@ final class StatusItemController: NSObject {
         showPopover()
     }
 
+    @objc private func openSettingsFromMenu(_ sender: Any?) {
+        appState.pane = .settings
+        showPopover()
+    }
+
     @objc private func quit(_ sender: Any?) {
         NSApp.terminate(nil)
+    }
+
+    static func versionMenuTitle(
+        infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:]
+    ) -> String {
+        let version = infoDictionary["CFBundleShortVersionString"] as? String
+        let build = infoDictionary["CFBundleVersion"] as? String
+
+        switch (version?.nonEmpty, build?.nonEmpty) {
+        case let (version?, build?):
+            return "Version \(version) (\(build))"
+        case let (version?, nil):
+            return "Version \(version)"
+        case let (nil, build?):
+            return "Build \(build)"
+        case (nil, nil):
+            return "Version unavailable"
+        }
     }
 
     private func showContextMenu() {
@@ -305,6 +348,12 @@ final class StatusItemController: NSObject {
         } else {
             button.title = ""
         }
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
