@@ -259,4 +259,122 @@ struct AstroshotWatcherTests {
         // Work from the prior generation must not repopulate AppState.
         #expect(!emittedPaths.contains(oldImage.path))
     }
+
+    @Test @MainActor
+    func recoveryScanEmitsDiscoveredFramesAsNewShots() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "astroshots-recovery-overlay-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let feature = root.appendingPathComponent(
+            ".astroshot/recovered",
+            isDirectory: true
+        )
+        let image = feature.appendingPathComponent("0001-recovered.png")
+        try FileManager.default.createDirectory(
+            at: feature,
+            withIntermediateDirectories: true
+        )
+        try Data("recovered image".utf8).write(to: image)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let watcher = AstroshotWatcher(
+            configuration: .init(
+                roots: [root],
+                settleNanos: 10_000_000,
+                cacheFileURL: root.appendingPathComponent("shot-index.json")
+            )
+        )
+        defer { watcher.stop() }
+        var newPaths: [String] = []
+        var fullPaths: [String] = []
+        watcher.onNewShot = { shot in
+            newPaths.append(shot.path)
+        }
+        watcher.onShotsChanged = { shots in
+            fullPaths = shots.map(\.path)
+        }
+
+        // A dropped event batch may contain no usable paths. Reconciliation
+        // must still surface captures as arrivals, not just bulk-list rows.
+        watcher.handleFSEvents(
+            paths: [],
+            latestEventID: 42,
+            requiresFullScan: true
+        )
+        for _ in 0..<100 where
+            !newPaths.contains(image.path) || !fullPaths.contains(image.path)
+        {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(newPaths.contains(image.path))
+        #expect(fullPaths.contains(image.path))
+    }
+
+    @Test @MainActor
+    func manifestRefreshEmitsFramesMissedByImageEvents() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "astroshots-manifest-arrival-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let feature = root.appendingPathComponent(
+            ".astroshot/atomic-capture",
+            isDirectory: true
+        )
+        let image = feature.appendingPathComponent("0001-atomic.png")
+        let manifest = feature.appendingPathComponent("manifest.json")
+        try FileManager.default.createDirectory(
+            at: feature,
+            withIntermediateDirectories: true
+        )
+        try Data("atomic image".utf8).write(to: image)
+        try Data(
+            """
+            {"version":1,"feature":"atomic-capture","shots":[{"file":"0001-atomic.png"}]}
+            """.utf8
+        ).write(to: manifest)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let watcher = AstroshotWatcher(
+            configuration: .init(
+                roots: [root],
+                settleNanos: 10_000_000,
+                cacheFileURL: root.appendingPathComponent("shot-index.json")
+            )
+        )
+        defer { watcher.stop() }
+        let suiteName = "astroshots-manifest-arrival-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+        preferences.watchRootPaths = [root.path]
+        let state = AppState(
+            preferences: preferences,
+            watcher: watcher,
+            automaticallyStartsWatching: false
+        )
+
+        // Atomic producers always replace the manifest after publishing a
+        // frame. That targeted refresh is the fallback if an image event was
+        // coalesced or dropped.
+        watcher.handleFSEvents(paths: [manifest.path])
+        for _ in 0..<100 where !state.shots.contains(where: { $0.path == image.path }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(state.shots.map(\.path) == [image.path])
+        #expect(state.unreadCount == 1)
+
+        // If the coalesced image event arrives after the manifest refresh, it
+        // must not increment unread or flash a second overlay for the same file.
+        try Data("atomic image revision".utf8).write(to: image, options: .atomic)
+        watcher.handleFSEvents(paths: [image.path])
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(state.shots.map(\.path) == [image.path])
+        #expect(state.unreadCount == 1)
+    }
 }
