@@ -81,6 +81,7 @@ jobs:
       - name: Build, sign, notarize DMG
         working-directory: macos
         env:
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
           CODE_SIGN_IDENTITY: ${{ secrets.MACOS_CODE_SIGN_IDENTITY }}
           DEVELOPMENT_TEAM: ${{ secrets.MACOS_DEVELOPMENT_TEAM }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -91,11 +92,22 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          chmod +x scripts/package-dmg.sh
-          ./scripts/package-dmg.sh --out "$GITHUB_WORKSPACE/dist/Astroshots.dmg"
-          if compgen -G "build/Astroshots-*.dmg" > /dev/null; then
-            cp build/Astroshots-*.dmg "$GITHUB_WORKSPACE/dist/"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: expected a semantic version tag (vX.Y.Z), got: $TAG" >&2
+            exit 1
           fi
+          VERSION="${TAG#v}"
+          PROJECT_VERSION="$(
+            awk -F'"' '/MARKETING_VERSION:/ { print $2; exit }' project.yml
+          )"
+          if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
+            echo "error: tag $TAG does not match project version $PROJECT_VERSION" >&2
+            exit 1
+          fi
+
+          chmod +x scripts/package-dmg.sh
+          ./scripts/package-dmg.sh \
+            --out "$GITHUB_WORKSPACE/dist/Astroshots-${VERSION}.dmg"
           ls -lh "$GITHUB_WORKSPACE/dist/"
 
       - name: Upload artifact
