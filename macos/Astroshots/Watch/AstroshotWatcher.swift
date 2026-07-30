@@ -44,8 +44,15 @@ final class AstroshotWatcher: @unchecked Sendable {
     private var lastEventID: FSEventStreamEventId?
     private var settleWorkItems: [String: DispatchWorkItem] = [:]
     private let lock = NSLock()
+    /// Live filesystem delivery must never wait behind a recursive workspace
+    /// walk. Scan results are serialized back onto `queue` before mutation.
     private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
+    private let scanQueue = DispatchQueue(label: "ai.archastro.astroshots.scan", qos: .utility)
     private var scanGeneration = 0
+    private var fullScanInFlight = false
+    private var fullScanNeedsRerun = false
+    private var rerunShouldPersistCache = false
+    private var rerunShouldNotifyNewShots = false
 
     /// Directory names we never descend into (monorepo / build junk).
     private static let skipDirectoryNames: Set<String> = [
@@ -108,6 +115,10 @@ final class AstroshotWatcher: @unchecked Sendable {
         scanGeneration += 1
         settleWorkItems.values.forEach { $0.cancel() }
         settleWorkItems.removeAll()
+        fullScanInFlight = false
+        fullScanNeedsRerun = false
+        rerunShouldPersistCache = false
+        rerunShouldNotifyNewShots = false
         lock.unlock()
         emitScanState(false)
     }
@@ -216,50 +227,140 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
     }
 
-    private func scheduleFullScan(persistCache: Bool) {
+    private func scheduleFullScan(
+        persistCache: Bool,
+        notifyNewShots: Bool = false
+    ) {
         lock.lock()
-        scanGeneration += 1
+        if fullScanInFlight {
+            fullScanNeedsRerun = true
+            rerunShouldPersistCache = rerunShouldPersistCache || persistCache
+            rerunShouldNotifyNewShots =
+                rerunShouldNotifyNewShots || notifyNewShots
+            lock.unlock()
+            return
+        }
+        fullScanInFlight = true
         let generation = scanGeneration
         let roots = configuration.roots
         let cacheFileURL = configuration.cacheFileURL
         lock.unlock()
 
         emitScanState(true)
-        queue.async { [weak self] in
+        scanQueue.async { [weak self] in
             guard let self else { return }
             let full = self.scanAllCollectingDirs()
-            self.lock.lock()
-            let existingOrder = self.arrivalOrder
-            self.lock.unlock()
-            let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
-                existing: existingOrder,
-                shots: full.shots
-            )
-            self.lock.lock()
-            let stillCurrent = self.scanGeneration == generation
-            if stillCurrent {
-                self.knownPaths = Set(full.shots.map(\.path))
-                self.knownAstroshotDirs = Set(full.astroshotDirs)
-                self.arrivalOrder = reconciledOrder
-            }
-            self.lock.unlock()
-            guard stillCurrent else { return }
-            self.emitShots(
-                ShotIndexCache.orderedShots(
-                    full.shots,
-                    arrivalOrder: reconciledOrder
-                )
-            )
-            if persistCache {
-                ShotIndexCache.save(
+            self.queue.async { [weak self] in
+                self?.applyFullScan(
+                    full,
+                    generation: generation,
                     roots: roots,
-                    astroshotDirs: full.astroshotDirs,
-                    arrivalOrder: reconciledOrder,
-                    lastEventID: self.currentLastEventID(),
-                    cacheFileURL: cacheFileURL
+                    cacheFileURL: cacheFileURL,
+                    persistCache: persistCache,
+                    notifyNewShots: notifyNewShots
                 )
             }
-            self.emitScanState(false)
+        }
+    }
+
+    private func applyFullScan(
+        _ full: ScanResult,
+        generation: Int,
+        roots: [URL],
+        cacheFileURL: URL,
+        persistCache: Bool,
+        notifyNewShots: Bool
+    ) {
+        lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        let previouslyKnownPaths = knownPaths
+        let existingOrder = arrivalOrder
+        let liveDirs = knownAstroshotDirs
+        lock.unlock()
+
+        // A file may land after the scan has already walked its directory but
+        // before the result is applied. Preserve live-ingested paths that still
+        // exist so reconciliation cannot erase a newer event.
+        var shotsByPath = Dictionary(
+            uniqueKeysWithValues: full.shots.map { ($0.path, $0) }
+        )
+        for path in previouslyKnownPaths where shotsByPath[path] == nil {
+            guard FileManager.default.fileExists(atPath: path),
+                  let shot = makeShot(at: path)
+            else {
+                continue
+            }
+            shotsByPath[path] = shot
+        }
+        let reconciledShots = uniqueSortedShots(Array(shotsByPath.values))
+        let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
+            existing: existingOrder,
+            shots: reconciledShots
+        )
+        let reconciledDirs = Set(full.astroshotDirs).union(
+            liveDirs.filter { FileManager.default.fileExists(atPath: $0) }
+        )
+        let newShots = reconciledShots.filter {
+            !previouslyKnownPaths.contains($0.path)
+        }
+
+        lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        knownPaths = Set(reconciledShots.map(\.path))
+        knownAstroshotDirs = reconciledDirs
+        arrivalOrder = reconciledOrder
+        let lastEventID = self.lastEventID
+        let shouldRerun = fullScanNeedsRerun
+        let rerunPersistCache = rerunShouldPersistCache
+        let rerunNotifyNewShots = rerunShouldNotifyNewShots
+        fullScanInFlight = false
+        fullScanNeedsRerun = false
+        rerunShouldPersistCache = false
+        rerunShouldNotifyNewShots = false
+        lock.unlock()
+
+        // Deliver newly recovered captures before the full replacement. This
+        // gives AppState the same unread/overlay behavior as a normal event;
+        // the subsequent list remains the authoritative deletion reconciliation.
+        let orderedShots = ShotIndexCache.orderedShots(
+            reconciledShots,
+            arrivalOrder: reconciledOrder
+        )
+        if notifyNewShots {
+            emitRecoveredShots(
+                newShots: ShotIndexCache.orderedShots(
+                    newShots,
+                    arrivalOrder: reconciledOrder
+                ),
+                allShots: orderedShots,
+                generation: generation
+            )
+        } else {
+            emitShots(orderedShots)
+        }
+        if persistCache {
+            ShotIndexCache.save(
+                roots: roots,
+                astroshotDirs: Array(reconciledDirs),
+                arrivalOrder: reconciledOrder,
+                lastEventID: lastEventID,
+                cacheFileURL: cacheFileURL
+            )
+        }
+
+        if shouldRerun {
+            scheduleFullScan(
+                persistCache: rerunPersistCache,
+                notifyNewShots: rerunNotifyNewShots
+            )
+        } else {
+            emitScanState(false)
         }
     }
 
@@ -515,8 +616,10 @@ final class AstroshotWatcher: @unchecked Sendable {
             lock.unlock()
         }
         if requiresFullScan {
-            scheduleFullScan(persistCache: true)
-            return
+            // Preserve every usable path in this batch while reconciliation
+            // runs independently. Dropped-history flags mean "verify the tree",
+            // not "throw away the events we did receive."
+            scheduleFullScan(persistCache: true, notifyNewShots: true)
         }
 
         var featureDirectories = Set<String>()
@@ -591,13 +694,20 @@ final class AstroshotWatcher: @unchecked Sendable {
             lock.unlock()
             return
         }
+        let newlyDiscovered = shots.filter {
+            !knownPaths.contains($0.path)
+        }
         knownPaths = knownPaths.filter { !$0.hasPrefix(featurePrefix) }
         knownPaths.formUnion(shots.map(\.path))
         lock.unlock()
 
+        // A manifest rename may be the only coalesced event we receive for a
+        // rapid atomic capture batch. Treat frames found by that targeted scan
+        // as real arrivals so they still increment unread and flash overlays.
         emitFeatureShots(
             directoryPath: directory.standardizedFileURL.path,
             shots: shots,
+            newlyDiscovered: newlyDiscovered,
             generation: generation
         )
     }
@@ -665,7 +775,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         )
 
         // Do not re-walk the whole tree for every PNG — emit the shot and let
-        // AppState merge it into the list.
+        // AppState insert new paths or refresh replacements in place.
         emitNew(shot, generation: generation)
     }
 
@@ -693,13 +803,36 @@ final class AstroshotWatcher: @unchecked Sendable {
     private func emitFeatureShots(
         directoryPath: String,
         shots: [Shot],
+        newlyDiscovered: [Shot] = [],
         generation: Int
     ) {
+        let newHandler = onNewShot
         let handler = onFeatureShotsChanged
         DispatchQueue.main.async { [weak self] in
             Task { @MainActor in
                 guard self?.isScanCurrent(generation) == true else { return }
+                for shot in newlyDiscovered {
+                    newHandler?(shot)
+                }
                 handler?(directoryPath, shots)
+            }
+        }
+    }
+
+    private func emitRecoveredShots(
+        newShots: [Shot],
+        allShots: [Shot],
+        generation: Int
+    ) {
+        let newHandler = onNewShot
+        let listHandler = onShotsChanged
+        DispatchQueue.main.async { [weak self] in
+            Task { @MainActor in
+                guard self?.isScanCurrent(generation) == true else { return }
+                for shot in newShots {
+                    newHandler?(shot)
+                }
+                listHandler?(allShots)
             }
         }
     }
