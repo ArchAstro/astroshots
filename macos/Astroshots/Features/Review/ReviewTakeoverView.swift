@@ -79,11 +79,23 @@ struct ReviewTakeoverView: View {
 
             Spacer(minLength: 24)
 
+            if let position = reviewPosition {
+                Text("\(position.index) / \(position.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.58))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .accessibilityIdentifier("review.position")
+                    .accessibilityLabel(
+                        "Screenshot \(position.index) of \(position.count)"
+                    )
+            }
+
             navigationButton(
                 symbol: "chevron.left",
                 help: "Older screenshot",
                 identifier: "review.navigate.older",
-                shortcut: "[",
                 isDisabled: !canNavigate(-1)
             ) {
                 onNavigate(-1)
@@ -93,7 +105,6 @@ struct ReviewTakeoverView: View {
                 symbol: "chevron.right",
                 help: "Newer screenshot",
                 identifier: "review.navigate.newer",
-                shortcut: "]",
                 isDisabled: !canNavigate(1)
             ) {
                 onNavigate(1)
@@ -139,8 +150,58 @@ struct ReviewTakeoverView: View {
                         maxHeight: max(180, proxy.size.height - 72)
                     )
                     .padding(36)
+
+                HStack {
+                    stageNavigateButton(
+                        symbol: "chevron.left",
+                        help: "Older screenshot",
+                        identifier: "review.stage.older",
+                        isDisabled: !canNavigate(-1)
+                    ) {
+                        onNavigate(-1)
+                    }
+
+                    Spacer()
+
+                    stageNavigateButton(
+                        symbol: "chevron.right",
+                        help: "Newer screenshot",
+                        identifier: "review.stage.newer",
+                        isDisabled: !canNavigate(1)
+                    ) {
+                        onNavigate(1)
+                    }
+                }
+                .padding(.horizontal, 18)
             }
         }
+    }
+
+    private func stageNavigateButton(
+        symbol: String,
+        help: String,
+        identifier: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .frame(width: 44, height: 44)
+                .background(Color.black.opacity(0.42), in: Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .opacity(isDisabled ? 0.22 : 1)
+        .disabled(isDisabled)
+        .help("\(help) (←/→)")
+        .accessibilityLabel(help)
+        .accessibilityIdentifier(identifier)
     }
 
     @ViewBuilder
@@ -359,7 +420,7 @@ struct ReviewTakeoverView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityIdentifier("review.saving")
             } else {
-                Text("⌘↩ send feedback  ·  ⌘⌥↩ seen")
+                Text("← → page  ·  ⌘↩ send  ·  ⌘⌥↩ seen")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -399,7 +460,6 @@ struct ReviewTakeoverView: View {
         symbol: String,
         help: String,
         identifier: String,
-        shortcut: Character,
         isDisabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -414,14 +474,17 @@ struct ReviewTakeoverView: View {
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
         .opacity(isDisabled ? 0.35 : 1)
         .disabled(isDisabled)
-        .keyboardShortcut(KeyEquivalent(shortcut), modifiers: [.command])
-        .help(help)
+        .help("\(help) (←/→)")
         .accessibilityLabel(help)
         .accessibilityIdentifier(identifier)
     }
 
     private func canNavigate(_ delta: Int) -> Bool {
         appState.reviewSibling(from: currentShot.id, delta: delta) != nil
+    }
+
+    private var reviewPosition: (index: Int, count: Int)? {
+        appState.reviewPosition(for: currentShot.id)
     }
 
     private func submitComment() {

@@ -8,6 +8,7 @@ struct DetailView: View {
     @State private var submissionError: String?
     @State private var isSubmitting = false
     @State private var activeSubmissionID: UUID?
+    @FocusState private var feedbackFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +32,16 @@ struct DetailView: View {
 
                 Spacer()
 
+                if let position = selectedDetailPosition {
+                    Text("\(position.index) / \(position.count)")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.muted2)
+                        .accessibilityIdentifier("detail.position")
+                        .accessibilityLabel(
+                            "Screenshot \(position.index) of \(position.count)"
+                        )
+                }
+
                 Button {
                     appState.stepDetail(1)
                 } label: {
@@ -38,9 +49,15 @@ struct DetailView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.ink2)
                         .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Older")
+                .opacity(canStepOlder ? 1 : 0.32)
+                .disabled(!canStepOlder)
+                .help("Older screenshot (←)")
+                .accessibilityLabel("Older screenshot")
+                .accessibilityIdentifier("detail.navigate.older")
+                .keyboardShortcut(.leftArrow, modifiers: [])
 
                 Button {
                     appState.stepDetail(-1)
@@ -49,9 +66,15 @@ struct DetailView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.ink2)
                         .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Newer")
+                .opacity(canStepNewer ? 1 : 0.32)
+                .disabled(!canStepNewer)
+                .help("Newer screenshot (→)")
+                .accessibilityLabel("Newer screenshot")
+                .accessibilityIdentifier("detail.navigate.newer")
+                .keyboardShortcut(.rightArrow, modifiers: [])
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -157,11 +180,27 @@ struct DetailView: View {
                     submissionError = nil
                     isSubmitting = false
                     activeSubmissionID = nil
+                    feedbackFocused = false
                 }
             } else {
                 EmptyStreamView()
             }
         }
+    }
+
+    private var canStepOlder: Bool {
+        appState.canStepDetail(1)
+    }
+
+    private var canStepNewer: Bool {
+        appState.canStepDetail(-1)
+    }
+
+    private var selectedDetailPosition: (index: Int, count: Int)? {
+        guard let id = appState.selectedShotID ?? appState.selectedShot?.id else {
+            return nil
+        }
+        return appState.detailPosition(for: id)
     }
 
     private func reviewLabel(for shot: Shot) -> String {
@@ -212,6 +251,7 @@ struct DetailView: View {
                 RoundedRectangle(cornerRadius: 9)
                     .stroke(Theme.lineStrong, lineWidth: 1)
             )
+            .focused($feedbackFocused)
             .accessibilityLabel("Compact review feedback")
             .accessibilityHint("Share optional feedback about this screenshot.")
             .accessibilityIdentifier("detail.feedback.note")

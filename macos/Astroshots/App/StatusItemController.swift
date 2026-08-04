@@ -44,6 +44,7 @@ final class StatusItemController: NSObject {
         let environment = ProcessInfo.processInfo.environment
         let isTrayUITest =
             environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+            || environment["ASTROSHOTS_UI_TEST_DETAIL_PATH"] != nil
             || environment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
         popover.behavior = isTrayUITest ? .applicationDefined : .transient
         #else
@@ -113,15 +114,27 @@ final class StatusItemController: NSObject {
 
     /// Test-only launch bridge for exercising the real review window without
     /// automating the system menu bar.
+    ///
+    /// Loads every shot under the same worktree root so full-screen left/right
+    /// paging has real siblings to walk through.
     func openReview(atImagePath path: String) {
-        guard let shot = loadTestShot(atImagePath: path) else { return }
+        guard let shot = loadTestShots(atImagePath: path) else { return }
         reviewWindowController?.open(shot)
     }
 
     /// Seeds and opens the real stream popover so UI automation can prove the
     /// same thumbnail interaction a reviewer uses from the menu-bar app.
+    ///
+    /// Loads every sibling under the worktree so detail paging has a real set.
     func openTray(atImagePath path: String) {
-        guard loadTestShot(atImagePath: path) != nil else { return }
+        guard loadTestShots(atImagePath: path) != nil else { return }
+        showPopover()
+    }
+
+    /// Seeds siblings and opens the tray already drilled into detail for `path`.
+    func openTrayDetail(atImagePath path: String) {
+        guard let shot = loadTestShots(atImagePath: path) else { return }
+        appState.selectShot(shot)
         showPopover()
     }
 
@@ -159,6 +172,32 @@ final class StatusItemController: NSObject {
         guard let shot = reader.makeShot(at: path) else { return nil }
         appState.handleNewShot(shot)
         return shot
+    }
+
+    /// Loads the targeted frame plus every sibling under its worktree so
+    /// review paging and multi-frame stream tests share one seed path.
+    private func loadTestShots(atImagePath path: String) -> Shot? {
+        let imageURL = URL(fileURLWithPath: path)
+        let standardizedPath = imageURL.standardizedFileURL.path
+        let root = imageURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let reader = AstroshotWatcher(configuration: .init(roots: [root]))
+        let discovered = reader.scanAll()
+        if discovered.isEmpty {
+            return loadTestShot(atImagePath: path)
+        }
+        // Oldest first so handleNewShot's insert-at-front ends newest-first.
+        for shot in discovered.sorted(by: { $0.capturedAt < $1.capturedAt }) {
+            appState.handleNewShot(shot)
+        }
+        return discovered.first {
+            $0.path == path
+                || $0.path == standardizedPath
+                || URL(fileURLWithPath: $0.path).standardizedFileURL.path
+                    == standardizedPath
+        } ?? reader.makeShot(at: path)
     }
 
     // MARK: - Button / menu

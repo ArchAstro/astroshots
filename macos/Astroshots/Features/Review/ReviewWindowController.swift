@@ -32,6 +32,9 @@ final class ReviewWindowController {
         let panel = panel ?? makePanel()
         panel.contentViewController = hosting
         panel.onEscape = { [weak self] in self?.close() }
+        panel.onNavigate = { [weak self] delta in
+            self?.navigate(delta)
+        }
 
         let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
         if let frame = screen?.visibleFrame {
@@ -100,6 +103,8 @@ final class ReviewWindowController {
 
 final class ReviewPanel: NSPanel {
     var onEscape: (() -> Void)?
+    /// Left = older (−1), right = newer (+1), matching photos-app paging.
+    var onNavigate: ((Int) -> Void)?
 
     init() {
         super.init(
@@ -114,11 +119,38 @@ final class ReviewPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        // Escape closes. Arrow keys page when the feedback editor is not
+        // first responder, so caret movement still works while typing.
+        switch event.keyCode {
+        case 53: // escape
             onEscape?()
-        } else {
+        case 123: // left arrow → older
+            if isEditingText {
+                super.keyDown(with: event)
+            } else {
+                onNavigate?(-1)
+            }
+        case 124: // right arrow → newer
+            if isEditingText {
+                super.keyDown(with: event)
+            } else {
+                onNavigate?(1)
+            }
+        default:
             super.keyDown(with: event)
         }
+    }
+
+    private var isEditingText: Bool {
+        guard let responder = firstResponder else { return false }
+        if let textView = responder as? NSTextView {
+            return textView.isEditable
+        }
+        // Field editors used by NSTextField / SwiftUI text fields.
+        if responder is NSText {
+            return true
+        }
+        return false
     }
 }
 
