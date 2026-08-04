@@ -99,16 +99,24 @@ describe("arbitrary PTY capture boundary", () => {
             ...process.env,
             // Exercise the ConPTY exit-status bridge on every development OS.
             ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER: "1",
-            // Reproduce the failing runner: the real program status is ready,
-            // but ConPTY has not delivered the terminal marker before settle.
+            // Status file is written immediately; delay the OSC marker so
+            // waitForExit must trust the file bridge (Windows production path).
             ASTROSHOT_TEST_DELAY_PTY_EXIT_MARKER_MS: "1500",
           },
           encoding: "utf8",
+          // Cold Windows runners need headroom for node → wrapper → child.
+          timeout: 30_000,
+          maxBuffer: 2 * 1024 * 1024,
         },
       );
 
       // The visible assertion passes, but the process boundary is authoritative.
-      expect(result.status).toBe(1);
+      expect(
+        result.status,
+        `expected CLI failure on crash, got status=${result.status}\n` +
+          `stdout:\n${result.stdout}\nstderr:\n${result.stderr}\n` +
+          `signal=${result.signal} error=${result.error?.message ?? ""}`,
+      ).toBe(1);
       expect(result.stderr).toContain("exited with code 7 before capture");
       expect(fs.existsSync(outPath)).toBe(false);
     } finally {

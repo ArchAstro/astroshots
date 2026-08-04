@@ -87,7 +87,8 @@ jobs:
         run: node packages/astroshot/bin/astroshot.mjs install-browser
 
       - name: Drive and capture real PTY children
-        run: npm run test:e2e --workspace @archastro/tui-shot -- --run src/pty-cli.e2e.test.ts
+        # Pass the file path after `--` so npm does not swallow vitest args.
+        run: npm run test:e2e --workspace @archastro/tui-shot -- src/pty-cli.e2e.test.ts
 
   test:
     name: macOS app

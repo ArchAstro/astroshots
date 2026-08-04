@@ -5,7 +5,13 @@ args:
 cwd: .
 cols: 40
 rows: 6
-timeoutMs: 5000
-settleMs: 600
+timeoutMs: 8000
+settleMs: 50
+actions:
+  # Wait for the painted frame first, then for process completion. A fixed
+  # settleMs alone races cold Windows spawns where exit(7) lands after settle.
+  - waitFor: Fatal terminal state
+  - waitForExit: true
+    timeoutMs: 4000
 expectText:
   - Fatal terminal state
