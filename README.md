@@ -348,100 +348,50 @@ Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](doc
 
 ## Releases
 
-| How | What you get |
-|-----|----------------|
-| [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed, notarized **DMG** |
-| Tag `v*` | CI builds that DMG automatically |
-| Tag `astroshot-vX.Y.Z` | Publishes the unified `@archastro/astroshot` CLI and its rendering engines |
+User-facing notes live in [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog).
+macOS app and npm package versions are independent tracks
+(`## [x.y.z] (macos)` vs `## [x.y.z] (npm)`).
 
-Maintainers: **Actions → Cut release** only prepares the macOS app release and
-DMG. It does not bump or publish the npm CLI. macOS signing secrets are
-documented in [`docs/SIGNING.md`](docs/SIGNING.md).
-For the exact human checklist, use
+| Maintainer action | What it does |
+|-------------------|--------------|
+| **Actions → Cut release** | Bump macOS marketing version + build, roll changelog, tag `vX.Y.Z`, **dispatch Release DMG**, PR to main |
+| **Actions → Cut npm release** | Bump all three `@archastro/*` packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
+| [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed DMG (macOS) and npm release notes |
+
+Both cut workflows follow the same shape as `archastro-js` / `archastro-python`
+`release.yml`: GITHUB_TOKEN tag pushes do not chain other workflows, so publish
+is always dispatched explicitly.
+
+```bash
+# macOS app (patch/minor/major)
+gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
+
+# npm packages
+gh workflow run "Cut npm release" --repo ArchAstro/astroshots -f bump=patch
+```
+
+Before cutting either track, put notes under `## [Unreleased]` in
+`CHANGELOG.md`. The cut workflow promotes that section into a dated release
+header and leaves a fresh empty Unreleased block.
+
+macOS signing secrets are documented in [`docs/SIGNING.md`](docs/SIGNING.md).
+First-time npm bootstrap and trusted publishing are documented in
 [`docs/GO-LIVE-CHECKLIST.md`](docs/GO-LIVE-CHECKLIST.md).
 
-The npm packages use GitHub Actions OIDC trusted publishing, so normal releases
-need no long-lived npm token. npm requires a package to exist before a trusted
-publisher can be configured, so a maintainer must bootstrap the two rendering
-engines and then the unified CLI from an authenticated, 2FA-protected npm
-account. From the repository root, explicitly disable provenance for only
-these bootstrap publishes because local publishes cannot create a supported
-provenance attestation. The scoped registry flag is intentional: ArchAstro
-development machines may map `@archastro` to GitHub Packages, while these
-packages publish to npmjs.
+### One-time npm bootstrap
 
-```bash
-npm login --registry=https://registry.npmjs.org
-npm whoami --registry=https://registry.npmjs.org
-
-npm --@archastro:registry=https://registry.npmjs.org \
-  publish --workspace @archastro/react-shot \
-  --access public --provenance=false
-npm --@archastro:registry=https://registry.npmjs.org \
-  publish --workspace @archastro/tui-shot \
-  --access public --provenance=false
-npm --@archastro:registry=https://registry.npmjs.org \
-  publish --workspace @archastro/astroshot \
-  --access public --provenance=false
-```
-
-Confirm all three public package pages and tarballs, then use the
-repository-pinned npm 11.17 release to run `npm trust github` for each package:
-
-```bash
-env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-  npm trust github @archastro/react-shot \
-  --repo ArchAstro/astroshots --file publish-npm.yml --allow-publish \
-  --yes
-env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-  npm trust github @archastro/tui-shot \
-  --repo ArchAstro/astroshots --file publish-npm.yml --allow-publish \
-  --yes
-env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-  npm trust github @archastro/astroshot \
-  --repo ArchAstro/astroshots --file publish-npm.yml --allow-publish \
-  --yes
-```
-
-These commands authorize `.github/workflows/publish-npm.yml` for
-`npm publish`. Do not use `--provenance=false` after the bootstrap; the tag
-workflow handles later releases with provenance enabled.
-
-For every later npm release, set all three workspaces and the unified CLI's
-renderer dependencies to the same version in a pull request:
-
-```bash
-npm run version:packages -- 0.1.1
-
-npm ci
-npm run build --workspaces --if-present
-node packages/astroshot/bin/astroshot.mjs install-browser
-npm run check
-ASTROSHOTS_VERIFY_PACKAGES_CAPTURE=1 npm run pack:check
-git diff --check
-```
-
-The version command updates all three `package.json` files, pins the unified
-CLI to the matching renderer versions, and updates the root `package-lock.json`;
-include them in the pull request. After that pull request is merged, tag the
-exact clean `origin/main` commit:
-
-```bash
-git fetch origin main
-test -z "$(git status --porcelain)"
-test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-
-VERSION="$(node -p "require('./packages/astroshot/package.json').version")"
-TAG="astroshot-v$VERSION"
-git tag -a "$TAG" -m "Release @archastro/astroshot $VERSION"
-git push origin "$TAG"
-```
+npm trusted publishing requires packages to exist before
+`npm trust github` can authorize CI. Bootstrap once from a clean `main`, with
+2FA, then configure trusted publishers for
+`.github/workflows/publish-npm.yml` (see the go-live checklist). After that,
+use **Cut npm release** only. Do not put an npm token in repository secrets.
 
 The publish workflow is safe to retry after a partial npm release. It skips an
 existing package version only when the registry tarball has the same integrity
 as the package built from the tagged commit.
 
-Pushing `astroshot-vX.Y.Z` starts `.github/workflows/publish-npm.yml`. The
+Tag `astroshot-vX.Y.Z` (or **Cut npm release**) starts
+`.github/workflows/publish-npm.yml`. The
 workflow rejects a tag unless every package has the same version, reruns
 verification, publishes both rendering engines, and publishes the unified CLI
 last through npm trusted publishing.

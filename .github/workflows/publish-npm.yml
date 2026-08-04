@@ -1,16 +1,21 @@
 name: Publish npm package
 
+# Tag push (when not suppressed) and explicit dispatch from Cut npm release.
+# Tags pushed by GITHUB_TOKEN do not trigger workflows; Cut npm release always
+# dispatches this workflow with --ref astroshot-vX.Y.Z.
+
 on:
   push:
     tags:
       - "astroshot-v*"
+  workflow_dispatch:
 
 concurrency:
   group: publish-npm-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -109,3 +114,29 @@ jobs:
 
       - name: Publish unified CLI
         run: node scripts/publish-package.mjs @archastro/astroshot
+
+      - name: Create GitHub Release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="$(cat <<EOF
+          Published to npm:
+
+          - https://www.npmjs.com/package/@archastro/react-shot/v/$VERSION
+          - https://www.npmjs.com/package/@archastro/tui-shot/v/$VERSION
+          - https://www.npmjs.com/package/@archastro/astroshot/v/$VERSION
+
+          See \`CHANGELOG.md\` section \`## [$VERSION] (npm)\`.
+          EOF
+          )"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$notes"
+          else
+            gh release create "$TAG" \
+              --title "@archastro/astroshot v$VERSION" \
+              --notes "$notes" \
+              --generate-notes
+          fi

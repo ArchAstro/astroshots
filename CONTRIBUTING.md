@@ -69,10 +69,14 @@ repository's [MIT License](LICENSE) and that you will follow the
 
 ## Releases
 
-Maintainers publish npm packages through the repository's trusted-publishing
-workflow. Do not add npm tokens to repository secrets or workflow files.
-macOS signing and notarization are documented separately in
-[`docs/SIGNING.md`](docs/SIGNING.md).
+Maintainers cut releases from GitHub Actions (see root README):
+
+- **Cut release** — macOS app version + signed DMG
+- **Cut npm release** — `@archastro/*` packages via OIDC trusted publishing
+
+Put user-facing notes under `## [Unreleased]` in `CHANGELOG.md` before either
+cut. Do not add npm tokens to repository secrets or workflow files. macOS
+signing and notarization are documented in [`docs/SIGNING.md`](docs/SIGNING.md).
 
 A macOS release that changes review-window behavior is blocked until a
 maintainer runs the signed `AstroshotsReviewUITests` scheme on a logged-in
