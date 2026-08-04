@@ -568,6 +568,7 @@ final class ReviewFlowUITests: XCTestCase {
         add(proof)
     }
 
+    @MainActor
     private func positionContains(
         _ element: XCUIElement,
         anyOf needles: [String]
