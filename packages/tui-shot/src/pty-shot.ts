@@ -499,7 +499,18 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     }
     await delay(settleMs);
     await writes;
+    // Re-read after settle: the child may have exited during the settle
+    // window (status file or OSC marker arriving just after the last poll).
     refreshWrappedExitCode();
+    // If ConPTY delivered onExit but the status bridge file is still racing
+    // the rename, give the wrapper a short fixed window before failing open.
+    if (useExitWrapper && exitState() && wrappedExitCode === null) {
+      const bridgeDeadline = Date.now() + 1_000;
+      while (Date.now() <= bridgeDeadline && wrappedExitCode === null) {
+        await delay(20);
+        refreshWrappedExitCode();
+      }
+    }
     const plainFrame = screen();
     const completed = exitState();
     if (useExitWrapper && completed && wrappedExitCode === null) {
