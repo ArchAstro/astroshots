@@ -166,9 +166,18 @@ the same installer contract before release.
 | Workflow | When | Output |
 |----------|------|--------|
 | `.github/workflows/ci.yml` | PRs / pushes | Tests + ad-hoc branded DMG proof |
-| `.github/workflows/cut-release.yml` | Manual: patch / minor / major | `release/vX.Y.Z` branch + tag + PR to main |
-| `.github/workflows/release-dmg.yml` | tags `v*` | Signed + notarized `Astroshots-X.Y.Z.dmg` on the GitHub Release |
+| `.github/workflows/cut-release.yml` | Manual: patch / minor / major | Bump + changelog + tag `vX.Y.Z` + **dispatch Release DMG** + PR |
+| `.github/workflows/cut-npm-release.yml` | Manual: patch / minor / major | Bump npm packages + changelog + tag `astroshot-v*` + publish dispatch + PR |
+| `.github/workflows/release-dmg.yml` | tags `v*` or dispatch | Signed + notarized `Astroshots-X.Y.Z.dmg` on the GitHub Release |
+| `.github/workflows/publish-npm.yml` | tags `astroshot-v*` or dispatch | Publish `@archastro/*` with OIDC trusted publishing |
 
 ```bash
+# macOS app
 gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
+
+# npm packages (separate version track)
+gh workflow run "Cut npm release" --repo ArchAstro/astroshots -f bump=patch
 ```
+
+User-facing notes: put them under `## [Unreleased]` in the repo-root
+[`CHANGELOG.md`](../CHANGELOG.md) before cutting either track.
