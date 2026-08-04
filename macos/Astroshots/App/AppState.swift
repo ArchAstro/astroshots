@@ -57,6 +57,7 @@ final class AppState {
         let isReviewUITest =
             environment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] != nil
                 || environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+                || environment["ASTROSHOTS_UI_TEST_DETAIL_PATH"] != nil
                 || environment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
                 || environment["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] != nil
         #else
@@ -206,11 +207,11 @@ final class AppState {
     }
     #endif
 
-    /// Navigate within the same worktree, feature, and run while the takeover
-    /// remains open. A missing run id intentionally groups only the feature.
-    func reviewSibling(from shotID: String, delta: Int) -> Shot? {
-        guard let current = shots.first(where: { $0.id == shotID }) else { return nil }
-        let runShots = shots
+    /// Shots that belong with `shotID` in full-screen review, ordered oldest → newest.
+    /// Same worktree + feature + run; a missing run id groups the whole feature.
+    func reviewSiblings(from shotID: String) -> [Shot] {
+        guard let current = shots.first(where: { $0.id == shotID }) else { return [] }
+        return shots
             .filter {
                 $0.worktreePath == current.worktreePath
                     && $0.feature == current.feature
@@ -222,10 +223,38 @@ final class AppState {
                 }
                 return lhs.capturedAt < rhs.capturedAt
             }
+    }
+
+    /// Navigate within the same worktree, feature, and run while the takeover
+    /// remains open. A missing run id intentionally groups only the feature.
+    ///
+    /// `delta` is relative to oldest→newest order: negative is older, positive is newer.
+    func reviewSibling(from shotID: String, delta: Int) -> Shot? {
+        let runShots = reviewSiblings(from: shotID)
         guard let index = runShots.firstIndex(where: { $0.id == shotID }) else { return nil }
         let next = index + delta
         guard runShots.indices.contains(next) else { return nil }
         return runShots[next]
+    }
+
+    /// 1-based position among review siblings, or `nil` when the shot is unknown.
+    func reviewPosition(for shotID: String) -> (index: Int, count: Int)? {
+        let runShots = reviewSiblings(from: shotID)
+        guard let index = runShots.firstIndex(where: { $0.id == shotID }) else { return nil }
+        return (index + 1, runShots.count)
+    }
+
+    /// 1-based position in the tray stream (newest-first), or `nil` when empty.
+    func detailPosition(for shotID: String) -> (index: Int, count: Int)? {
+        guard let index = shots.firstIndex(where: { $0.id == shotID }) else { return nil }
+        return (index + 1, shots.count)
+    }
+
+    func canStepDetail(_ delta: Int) -> Bool {
+        guard let current = selectedShotID,
+              let index = shots.firstIndex(where: { $0.id == current })
+        else { return false }
+        return shots.indices.contains(index + delta)
     }
 
     func addReviewComment(_ body: String, to shot: Shot) async throws {
@@ -302,13 +331,16 @@ final class AppState {
         pane = pane == .settings ? .stream : .settings
     }
 
+    /// Page the tray detail view through the stream.
+    ///
+    /// Stream order is newest-first, so positive `delta` moves older and
+    /// negative `delta` moves newer — matching left = older, right = newer.
     func stepDetail(_ delta: Int) {
-        guard let current = selectedShotID,
+        guard canStepDetail(delta),
+              let current = selectedShotID,
               let index = shots.firstIndex(where: { $0.id == current })
         else { return }
-        let next = index + delta
-        guard shots.indices.contains(next) else { return }
-        selectedShotID = shots[next].id
+        selectedShotID = shots[index + delta].id
     }
 
     func setOverlayEnabled(_ enabled: Bool) {

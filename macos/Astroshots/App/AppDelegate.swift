@@ -44,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 controller.openTray(atRootPath: trayRoot)
             }
+        } else if let detailPath = ProcessInfo.processInfo.environment[
+            "ASTROSHOTS_UI_TEST_DETAIL_PATH"
+        ] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                controller.openTrayDetail(atImagePath: detailPath)
+            }
         } else if let trayPath = ProcessInfo.processInfo.environment[
             "ASTROSHOTS_UI_TEST_TRAY_PATH"
         ] {
