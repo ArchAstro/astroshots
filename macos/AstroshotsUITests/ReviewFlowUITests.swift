@@ -440,6 +440,209 @@ final class ReviewFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testDetailPagesThroughStreamWithButtonsAndArrows() throws {
+        let multiRoot = try seedMultiFrameFeature(prefix: "detail-page")
+        // Seed via a concrete frame path (same bridge as other detail tests),
+        // which also loads every sibling under the worktree for paging.
+        // Launch already in detail on the newest frame so paging is the
+        // surface under test (stream-row entry is covered by other tests).
+        let newest = multiRoot
+            .appendingPathComponent(".astroshot/settings-review/0003-third.png")
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_DETAIL_PATH"] = newest.path
+        app.launch()
+
+        let viewport = app.descendants(matching: .any)["detail.viewport"]
+        XCTAssertTrue(
+            viewport.waitForExistence(timeout: 8),
+            "Detail pane did not open from the detail launch bridge"
+        )
+
+        let older = app.buttons["detail.navigate.older"]
+        let newer = app.buttons["detail.navigate.newer"]
+        let position = app.descendants(matching: .any)["detail.position"]
+        XCTAssertTrue(
+            older.waitForExistence(timeout: 3),
+            "Missing older control; hierarchy=\(app.debugDescription)"
+        )
+        XCTAssertTrue(newer.waitForExistence(timeout: 2))
+        XCTAssertTrue(position.waitForExistence(timeout: 2))
+        // Newest is stream index 1; only older is enabled.
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertFalse(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["1 / 3", "1 of 3"]),
+            "Expected newest stream index, got label=\(position.label)"
+        )
+
+        older.click()
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertTrue(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["2 / 3", "2 of 3"]),
+            "Expected middle stream index after paging older, got label=\(position.label)"
+        )
+
+        // Keyboard left arrow should page older (toward index 3).
+        app.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertFalse(older.isEnabled)
+        XCTAssertTrue(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["3 / 3", "3 of 3"]),
+            "Expected oldest stream index after ←, got label=\(position.label)"
+        )
+
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["2 / 3", "2 of 3"]),
+            "Expected middle stream index after →, got label=\(position.label)"
+        )
+
+        let proof = XCTAttachment(screenshot: app.screenshot())
+        proof.name = "Detail image paging"
+        proof.lifetime = .keepAlways
+        add(proof)
+    }
+
+    @MainActor
+    func testFullscreenReviewPagesSiblingsWithButtonsAndArrows() throws {
+        let multiRoot = try seedMultiFrameFeature(prefix: "review-page")
+        // Open on the middle frame so both directions are available.
+        let middle = multiRoot
+            .appendingPathComponent(".astroshot/settings-review/0002-second.png")
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_REVIEW_PATH"] = middle.path
+        app.launch()
+
+        let takeover = app.descendants(matching: .any)["review.takeover"]
+        XCTAssertTrue(takeover.waitForExistence(timeout: 8))
+
+        let older = app.buttons["review.navigate.older"]
+        let newer = app.buttons["review.navigate.newer"]
+        let position = app.descendants(matching: .any)["review.position"]
+        XCTAssertTrue(older.waitForExistence(timeout: 3))
+        XCTAssertTrue(newer.waitForExistence(timeout: 2))
+        XCTAssertTrue(position.waitForExistence(timeout: 2))
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertTrue(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["2 / 3", "2 of 3"]),
+            "Expected middle review index, got label=\(position.label) count buttons older/newer enabled"
+        )
+
+        older.click()
+        XCTAssertFalse(older.isEnabled)
+        XCTAssertTrue(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["1 / 3", "1 of 3"]),
+            "Expected oldest review index after older click, got label=\(position.label)"
+        )
+
+        // Arrow keys page without focusing the feedback editor.
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertTrue(newer.isEnabled)
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertFalse(newer.isEnabled)
+        XCTAssertTrue(older.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["3 / 3", "3 of 3"]),
+            "Expected newest review index after → →, got label=\(position.label)"
+        )
+
+        // Stage-side affordances stay available for click navigation.
+        XCTAssertTrue(app.buttons["review.stage.older"].exists)
+        app.buttons["review.stage.older"].click()
+        XCTAssertTrue(newer.isEnabled)
+        XCTAssertTrue(
+            positionContains(position, anyOf: ["2 / 3", "2 of 3"]),
+            "Expected middle review index after stage older, got label=\(position.label)"
+        )
+
+        let proof = XCTAttachment(screenshot: app.screenshot())
+        proof.name = "Fullscreen image paging"
+        proof.lifetime = .keepAlways
+        add(proof)
+    }
+
+    private func positionContains(
+        _ element: XCUIElement,
+        anyOf needles: [String]
+    ) -> Bool {
+        let label = element.label
+        let value = element.value as? String ?? ""
+        let combined = "\(label) \(value)"
+        return needles.contains { combined.contains($0) }
+    }
+
+    @MainActor
+    private func seedMultiFrameFeature(prefix: String) throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "astroshots-\(prefix)-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let feature = root.appendingPathComponent(
+            ".astroshot/settings-review",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: feature,
+            withIntermediateDirectories: true
+        )
+
+        let frames: [(file: String, title: String, offset: TimeInterval)] = [
+            ("0001-first.png", "First frame", -20),
+            ("0002-second.png", "Second frame", -10),
+            ("0003-third.png", "Third frame", 0),
+        ]
+        let now = Date()
+        for frame in frames {
+            let url = feature.appendingPathComponent(frame.file)
+            try fixturePNG(width: 1_200, height: 700)
+                .write(to: url, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(frame.offset)],
+                ofItemAtPath: url.path
+            )
+        }
+
+        let shotsJSON = frames.map { frame in
+            """
+            {
+              "id": "\(frame.file.prefix(4))",
+              "file": "\(frame.file)",
+              "slug": "\(frame.file.dropFirst(5).dropLast(4))",
+              "title": "\(frame.title)",
+              "description": "Paging fixture \(frame.title).",
+              "captured_at": "2026-08-03T12:00:00Z"
+            }
+            """
+        }.joined(separator: ",\n")
+
+        let manifest = """
+        {
+          "version": 1,
+          "feature": "settings-review",
+          "run_id": "paging-run-1",
+          "status": "pass",
+          "shots": [
+            \(shotsJSON)
+          ]
+        }
+        """
+        try manifest.write(
+            to: feature.appendingPathComponent("manifest.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        return root
+    }
+
+    @MainActor
     private func launchReviewApp() -> XCUIApplication {
         terminateRunningAstroshots()
         let app = XCUIApplication()
