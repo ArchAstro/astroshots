@@ -1,13 +1,15 @@
-name: Cut release
+name: Cut npm release
 
 # Manually trigger from the Actions tab to:
-#   1. Bump MARKETING_VERSION + roll CHANGELOG.md on a release branch
-#   2. Push tag vX.Y.Z
-#   3. Explicitly dispatch Release DMG (GITHUB_TOKEN tag pushes do not
-#      trigger other workflows)
-#   4. Open a PR back to main so main tracks the version bump
+#   1. Bump all three @archastro/* packages to the same version
+#   2. Roll CHANGELOG.md Unreleased → ## [X.Y.Z] (npm)
+#   3. Push tag astroshot-vX.Y.Z
+#   4. Explicitly dispatch Publish npm package (GITHUB_TOKEN tag pushes do
+#      not trigger other workflows)
+#   5. Open a PR back to main so main tracks the bump
 #
-# Same shape as archastro-js / archastro-python release.yml.
+# Same shape as archastro-js release.yml. First-time publish still requires
+# a manual bootstrap + npm trust github (see README / GO-LIVE-CHECKLIST).
 
 on:
   workflow_dispatch:
@@ -22,12 +24,12 @@ on:
           - minor
           - major
       version:
-        description: "Explicit version, e.g. 0.2.0 (overrides bump when set)"
+        description: "Explicit version, e.g. 0.1.1 (overrides bump when set)"
         required: false
         type: string
 
 concurrency:
-  group: cut-release
+  group: cut-npm-release
   cancel-in-progress: false
 
 permissions:
@@ -36,15 +38,25 @@ permissions:
   actions: write
 
 jobs:
-  cut-release:
+  cut-npm-release:
     name: Bump + branch + tag
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
 
       - name: Configure git identity
         run: |
@@ -58,19 +70,18 @@ jobs:
           VERSION_INPUT: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          PKG=macos/project.yml
-
-          CUR="$(
-            sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' "$PKG" | head -1
-          )"
-          BUILD="$(
-            sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "\([^"]*\)"/\1/p' "$PKG" | head -1
-          )"
-          [[ -n "$CUR" ]] || { echo "MARKETING_VERSION not found in $PKG" >&2; exit 1; }
-          [[ -n "$BUILD" ]] || BUILD=0
+          CUR="$(node -p "require('./packages/astroshot/package.json').version")"
+          for directory in packages/react-shot packages/tui-shot packages/astroshot; do
+            package_version="$(node -p "require('./${directory}/package.json').version")"
+            if [[ "$package_version" != "$CUR" ]]; then
+              echo "Package versions are not aligned ($directory=$package_version, astroshot=$CUR)" >&2
+              exit 1
+            fi
+          done
 
           if [[ -n "${VERSION_INPUT// }" ]]; then
             NEXT="${VERSION_INPUT#v}"
+            NEXT="${NEXT#astroshot-v}"
           else
             IFS='.' read -r MAJ MIN PAT <<<"${CUR%%-*}"
             case "$BUMP" in
@@ -90,74 +101,50 @@ jobs:
             echo "Next version equals current ($CUR); nothing to release" >&2
             exit 1
           fi
-          if git rev-parse "v$NEXT" >/dev/null 2>&1; then
-            echo "Tag v$NEXT already exists" >&2
+          if git rev-parse "astroshot-v$NEXT" >/dev/null 2>&1; then
+            echo "Tag astroshot-v$NEXT already exists" >&2
             exit 1
           fi
 
-          NEXT_BUILD=$((BUILD + 1))
-          TAG="v$NEXT"
+          TAG="astroshot-v$NEXT"
           BRANCH="release/$TAG"
 
           {
             echo "current=$CUR"
             echo "next=$NEXT"
-            echo "next_build=$NEXT_BUILD"
             echo "tag=$TAG"
             echo "branch=$BRANCH"
           } >>"$GITHUB_OUTPUT"
 
           {
-            echo "### Cut release (macOS)"
+            echo "### Cut npm release"
             echo ""
-            echo "- Marketing: \`$CUR\` → \`$NEXT\`"
-            echo "- Build: \`$BUILD\` → \`$NEXT_BUILD\`"
+            echo "- Packages: \`$CUR\` → \`$NEXT\`"
             echo "- Branch: \`$BRANCH\`"
             echo "- Tag: \`$TAG\`"
-            echo "- DMG: explicit **Release DMG** dispatch after the tag"
+            echo "- Publish: explicit **Publish npm package** dispatch after the tag"
           } >>"$GITHUB_STEP_SUMMARY"
 
-      - name: Bump project.yml + changelog on release branch
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump packages + changelog on release branch
         env:
-          CUR: ${{ steps.bump.outputs.current }}
           NEXT: ${{ steps.bump.outputs.next }}
-          NEXT_BUILD: ${{ steps.bump.outputs.next_build }}
           BRANCH: ${{ steps.bump.outputs.branch }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
           set -euo pipefail
-          PKG=macos/project.yml
-
           git checkout -b "$BRANCH"
-
-          python3 - <<'PY'
-          import os, pathlib, re
-          path = pathlib.Path("macos/project.yml")
-          text = path.read_text()
-          cur, nxt, build = os.environ["CUR"], os.environ["NEXT"], os.environ["NEXT_BUILD"]
-          text2, n1 = re.subn(
-              r'(MARKETING_VERSION:\s*")' + re.escape(cur) + r'(")',
-              r"\g<1>" + nxt + r"\2",
-              text,
-              count=1,
-          )
-          if n1 != 1:
-              raise SystemExit(f"failed to replace MARKETING_VERSION {cur!r}")
-          text3, n2 = re.subn(
-              r'(CURRENT_PROJECT_VERSION:\s*")\d+(")',
-              r"\g<1>" + build + r"\2",
-              text2,
-              count=1,
-          )
-          if n2 != 1:
-              raise SystemExit("failed to replace CURRENT_PROJECT_VERSION")
-          path.write_text(text3)
-          PY
-
-          node scripts/roll-changelog.mjs "$NEXT" --track macos
-
-          git add macos/project.yml CHANGELOG.md
-          git commit -m "release: Astroshots $TAG"
+          npm run version:packages -- "$NEXT"
+          node scripts/roll-changelog.mjs "$NEXT" --track npm
+          git add \
+            packages/react-shot/package.json \
+            packages/tui-shot/package.json \
+            packages/astroshot/package.json \
+            package-lock.json \
+            CHANGELOG.md
+          git commit -m "release: npm $TAG"
           git push origin "$BRANCH"
 
       - name: Create + push tag
@@ -165,19 +152,19 @@ jobs:
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
           set -euo pipefail
-          git tag -a "$TAG" -m "Astroshots $TAG"
+          git tag -a "$TAG" -m "Release @archastro/astroshot ${TAG#astroshot-v}"
           git push origin "$TAG"
 
-      - name: Dispatch Release DMG
+      - name: Dispatch Publish npm package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
           set -euo pipefail
-          # Tags pushed with GITHUB_TOKEN do not trigger push workflows; dispatch
-          # explicitly so the signed DMG always builds for this cut.
-          gh workflow run "Release DMG" --repo "${{ github.repository }}" -f "tag=$TAG"
-          echo "Dispatched Release DMG for $TAG" >>"$GITHUB_STEP_SUMMARY"
+          gh workflow run "Publish npm package" \
+            --repo "${{ github.repository }}" \
+            --ref "$TAG"
+          echo "Dispatched Publish npm package for $TAG" >>"$GITHUB_STEP_SUMMARY"
 
       - name: Open PR back to main
         env:
@@ -189,22 +176,23 @@ jobs:
         run: |
           set -euo pipefail
           body=$(cat <<EOF
-          Automated macOS release branch cut by **Cut release**.
+          Automated npm release branch cut by **Cut npm release**.
 
           | | |
           |--|--|
           | Version | \`$CUR\` → \`$NEXT\` |
           | Tag | \`$TAG\` |
-          | DMG | **Release DMG** (explicitly dispatched after the tag) |
-          | Changelog | \`## [$NEXT] (macos)\` rolled from Unreleased |
+          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/astroshot\` |
+          | Publish | **Publish npm package** (explicitly dispatched after the tag) |
+          | Changelog | \`## [$NEXT] (npm)\` rolled from Unreleased |
 
-          Once checks pass, merge so \`main\` tracks the shipped version.
+          Once checks pass, merge so \`main\` tracks the published version.
           EOF
           )
           pr_url=$(gh pr create \
             --base main \
             --head "$BRANCH" \
-            --title "release: Astroshots $TAG" \
+            --title "release: npm $TAG" \
             --body "$body")
           echo "Opened $pr_url" >>"$GITHUB_STEP_SUMMARY"
           echo "PR: $pr_url"

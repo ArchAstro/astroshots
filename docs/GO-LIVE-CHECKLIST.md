@@ -245,71 +245,24 @@ You are done when all five are true:
 
 ---
 
-## Not today: the next npm release
+## Next npm release (after 0.1.0 is live)
 
-Use this only after `0.1.0` is live.
+1. Add notes under `## [Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).
+2. **Actions → Cut npm release → patch / minor / major** (or
+   `gh workflow run "Cut npm release" -f bump=patch`).
+3. Confirm **Publish npm package** is green and the three package pages show
+   the new version with provenance.
+4. Smoke: `npx --yes --@archastro:registry=https://registry.npmjs.org @archastro/astroshot@<version> --help`.
 
-### 1. Create the version change — 2 minutes
+The cut workflow bumps all three packages, rolls the changelog, tags
+`astroshot-vX.Y.Z`, dispatches publish, and opens a PR to main.
 
-Replace `0.1.1` below with the next version:
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c release/astroshot-v0.1.1
-npm run version:packages -- 0.1.1
-```
-
-### 2. Run the release gate — 5–10 minutes
-
-```bash
-npm ci
-npm run build --workspaces --if-present
-node packages/astroshot/bin/astroshot.mjs install-browser
-npm run check
-ASTROSHOTS_VERIFY_PACKAGES_CAPTURE=1 npm run pack:check
-git diff --check
-```
-
-### 3. Commit, push, and merge — 5 minutes plus CI
-
-```bash
-git add \
-  package-lock.json \
-  packages/astroshot/package.json \
-  packages/react-shot/package.json \
-  packages/tui-shot/package.json
-git commit -m "release: Astroshot npm v0.1.1"
-git push -u origin release/astroshot-v0.1.1
-gh pr create --fill
-```
-
-Wait for CI. Merge only when every required check is green.
-
-### 4. Tag the merged `main` commit — 1 minute
-
-```bash
-git switch main
-git pull --ff-only
-test -z "$(git status --porcelain)"
-test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-
-VERSION="$(node -p "require('./packages/astroshot/package.json').version")"
-TAG="astroshot-v$VERSION"
-git tag -a "$TAG" -m "Release @archastro/astroshot $VERSION"
-git push origin "$TAG"
-```
-
-### 5. Verify publication — 3 minutes plus CI
-
-- [ ] `Publish npm package` is green
-- [ ] All three packages show the new version
-- [ ] The package pages show provenance
-- [ ] The registry-pinned `npx @archastro/astroshot@<version> --help` works
+Manual fallback (if Actions is unavailable) is still documented in the root
+README history and `npm run version:packages -- X.Y.Z`.
 
 ---
 
-## Not today: the next macOS release
+## Next macOS release
 
 The npm package version and macOS app version are independent.
 
@@ -347,21 +300,19 @@ xcodebuild \
 
 ### 3. Cut the release
 
-In GitHub, run:
+1. Add notes under `## [Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).
+2. In GitHub, run **Actions → Cut release → patch/minor/major**
+   (or `gh workflow run "Cut release" -f bump=patch`).
 
-**Actions → Cut release → Run workflow → patch/minor/major**
+**Cut release** bumps `macos/project.yml`, rolls the changelog, tags `vX.Y.Z`,
+**dispatches Release DMG** (so you no longer need a second manual dispatch),
+and opens a PR to main.
 
-### 4. Confirm the DMG workflow actually starts
-
-GitHub does not trigger a second workflow when `Cut release` pushes its tag
-with `GITHUB_TOKEN`. Until that workflow is redesigned, manually run:
-
-**Actions → Release DMG → Run workflow → tag `vX.Y.Z`**
-
-### 5. Verify the release
+### 4. Verify the release
 
 - [ ] The release PR is merged
 - [ ] `main` contains the new marketing and build versions
-- [ ] `Release DMG` is green
+- [ ] `CHANGELOG.md` has `## [X.Y.Z] (macos)`
+- [ ] `Release DMG` is green (auto-dispatched)
 - [ ] The GitHub Release is public
-- [ ] `Astroshots.dmg` is attached, signed, and notarized
+- [ ] `Astroshots-X.Y.Z.dmg` is attached, signed, and notarized
