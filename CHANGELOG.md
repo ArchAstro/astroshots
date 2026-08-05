@@ -13,6 +13,9 @@ The two tracks are versioned independently.
 
 ### Added
 
+- CI caches Playwright Chromium under `.cache/ms-playwright` (keyed by OS,
+  arch, and Playwright version) so `install-browser` is a no-op on warm
+  runners; Linux still applies `--with-deps` for system libraries.
 - First-run setup replaces any default watch path: a fresh install is detected
   via an explicit `hasCompletedFirstRunSetup` preference and watches nothing
   until the user chooses folders. Launch opens the tray + folder panel only
