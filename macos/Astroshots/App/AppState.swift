@@ -28,8 +28,12 @@ final class AppState {
     var overlayEnabled: Bool
     var autoDismiss: Bool
     var watchRootPaths: [String]
-    /// True until the user has chosen at least one watch folder.
+    /// True when no watch roots are configured (empty stream / setup CTA).
     var needsWatchRootSetup: Bool
+    /// True while first-run setup is incomplete — launch should present the
+    /// startup sequence (tray + folder panel). Driven by an explicit preference
+    /// flag, not merely empty roots.
+    var shouldPresentFirstRunStartup: Bool
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher
@@ -54,7 +58,8 @@ final class AppState {
         automaticallyStartsWatching: Bool = true
     ) {
         let rootPaths = preferences.watchRootPaths
-        let needsSetup = !preferences.hasConfiguredWatchRoots || rootPaths.isEmpty
+        let needsSetup = rootPaths.isEmpty
+        let presentFirstRun = preferences.shouldPresentFirstRunStartup
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         let isReviewUITest =
@@ -72,6 +77,7 @@ final class AppState {
         autoDismiss = preferences.autoDismiss
         watchRootPaths = rootPaths
         needsWatchRootSetup = needsSetup
+        shouldPresentFirstRunStartup = presentFirstRun
         isWatching = !needsSetup
 
         self.watcher = watcher ?? AstroshotWatcher(
@@ -363,6 +369,12 @@ final class AppState {
         setWatchRoots(watchRootPaths + paths)
     }
 
+    /// Apply roots chosen during first-run (or empty-state) setup and mark
+    /// first-run complete when the list is non-empty.
+    func finishWatchRootSetup(_ paths: [String]) {
+        setWatchRoots(paths, completingFirstRun: true)
+    }
+
     func removeWatchRoot(_ path: String) {
         guard watchRootPaths.count > 1 else {
             showToast("Keep at least one watched folder")
@@ -371,11 +383,19 @@ final class AppState {
         setWatchRoots(watchRootPaths.filter { $0 != path })
     }
 
-    private func setWatchRoots(_ paths: [String]) {
+    private func setWatchRoots(_ paths: [String], completingFirstRun: Bool = false) {
         preferences.watchRootPaths = paths
         watchRootPaths = preferences.watchRootPaths
         needsWatchRootSetup = watchRootPaths.isEmpty
         isWatching = !watchRootPaths.isEmpty
+
+        if completingFirstRun, !watchRootPaths.isEmpty {
+            preferences.markFirstRunSetupComplete()
+            shouldPresentFirstRunStartup = false
+        } else {
+            shouldPresentFirstRunStartup = preferences.shouldPresentFirstRunStartup
+        }
+
         shots.removeAll {
             !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
         }
@@ -411,9 +431,10 @@ final class AppState {
     ///
     /// - Parameter forSetup: When true (first launch or empty configuration),
     ///   replaces the root list and uses setup copy. Otherwise appends.
+    ///   Completing setup with a non-empty selection marks first-run done.
     @discardableResult
     func chooseWatchRoots(forSetup: Bool = false) -> Bool {
-        let isSetup = forSetup || needsWatchRootSetup
+        let isSetup = forSetup || needsWatchRootSetup || shouldPresentFirstRunStartup
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -430,7 +451,7 @@ final class AppState {
         let paths = panel.urls.map(\.path)
         guard !paths.isEmpty else { return false }
         if isSetup {
-            setWatchRoots(paths)
+            finishWatchRootSetup(paths)
         } else {
             addWatchRoots(paths)
         }

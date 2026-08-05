@@ -13,9 +13,12 @@ The two tracks are versioned independently.
 
 ### Added
 
-- First-run setup replaces any default watch path: a fresh install watches
-  nothing until the user chooses folders. The open panel starts browsing in
-  `~/Projects` when that directory exists (picker start only, not a root).
+- First-run setup replaces any default watch path: a fresh install is detected
+  via an explicit `hasCompletedFirstRunSetup` preference and watches nothing
+  until the user chooses folders. Launch opens the tray + folder panel only
+  when that flag is incomplete. The open panel starts browsing in `~/Projects`
+  when that directory exists (picker start only, not a root). Upgrades that
+  already have saved watch roots skip first-run.
 - Release automation: **Cut npm release** workflow, changelog roll-forward,
   and automatic **Release DMG** dispatch from **Cut release** (macOS).
 

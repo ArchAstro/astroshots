@@ -4,14 +4,34 @@ import Testing
 
 struct PreferencesTests {
     @Test @MainActor
-    func freshInstallHasNoWatchRootsUntilConfigured() {
+    func freshInstallNeedsFirstRunStartup() {
         let suiteName = "astroshots-preferences-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = Preferences(defaults: defaults)
 
+        #expect(preferences.hasCompletedFirstRunSetup == false)
+        #expect(preferences.shouldPresentFirstRunStartup)
         #expect(preferences.hasConfiguredWatchRoots == false)
         #expect(preferences.watchRootPaths.isEmpty)
+    }
+
+    @Test @MainActor
+    func upgradeWithSavedRootsSkipsFirstRunStartup() {
+        let suiteName = "astroshots-preferences-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(["/tmp/astroshots-existing-work"], forKey: "watchRoots")
+
+        let preferences = Preferences(defaults: defaults)
+        let expected = URL(
+            fileURLWithPath: "/tmp/astroshots-existing-work",
+            isDirectory: true
+        ).standardizedFileURL.path
+
+        #expect(preferences.hasCompletedFirstRunSetup)
+        #expect(preferences.shouldPresentFirstRunStartup == false)
+        #expect(preferences.watchRootPaths == [expected])
     }
 
     @Test @MainActor
@@ -28,6 +48,8 @@ struct PreferencesTests {
         ).standardizedFileURL.path
 
         #expect(preferences.hasConfiguredWatchRoots)
+        #expect(preferences.hasCompletedFirstRunSetup)
+        #expect(preferences.shouldPresentFirstRunStartup == false)
         #expect(preferences.watchRootPaths == [expected])
     }
 
@@ -85,7 +107,7 @@ struct PreferencesTests {
     }
 
     @Test @MainActor
-    func appStateSkipsWatchingUntilRootsAreConfigured() {
+    func appStatePresentsFirstRunUntilSetupCompletes() {
         let suiteName = "astroshots-first-run-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -115,15 +137,36 @@ struct PreferencesTests {
             automaticallyStartsWatching: true
         )
 
+        #expect(state.shouldPresentFirstRunStartup)
         #expect(state.needsWatchRootSetup)
         #expect(state.watchRootPaths.isEmpty)
         #expect(state.isWatching == false)
 
-        state.addWatchRoots([temporary.path])
+        // Completing setup marks first-run done (same path as the folder panel).
+        state.finishWatchRootSetup([temporary.path])
 
+        #expect(state.shouldPresentFirstRunStartup == false)
         #expect(state.needsWatchRootSetup == false)
         #expect(state.watchRootPaths == [temporary.path])
         #expect(state.isWatching)
+        #expect(preferences.hasCompletedFirstRunSetup)
         #expect(preferences.hasConfiguredWatchRoots)
+    }
+
+    @Test @MainActor
+    func cancellingFirstRunKeepsStartupPendingForNextLaunch() {
+        let suiteName = "astroshots-first-run-cancel-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+
+        #expect(preferences.shouldPresentFirstRunStartup)
+
+        // Simulate cancel: roots stay empty and first-run is not marked complete.
+        #expect(preferences.hasCompletedFirstRunSetup == false)
+
+        let again = Preferences(defaults: defaults)
+        #expect(again.shouldPresentFirstRunStartup)
+        #expect(again.watchRootPaths.isEmpty)
     }
 }
