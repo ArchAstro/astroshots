@@ -48,21 +48,29 @@ struct TrayView: View {
             HStack(spacing: 5) {
                 Circle()
                     .fill(
-                        appState.isScanning
+                        appState.needsWatchRootSetup
                             ? Theme.amber
-                            : (appState.isEmpty ? Color(hex: 0xB0AAA2) : Color(hex: 0x20A37F))
+                            : (appState.isScanning
+                                ? Theme.amber
+                                : (appState.isEmpty ? Color(hex: 0xB0AAA2) : Color(hex: 0x20A37F)))
                     )
                     .frame(width: 5, height: 5)
                     .shadow(
-                        color: appState.isEmpty || appState.isScanning
+                        color: appState.needsWatchRootSetup
+                            || appState.isEmpty
+                            || appState.isScanning
                             ? .clear
                             : Color(hex: 0x20A37F).opacity(0.35),
                         radius: 3
                     )
-                Text(appState.isScanning ? "scanning" : (appState.isEmpty ? "idle" : "live"))
+                Text(
+                    appState.needsWatchRootSetup
+                        ? "setup"
+                        : (appState.isScanning ? "scanning" : (appState.isEmpty ? "idle" : "live"))
+                )
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(
-                        appState.isScanning
+                        appState.needsWatchRootSetup || appState.isScanning
                             ? Theme.amber
                             : (appState.isEmpty ? Theme.muted : Theme.green)
                     )

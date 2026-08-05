@@ -224,6 +224,24 @@ final class StatusItemController: NSObject {
         showPopover()
     }
 
+    /// First launch: open the tray, then ask which folders to watch.
+    ///
+    /// The status item needs a run-loop turn before its button has a window;
+    /// otherwise the popover is a no-op.
+    func presentFirstRunSetupIfNeeded() {
+        guard appState.needsWatchRootSetup else { return }
+        appState.pane = .stream
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self else { return }
+            self.showPopover()
+            // Let the popover present before the modal folder panel steals focus.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self, self.appState.needsWatchRootSetup else { return }
+                _ = self.appState.chooseWatchRoots(forSetup: true)
+            }
+        }
+    }
+
     @objc private func quit(_ sender: Any?) {
         NSApp.terminate(nil)
     }

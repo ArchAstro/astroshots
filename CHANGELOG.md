@@ -13,8 +13,15 @@ The two tracks are versioned independently.
 
 ### Added
 
+- First-run setup asks which folders to watch instead of assuming a default path.
+  The folder picker starts in `~/Projects` when that directory exists.
 - Release automation: **Cut npm release** workflow, changelog roll-forward,
   and automatic **Release DMG** dispatch from **Cut release** (macOS).
+
+### Changed
+
+- Default suggested watch root is `~/Projects` (was `~/archastro`). Existing
+  saved watch roots are unchanged.
 
 ## [0.1.14] (macos) - 2026-08-04
 

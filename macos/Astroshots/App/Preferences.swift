@@ -19,30 +19,43 @@ final class Preferences {
         self.defaults = defaults
     }
 
-    /// Absolute paths of the recursive watch roots. Default: `~/archastro`.
+    /// Whether the user has ever chosen watch folders (or upgraded from a
+    /// build that stored a single `watchRoot`).
     ///
-    /// Reads the former singular preference when necessary so upgrades retain
-    /// the directory the user already chose.
+    /// Fresh installs leave this false so launch can prompt for directories
+    /// instead of silently watching a guessed path.
+    var hasConfiguredWatchRoots: Bool {
+        defaults.object(forKey: Key.watchRoots) != nil
+            || defaults.object(forKey: Key.watchRoot) != nil
+    }
+
+    /// Absolute paths of the recursive watch roots.
+    ///
+    /// Empty until the user configures folders. Reads the former singular
+    /// preference when necessary so upgrades retain the directory they already
+    /// chose. `defaultWatchRoot` is only a suggested starting directory for
+    /// the folder picker (`~/Projects`).
     var watchRootPaths: [String] {
         get {
-            if let stored = defaults.stringArray(forKey: Key.watchRoots) {
-                let normalized = Self.normalizeWatchRootPaths(stored)
-                if !normalized.isEmpty {
-                    return normalized
-                }
+            if defaults.object(forKey: Key.watchRoots) != nil {
+                let stored = defaults.stringArray(forKey: Key.watchRoots) ?? []
+                return Self.normalizeWatchRootPaths(stored)
             }
 
             if let legacy = defaults.string(forKey: Key.watchRoot), !legacy.isEmpty {
                 return Self.normalizeWatchRootPaths([legacy])
             }
 
-            return [Self.defaultWatchRoot.path]
+            return []
         }
         set {
             let normalized = Self.normalizeWatchRootPaths(newValue)
-            let persisted = normalized.isEmpty ? [Self.defaultWatchRoot.path] : normalized
-            defaults.set(persisted, forKey: Key.watchRoots)
-            defaults.set(persisted[0], forKey: Key.watchRoot)
+            defaults.set(normalized, forKey: Key.watchRoots)
+            if let first = normalized.first {
+                defaults.set(first, forKey: Key.watchRoot)
+            } else {
+                defaults.removeObject(forKey: Key.watchRoot)
+            }
         }
     }
 
@@ -76,9 +89,17 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.autoDismissSeconds) }
     }
 
+    /// Suggested starting directory for the watch-folder picker.
+    ///
+    /// Prefers `~/Projects` when it exists; otherwise the home directory so
+    /// the panel never opens on a missing path.
     static var defaultWatchRoot: URL {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent("archastro", isDirectory: true)
+        let projects = home.appendingPathComponent("Projects", isDirectory: true)
+        if FileManager.default.fileExists(atPath: projects.path) {
+            return projects
+        }
+        return home
     }
 
     /// Preserve selection order while dropping duplicates and roots already
