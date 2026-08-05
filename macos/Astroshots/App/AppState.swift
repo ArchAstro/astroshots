@@ -467,6 +467,14 @@ final class AppState {
         showToast("Scanning…")
     }
 
+    /// Copy the shot's PNG/JPEG onto the general pasteboard for paste elsewhere.
+    @discardableResult
+    func copyShotImage(_ shot: Shot) -> Bool {
+        let ok = ImageClipboard.copyImage(atPath: shot.path)
+        showToast(ok ? "Copied image" : "Couldn’t copy image")
+        return ok
+    }
+
     func showToast(_ message: String) {
         toastTask?.cancel()
         toast = message

@@ -216,6 +216,13 @@ struct ReviewTakeoverView: View {
                         .stroke(Color.white.opacity(0.14), lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.34), radius: 28, y: 12)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button("Copy Image") {
+                        _ = appState.copyShotImage(currentShot)
+                    }
+                    .accessibilityIdentifier("review.copy")
+                }
                 .accessibilityLabel("Screenshot \(currentShot.title)")
                 .accessibilityIdentifier("review.image")
         } else {
