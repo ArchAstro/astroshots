@@ -24,6 +24,8 @@ node_modules/
 coverage/
 test-results/
 playwright-report/
+# CI / local Playwright browser store (PLAYWRIGHT_BROWSERS_PATH)
+.cache/
 *.tgz
 npm-debug.log*
 .verify-skills.*/
