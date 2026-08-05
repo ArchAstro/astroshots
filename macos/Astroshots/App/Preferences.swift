@@ -10,20 +10,40 @@ final class Preferences {
         static let watchRoots = "watchRoots"
         /// Retained as a migration and downgrade path for pre-multi-root builds.
         static let watchRoot = "watchRoot"
+        /// Explicit gate for the first-run watch-folder startup sequence.
+        static let hasCompletedFirstRunSetup = "hasCompletedFirstRunSetup"
+        /// Bumps when first-run migration rules change.
+        static let firstRunMigrationVersion = "firstRunMigrationVersion"
         static let overlayEnabled = "overlayEnabled"
         static let autoDismiss = "autoDismiss"
         static let autoDismissSeconds = "autoDismissSeconds"
     }
 
+    /// Migration schema for first-run detection. Increment when adoption rules
+    /// for upgrades change.
+    private static let currentFirstRunMigrationVersion = 1
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        migrateFirstRunStateIfNeeded()
     }
 
-    /// Whether the user has ever chosen watch folders (or upgraded from a
-    /// build that stored a single `watchRoot`).
+    /// True after the user finishes first-run folder setup (or after an upgrade
+    /// migration that already had watch roots).
     ///
-    /// Fresh installs leave this false so launch can prompt for directories
-    /// instead of silently watching a guessed path.
+    /// This is the source of truth for “should we run the first-run startup
+    /// sequence,” not the absence of watch roots alone.
+    var hasCompletedFirstRunSetup: Bool {
+        get { defaults.bool(forKey: Key.hasCompletedFirstRunSetup) }
+        set { defaults.set(newValue, forKey: Key.hasCompletedFirstRunSetup) }
+    }
+
+    /// Open the tray + folder panel on launch only when first-run is incomplete.
+    var shouldPresentFirstRunStartup: Bool {
+        !hasCompletedFirstRunSetup
+    }
+
+    /// Whether any watch-root preference key has been written.
     var hasConfiguredWatchRoots: Bool {
         defaults.object(forKey: Key.watchRoots) != nil
             || defaults.object(forKey: Key.watchRoot) != nil
@@ -88,6 +108,11 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.autoDismissSeconds) }
     }
 
+    /// Call when the user successfully chooses initial watch folders.
+    func markFirstRunSetupComplete() {
+        hasCompletedFirstRunSetup = true
+    }
+
     /// Where the watch-folder open panel should start browsing.
     ///
     /// Not a watch root. Prefers `~/Projects` when it exists; otherwise home
@@ -134,6 +159,27 @@ final class Preferences {
         return roots.contains {
             contains(root: $0, path: normalizedPath)
         }
+    }
+
+    // MARK: - First-run detection
+
+    /// Upgrades that already had watch roots must not see first-run UI.
+    /// Fresh installs keep `hasCompletedFirstRunSetup == false` until the user
+    /// finishes the folder panel (or equivalent Settings path).
+    private func migrateFirstRunStateIfNeeded() {
+        let version = defaults.integer(forKey: Key.firstRunMigrationVersion)
+        guard version < Self.currentFirstRunMigrationVersion else { return }
+
+        if !watchRootPaths.isEmpty {
+            // Prior install that already chose or persisted roots.
+            hasCompletedFirstRunSetup = true
+        }
+        // Else leave incomplete so launch presents first-run startup.
+
+        defaults.set(
+            Self.currentFirstRunMigrationVersion,
+            forKey: Key.firstRunMigrationVersion
+        )
     }
 
     private static func contains(root: String, path: String) -> Bool {

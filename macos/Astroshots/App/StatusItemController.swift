@@ -226,17 +226,21 @@ final class StatusItemController: NSObject {
 
     /// First launch: open the tray, then ask which folders to watch.
     ///
+    /// Gated by `AppState.shouldPresentFirstRunStartup` (explicit preference
+    /// flag), not merely an empty root list — so upgrades with saved roots and
+    /// later empty states do not all look like first run.
+    ///
     /// The status item needs a run-loop turn before its button has a window;
     /// otherwise the popover is a no-op.
     func presentFirstRunSetupIfNeeded() {
-        guard appState.needsWatchRootSetup else { return }
+        guard appState.shouldPresentFirstRunStartup else { return }
         appState.pane = .stream
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self else { return }
+            guard let self, self.appState.shouldPresentFirstRunStartup else { return }
             self.showPopover()
             // Let the popover present before the modal folder panel steals focus.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                guard let self, self.appState.needsWatchRootSetup else { return }
+                guard let self, self.appState.shouldPresentFirstRunStartup else { return }
                 _ = self.appState.chooseWatchRoots(forSetup: true)
             }
         }
