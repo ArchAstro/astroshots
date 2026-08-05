@@ -25,9 +25,9 @@ xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platfo
 
 ## Behavior
 
-- **Watch roots** (chosen on first launch; picker defaults toward `~/Projects`):
+- **Watch roots** (required first-run choice; no automatic default root):
   recursive scan + FSEvents for `**/.astroshot/<feature>/*.{png,jpg,…}` and
-  `manifest.json`.
+  `manifest.json`. The folder open panel starts in `~/Projects` when present.
 - **No per-project picker**: every project under the watched roots streams into
   one newest-first list. Project name is a badge on each row / overlay.
 - **Desktop overlay**: new frames float above all windows; clicking anywhere on

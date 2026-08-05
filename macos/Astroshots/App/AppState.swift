@@ -419,11 +419,11 @@ final class AppState {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         panel.directoryURL = URL(
-            fileURLWithPath: watchRootPaths.first ?? Preferences.defaultWatchRoot.path,
+            fileURLWithPath: watchRootPaths.first ?? Preferences.folderPickerStartURL.path,
             isDirectory: true
         )
         panel.message = isSetup
-            ? "Choose one or more folders Astroshots should watch for .astroshot screenshots. The panel starts in ~/Projects when that folder exists."
+            ? "Choose one or more folders Astroshots should watch for .astroshot screenshots."
             : "Choose one or more folders to scan for .astroshot directories"
         panel.prompt = isSetup ? "Start watching" : "Add"
         guard panel.runModal() == .OK else { return false }

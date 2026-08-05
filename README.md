@@ -33,8 +33,8 @@ No project picker. No account. No cloud. Just files on disk and a camera icon in
 
 1. Download the latest versioned **Astroshots-x.y.z.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
 2. Open the DMG and drag **Astroshots** into **Applications**.
-3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). On first launch it **asks which folders to watch** (the picker starts in `~/Projects` when that folder exists).
-4. After the first run it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
+3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). There is **no default watch folder**: first launch **asks which folders to watch** (the open panel starts in `~/Projects` when that folder exists).
+4. After setup it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
 5. Click the camera icon → gear → **Add folders…** to watch more locations later.
 6. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
 
@@ -57,7 +57,7 @@ Details: [`macos/README.md`](macos/README.md).
 
 ## How it works
 
-1. **Watch** — Astroshots recursively watches one or more folders you choose (first-run picker; suggested start `~/Projects`) for `.astroshot/` trees.
+1. **Watch** — On first launch you choose one or more folders; Astroshots recursively watches them for `.astroshot/` trees.
 2. **Write** — Your harness, agent, or script drops PNGs (and an optional
    execution `manifest.json`) under that layout.
 3. **See** — New frames flash on the desktop; open the tray for the full
