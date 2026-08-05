@@ -107,6 +107,12 @@ struct DetailView: View {
                         .help("Open full-screen review")
                         .accessibilityLabel("Review \(shot.title) full screen")
                         .accessibilityIdentifier("detail.preview")
+                        .contextMenu {
+                            Button("Copy Image") {
+                                _ = appState.copyShotImage(shot)
+                            }
+                            .accessibilityIdentifier("detail.copy")
+                        }
                         .padding(.horizontal, 12)
                         .padding(.top, 12)
                         .frame(maxWidth: .infinity)

@@ -11,6 +11,11 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- Right-click **Copy Image** on stream rows, tray detail preview, and
+  full-screen review so frames paste into other apps.
+
 ## [0.1.15] (macos) - 2026-08-05
 
 ### Added

@@ -301,6 +301,7 @@ private struct WorktreeStreamGroup: View {
 }
 
 struct ShotRow: View {
+    @Environment(AppState.self) private var appState
     @Environment(\.reviewChrome) private var reviewChrome
 
     let shot: Shot
@@ -381,6 +382,13 @@ struct ShotRow: View {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(Color.clear)
         )
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Copy Image") {
+                _ = appState.copyShotImage(shot)
+            }
+            .accessibilityIdentifier("stream.copy.\(shot.fileName)")
+        }
         #if os(macOS)
         .onHover { hovering in
             // Visual handled by plain button; could add highlight state later.
