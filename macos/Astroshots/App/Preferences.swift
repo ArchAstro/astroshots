@@ -31,10 +31,9 @@ final class Preferences {
 
     /// Absolute paths of the recursive watch roots.
     ///
-    /// Empty until the user configures folders. Reads the former singular
-    /// preference when necessary so upgrades retain the directory they already
-    /// chose. `defaultWatchRoot` is only a suggested starting directory for
-    /// the folder picker (`~/Projects`).
+    /// Empty until first-run (or Settings) configures folders — there is no
+    /// automatic default root. Reads the former singular preference when
+    /// necessary so upgrades retain the directory the user already chose.
     var watchRootPaths: [String] {
         get {
             if defaults.object(forKey: Key.watchRoots) != nil {
@@ -89,11 +88,11 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.autoDismissSeconds) }
     }
 
-    /// Suggested starting directory for the watch-folder picker.
+    /// Where the watch-folder open panel should start browsing.
     ///
-    /// Prefers `~/Projects` when it exists; otherwise the home directory so
-    /// the panel never opens on a missing path.
-    static var defaultWatchRoot: URL {
+    /// Not a watch root. Prefers `~/Projects` when it exists; otherwise home
+    /// so the panel never opens on a missing path.
+    static var folderPickerStartURL: URL {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let projects = home.appendingPathComponent("Projects", isDirectory: true)
         if FileManager.default.fileExists(atPath: projects.path) {

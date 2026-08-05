@@ -50,13 +50,13 @@ struct PreferencesTests {
     }
 
     @Test @MainActor
-    func defaultWatchRootPrefersProjectsWhenPresent() {
+    func folderPickerStartsInProjectsWhenPresent() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let projects = home.appendingPathComponent("Projects", isDirectory: true)
         let expected = FileManager.default.fileExists(atPath: projects.path)
             ? projects
             : home
-        #expect(Preferences.defaultWatchRoot.path == expected.path)
+        #expect(Preferences.folderPickerStartURL.path == expected.path)
     }
 
     @Test @MainActor

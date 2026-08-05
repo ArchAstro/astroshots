@@ -51,7 +51,7 @@ struct SettingsPane: View {
                             .font(.system(size: 12, weight: .semibold))
                         Text(
                             appState.needsWatchRootSetup
-                                ? "Pick the directories that contain your projects. The folder picker starts in ~/Projects when it exists."
+                                ? "Pick the directories that contain your projects. Nothing is watched until you choose at least one."
                                 : "Every worktree below any of these folders streams into one feed."
                         )
                             .font(.system(size: 10))
