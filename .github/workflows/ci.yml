@@ -11,6 +11,13 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Pin the Playwright browser store into the workspace so Actions cache keys are
+# OS-stable (Linux/macOS/Windows would otherwise scatter under different home
+# paths). install-browser still runs every job so missing browsers and Linux
+# --with-deps packages stay correct; a warm cache makes Chromium install a no-op.
+env:
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+
 jobs:
   node-tools:
     name: Node screenshot tools on Node ${{ matrix.node }}
@@ -34,6 +41,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Resolve Playwright version
+        id: playwright
+        run: |
+          version="$(node -p "require('playwright/package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
 
       - name: Build screenshot CLIs
         run: npm run build --workspaces --if-present
@@ -79,6 +98,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Resolve Playwright version
+        id: playwright
+        shell: bash
+        run: |
+          version="$(node -p "require('playwright/package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
 
       - name: Build screenshot CLIs
         run: npm run build --workspaces --if-present
