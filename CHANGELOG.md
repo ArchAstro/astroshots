@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.1.15] (macos) - 2026-08-05
+
 ### Added
 
 - CI caches Playwright Chromium under `.cache/ms-playwright` (keyed by OS,
