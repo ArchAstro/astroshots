@@ -49,10 +49,27 @@ struct SettingsPane: View {
                     card {
                         Text("Watched folders")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Every worktree below any of these folders streams into one feed.")
+                        Text(
+                            appState.needsWatchRootSetup
+                                ? "Pick the directories that contain your projects. The folder picker starts in ~/Projects when it exists."
+                                : "Every worktree below any of these folders streams into one feed."
+                        )
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.muted)
                             .padding(.bottom, 4)
+
+                        if appState.watchRootPaths.isEmpty {
+                            Text("No folders yet")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.muted)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    Theme.surface,
+                                    in: RoundedRectangle(cornerRadius: 8)
+                                )
+                        }
 
                         ForEach(
                             Array(appState.watchRootPaths.enumerated()),
@@ -97,8 +114,10 @@ struct SettingsPane: View {
                         }
 
                         HStack(spacing: 8) {
-                            Button("Add folders…") {
-                                appState.chooseWatchRoots()
+                            Button(appState.needsWatchRootSetup ? "Choose folders…" : "Add folders…") {
+                                _ = appState.chooseWatchRoots(
+                                    forSetup: appState.needsWatchRootSetup
+                                )
                             }
                             .buttonStyle(.plain)
                             .font(.system(size: 11, weight: .semibold))
@@ -107,14 +126,16 @@ struct SettingsPane: View {
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
                             .accessibilityIdentifier("add-watch-roots")
 
-                            Button("Rescan") {
-                                appState.rescan()
+                            if !appState.needsWatchRootSetup {
+                                Button("Rescan") {
+                                    appState.rescan()
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11, weight: .semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
                             }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
                         }
                         .padding(.top, 6)
                     }

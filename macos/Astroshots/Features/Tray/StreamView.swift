@@ -487,41 +487,73 @@ struct EmptyStreamView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            Image(systemName: "camera")
+            Image(systemName: appState.needsWatchRootSetup ? "folder.badge.plus" : "camera")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Theme.muted)
                 .frame(width: 40, height: 40)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
                 .padding(.bottom, 12)
-            Text(appState.isScanning ? "Scanning watched folders…" : "Waiting for frames")
+            Text(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
                 .padding(.bottom, 5)
-            Text(
-                appState.isScanning
-                    ? "First scan of a large folder can take a bit. The menu bar icon stays available."
-                    : "When any project under a watched folder writes to .astroshot/, shots land here and on the desktop."
-            )
+            Text(subtitle)
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 240)
                 .padding(.bottom, 14)
-            Button("Rescan") {
-                appState.rescan()
+            if appState.needsWatchRootSetup {
+                Button("Choose folders…") {
+                    _ = appState.chooseWatchRoots(forSetup: true)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Theme.lineStrong, lineWidth: 1)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
+                )
+                .accessibilityIdentifier("setup-choose-folders")
+            } else {
+                Button("Rescan") {
+                    appState.rescan()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Theme.lineStrong, lineWidth: 1)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
+                )
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 11, weight: .semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Theme.lineStrong, lineWidth: 1)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
-            )
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 28)
+    }
+
+    private var title: String {
+        if appState.needsWatchRootSetup {
+            return "Choose folders to watch"
+        }
+        if appState.isScanning {
+            return "Scanning watched folders…"
+        }
+        return "Waiting for frames"
+    }
+
+    private var subtitle: String {
+        if appState.needsWatchRootSetup {
+            return "Pick the directories that contain your projects. Astroshots watches them for .astroshot/ screenshots."
+        }
+        if appState.isScanning {
+            return "First scan of a large folder can take a bit. The menu bar icon stays available."
+        }
+        return "When any project under a watched folder writes to .astroshot/, shots land here and on the desktop."
     }
 }

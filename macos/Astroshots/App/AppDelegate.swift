@@ -58,7 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 controller.openTray(atImagePath: trayPath)
             }
+        } else {
+            controller.presentFirstRunSetupIfNeeded()
         }
+        #else
+        controller.presentFirstRunSetupIfNeeded()
         #endif
     }
 

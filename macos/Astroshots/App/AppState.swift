@@ -28,6 +28,8 @@ final class AppState {
     var overlayEnabled: Bool
     var autoDismiss: Bool
     var watchRootPaths: [String]
+    /// True until the user has chosen at least one watch folder.
+    var needsWatchRootSetup: Bool
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher
@@ -52,6 +54,7 @@ final class AppState {
         automaticallyStartsWatching: Bool = true
     ) {
         let rootPaths = preferences.watchRootPaths
+        let needsSetup = !preferences.hasConfiguredWatchRoots || rootPaths.isEmpty
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         let isReviewUITest =
@@ -68,6 +71,8 @@ final class AppState {
         overlayEnabled = preferences.overlayEnabled
         autoDismiss = preferences.autoDismiss
         watchRootPaths = rootPaths
+        needsWatchRootSetup = needsSetup
+        isWatching = !needsSetup
 
         self.watcher = watcher ?? AstroshotWatcher(
             configuration: .init(
@@ -95,9 +100,8 @@ final class AppState {
         }
 
         // Defer filesystem work so the status item can appear immediately.
-        // Scanning ~/archastro (or any large tree) on the main thread made the
-        // app look like it crashed: no status item until the walk finished.
-        if automaticallyStartsWatching && !isReviewUITest {
+        // Do not start watching until the user has chosen folders (first run).
+        if automaticallyStartsWatching && !isReviewUITest && !needsSetup {
             Task { @MainActor in
                 self.startWatching()
             }
@@ -106,7 +110,9 @@ final class AppState {
 
     func startWatching() {
         guard !didStartWatching else { return }
+        guard !watchRootPaths.isEmpty else { return }
         didStartWatching = true
+        isWatching = true
         watcher.start()
         Task {
             // Warm cache can populate the tray in tens of ms; wait a short
@@ -368,6 +374,8 @@ final class AppState {
     private func setWatchRoots(_ paths: [String]) {
         preferences.watchRootPaths = paths
         watchRootPaths = preferences.watchRootPaths
+        needsWatchRootSetup = watchRootPaths.isEmpty
+        isWatching = !watchRootPaths.isEmpty
         shots.removeAll {
             !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
         }
@@ -375,6 +383,11 @@ final class AppState {
            !shots.contains(where: { $0.id == selectedShotID })
         {
             self.selectedShotID = shots.first?.id
+        }
+        guard !watchRootPaths.isEmpty else {
+            didStartWatching = false
+            watcher.stop()
+            return
         }
         suppressOverlay = true
         didStartWatching = true
@@ -394,7 +407,13 @@ final class AppState {
         )
     }
 
-    func chooseWatchRoots() {
+    /// Opens a multi-select folder panel.
+    ///
+    /// - Parameter forSetup: When true (first launch or empty configuration),
+    ///   replaces the root list and uses setup copy. Otherwise appends.
+    @discardableResult
+    func chooseWatchRoots(forSetup: Bool = false) -> Bool {
+        let isSetup = forSetup || needsWatchRootSetup
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -403,14 +422,26 @@ final class AppState {
             fileURLWithPath: watchRootPaths.first ?? Preferences.defaultWatchRoot.path,
             isDirectory: true
         )
-        panel.message = "Choose one or more folders to scan for .astroshot directories"
-        panel.prompt = "Add"
-        if panel.runModal() == .OK {
-            addWatchRoots(panel.urls.map(\.path))
+        panel.message = isSetup
+            ? "Choose one or more folders Astroshots should watch for .astroshot screenshots. The panel starts in ~/Projects when that folder exists."
+            : "Choose one or more folders to scan for .astroshot directories"
+        panel.prompt = isSetup ? "Start watching" : "Add"
+        guard panel.runModal() == .OK else { return false }
+        let paths = panel.urls.map(\.path)
+        guard !paths.isEmpty else { return false }
+        if isSetup {
+            setWatchRoots(paths)
+        } else {
+            addWatchRoots(paths)
         }
+        return true
     }
 
     func rescan() {
+        guard !needsWatchRootSetup, !watchRootPaths.isEmpty else {
+            showToast("Choose folders to watch first")
+            return
+        }
         watcher.rescan()
         showToast("Scanning…")
     }
