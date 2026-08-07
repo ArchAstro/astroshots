@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Pack the unified public CLI and its two rendering engines, install their
- * tarballs into a clean consumer, and exercise the one executable users run.
+ * Pack the unified public CLI and its engines (react, tui, movie-harness),
+ * install their tarballs into a clean consumer, and exercise the executable.
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -165,22 +165,35 @@ try {
     }
   }
 
-  for (const packageName of ["react-shot", "tui-shot"]) {
+  for (const packageName of ["react-shot", "tui-shot", "movie-harness"]) {
     const packageRoot = path.join(
       consumerDir,
       "node_modules",
       "@archastro",
       packageName,
     );
+    const binName =
+      packageName === "movie-harness" ? "astroshot-movie.mjs" : `${packageName}.mjs`;
     for (const requiredPath of [
       "package.json",
-      `bin/${packageName}.mjs`,
+      `bin/${binName}`,
       "dist/index.js",
       "dist/index.d.ts",
     ]) {
       if (!fs.existsSync(path.join(packageRoot, requiredPath))) {
         throw new Error(
           `@archastro/${packageName} tarball is missing ${requiredPath}`,
+        );
+      }
+    }
+    if (packageName === "movie-harness") {
+      const swiftHelper = path.join(
+        packageRoot,
+        "native/macos/WindowTools.swift",
+      );
+      if (!fs.existsSync(swiftHelper)) {
+        throw new Error(
+          "@archastro/movie-harness tarball is missing native/macos/WindowTools.swift",
         );
       }
     }

@@ -90,7 +90,12 @@ jobs:
           TAG_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          for directory in packages/react-shot packages/tui-shot packages/astroshot; do
+          for directory in \
+            packages/react-shot \
+            packages/tui-shot \
+            packages/movie-harness \
+            packages/astroshot
+          do
             package_version="$(node -p "require('./${directory}/package.json').version")"
             if [[ "$package_version" != "$TAG_VERSION" ]]; then
               echo "Tag version $TAG_VERSION does not match $directory version $package_version" >&2
@@ -102,16 +107,17 @@ jobs:
           import astroshot from "./packages/astroshot/package.json" with { type: "json" };
 
           const version = process.env.TAG_VERSION;
-          assert.equal(
-            astroshot.dependencies["@archastro/react-shot"],
-            version,
-            "@archastro/astroshot must depend on the release version of @archastro/react-shot",
-          );
-          assert.equal(
-            astroshot.dependencies["@archastro/tui-shot"],
-            version,
-            "@archastro/astroshot must depend on the release version of @archastro/tui-shot",
-          );
+          for (const dep of [
+            "@archastro/react-shot",
+            "@archastro/tui-shot",
+            "@archastro/movie-harness",
+          ]) {
+            assert.equal(
+              astroshot.dependencies[dep],
+              version,
+              `@archastro/astroshot must depend on the release version of ${dep}`,
+            );
+          }
           NODE
 
       - name: Install Chromium
@@ -123,10 +129,12 @@ jobs:
           npm test --workspaces --if-present
           npm run pack:check
 
-      - name: Publish rendering engines
+      # Engines first so the unified CLI can resolve them at install time.
+      - name: Publish engines
         run: |
           node scripts/publish-package.mjs @archastro/react-shot
           node scripts/publish-package.mjs @archastro/tui-shot
+          node scripts/publish-package.mjs @archastro/movie-harness
 
       - name: Publish unified CLI
         run: node scripts/publish-package.mjs @archastro/astroshot
@@ -143,7 +151,10 @@ jobs:
 
           - https://www.npmjs.com/package/@archastro/react-shot/v/$VERSION
           - https://www.npmjs.com/package/@archastro/tui-shot/v/$VERSION
+          - https://www.npmjs.com/package/@archastro/movie-harness/v/$VERSION
           - https://www.npmjs.com/package/@archastro/astroshot/v/$VERSION
+
+          CLI includes \`astroshot movie\` (browser / pty / frames / desktop.window).
 
           See \`CHANGELOG.md\` section \`## [$VERSION] (npm)\`.
           EOF
