@@ -302,6 +302,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
         )
     }
 
+    @MainActor
     private func saveScreenshot(
         _ screenshot: XCUIScreenshot,
         as name: String,
