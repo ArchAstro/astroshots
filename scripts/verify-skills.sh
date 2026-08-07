@@ -27,9 +27,13 @@ for file in README.md packages/astroshot/README.md \
   require_reference "$file" "@archastro/astroshot"
 done
 
-for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness; do
+for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness friction-log; do
   require_reference "skills/$skill/SKILL.md" "name: $skill"
 done
+
+require_reference "skills/friction-log/SKILL.md" ".astroshot/friction-logs"
+require_reference "skills/friction-log/SKILL.md" "log.jsonl"
+require_reference "skills/friction-log/references/contract.md" "screenshots"
 
 # Guard the two easy-to-miss safety properties in the browser guidance:
 # inspection examples must not use agent-browser's default-clicking `find`

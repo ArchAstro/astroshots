@@ -26,33 +26,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.install()
 
         #if DEBUG
-        if let overlayPath = ProcessInfo.processInfo.environment[
-            "ASTROSHOTS_UI_TEST_OVERLAY_PATH"
-        ] {
+        let env = ProcessInfo.processInfo.environment
+        if let overlayPath = env["ASTROSHOTS_UI_TEST_OVERLAY_PATH"] {
             DispatchQueue.main.async {
                 controller.openOverlay(atImagePath: overlayPath)
             }
-        } else if let reviewPath = ProcessInfo.processInfo.environment[
-            "ASTROSHOTS_UI_TEST_REVIEW_PATH"
-        ] {
+        } else if let reviewPath = env["ASTROSHOTS_UI_TEST_REVIEW_PATH"] {
             DispatchQueue.main.async {
                 controller.openReview(atImagePath: reviewPath)
             }
-        } else if let trayRoot = ProcessInfo.processInfo.environment[
-            "ASTROSHOTS_UI_TEST_TRAY_ROOT"
-        ] {
+        } else if let captureDir = env["ASTROSHOTS_FRICTION_CAPTURE_DIR"],
+                  let trayRoot = env["ASTROSHOTS_UI_TEST_TRAY_ROOT"]
+        {
+            // Friction-log agent runner: walk panes and dump tray PNGs.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                controller.captureFrictionLogJourney(
+                    fixtureRoot: trayRoot,
+                    outputDir: captureDir
+                )
+            }
+        } else if let trayRoot = env["ASTROSHOTS_UI_TEST_TRAY_ROOT"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 controller.openTray(atRootPath: trayRoot)
             }
-        } else if let detailPath = ProcessInfo.processInfo.environment[
-            "ASTROSHOTS_UI_TEST_DETAIL_PATH"
-        ] {
+        } else if let detailPath = env["ASTROSHOTS_UI_TEST_DETAIL_PATH"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 controller.openTrayDetail(atImagePath: detailPath)
             }
-        } else if let trayPath = ProcessInfo.processInfo.environment[
-            "ASTROSHOTS_UI_TEST_TRAY_PATH"
-        ] {
+        } else if let trayPath = env["ASTROSHOTS_UI_TEST_TRAY_PATH"] {
             // Give AppKit one pass to attach the status item to the menu bar.
             // Showing an NSPopover before its anchor has a window is a no-op.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

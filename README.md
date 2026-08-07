@@ -61,10 +61,14 @@ Details: [`macos/README.md`](macos/README.md).
 2. **Write** — Your harness, agent, or script drops PNGs (and an optional
    execution `manifest.json`) under that layout.
 3. **See** — New frames flash on the desktop; open the tray for the full
-   stream. Click a row for detail.
+   stream. Click a row for detail. The tray has two tabs: **Shots** (one-off
+   harness frames) and **Friction Logs** (agentic UX walkthroughs under
+   `.astroshot/friction-logs/`).
 4. **Review** — Click a screenshot for a chromeless, screen-sized review
    takeover. A human can send feedback or mark the current image Seen;
    Astroshots writes that state to `review.json` for agents and harnesses.
+   Friction log steps open in-tab with good/improve notes and screenshots
+   (author/run with the **friction-log** skill).
 
 ### The tray
 

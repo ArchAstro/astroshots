@@ -27,6 +27,9 @@ final class StatusItemController: NSObject {
         appState.onReviewRequested = { [weak reviewWindowController] shot in
             reviewWindowController?.open(shot)
         }
+        appState.onFrictionStepReviewRequested = { [weak reviewWindowController] step in
+            reviewWindowController?.openFrictionStep(step)
+        }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
@@ -46,6 +49,7 @@ final class StatusItemController: NSObject {
             environment["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
             || environment["ASTROSHOTS_UI_TEST_DETAIL_PATH"] != nil
             || environment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
+            || environment["ASTROSHOTS_FRICTION_CAPTURE_DIR"] != nil
         popover.behavior = isTrayUITest ? .applicationDefined : .transient
         #else
         popover.behavior = .transient
@@ -104,6 +108,7 @@ final class StatusItemController: NSObject {
         reviewWindowController?.close()
         reviewWindowController = nil
         appState.onReviewRequested = nil
+        appState.onFrictionStepReviewRequested = nil
         if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
         }
@@ -139,6 +144,7 @@ final class StatusItemController: NSObject {
     }
 
     /// Seeds a complete multi-worktree stream for grouped-stream UI proofs.
+    /// Also loads any `.astroshot/friction-logs/` scenarios under the root.
     func openTray(atRootPath path: String) {
         let reader = AstroshotWatcher(
             configuration: .init(
@@ -146,9 +152,16 @@ final class StatusItemController: NSObject {
             )
         )
         let shots = reader.scanAll()
-        guard !shots.isEmpty else { return }
+        let logs = reader.scanAllFrictionLogs()
+        guard !shots.isEmpty || !logs.isEmpty else { return }
         for shot in shots.reversed() {
             appState.handleNewShot(shot)
+        }
+        if !logs.isEmpty {
+            appState.frictionLogs = logs
+            appState.selectedFrictionLogID = logs.first?.id
+            appState.selectedFrictionRunID = logs.first?.latestRun?.id
+            appState.selectedFrictionStepID = logs.first?.latestRun?.steps.first?.id
         }
         showPopover()
     }
@@ -159,6 +172,76 @@ final class StatusItemController: NSObject {
     func openOverlay(atImagePath path: String) {
         guard let shot = loadTestShot(atImagePath: path) else { return }
         appState.showOverlayForTesting(shot)
+    }
+
+    /// Agent friction-log runner: seed tray from `fixtureRoot`, walk Shots →
+    /// Friction Logs → step detail via `AppState`, and write tray PNGs into
+    /// `outputDir` (no Accessibility permission required).
+    func captureFrictionLogJourney(fixtureRoot: String, outputDir: String) {
+        let out = URL(fileURLWithPath: outputDir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+
+        openTray(atRootPath: fixtureRoot)
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0001-open-tray-stream.png"))
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0002-stream-chrome-tabs.png"))
+
+            if let shot = self.appState.shots.first {
+                self.appState.selectShot(shot)
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0003-shot-detail.png"))
+
+            self.appState.backToStream()
+            self.appState.selectTab(.frictionLogs)
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0004-friction-logs-list.png"))
+
+            if let log = self.appState.frictionLogs.first {
+                self.appState.selectFrictionLog(log)
+            }
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0005-friction-log-detail.png"))
+
+            // Step detail is its own tray page (not inline under the table).
+            if let run = self.appState.selectedFrictionRun, let first = run.steps.first {
+                self.appState.selectFrictionStep(first)
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0006-friction-step-detail.png"))
+
+            if let run = self.appState.selectedFrictionRun, run.steps.count > 1 {
+                self.appState.selectFrictionStep(run.steps[1])
+            } else {
+                self.appState.stepFrictionStep(1)
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            self.capturePopover(to: out.appendingPathComponent("0007-friction-step-two.png"))
+
+            try? "ok".write(
+                to: out.appendingPathComponent("CAPTURE_OK"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            NSApp.terminate(nil)
+        }
+    }
+
+    private func capturePopover(to url: URL) {
+        guard let view = popover?.contentViewController?.view else { return }
+        view.layoutSubtreeIfNeeded()
+        view.window?.layoutIfNeeded()
+        let bounds = view.bounds
+        guard bounds.width > 1, bounds.height > 1,
+              let rep = view.bitmapImageRepForCachingDisplay(in: bounds)
+        else { return }
+        view.cacheDisplay(in: bounds, to: rep)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return }
+        try? data.write(to: url, options: .atomic)
     }
     #endif
 
@@ -372,6 +455,10 @@ final class StatusItemController: NSObject {
             open: { [weak self] shot in
                 self?.closePopover()
                 self?.reviewWindowController?.open(shot)
+            },
+            openFrictionStep: { [weak self] step in
+                self?.closePopover()
+                self?.reviewWindowController?.openFrictionStep(step)
             }
         )
     }
