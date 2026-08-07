@@ -5,17 +5,26 @@ import SwiftUI
 ///
 /// The tray and desktop overlays remain lightweight entry points. Feedback and
 /// Seen acknowledgement happen here, in a key window that can accept text.
+/// Friction-log steps reuse the same panel shell with a notes rail instead of
+/// the shot feedback composer.
 @MainActor
 final class ReviewWindowController {
+    private enum Mode {
+        case shot
+        case frictionStep
+    }
+
     private let appState: AppState
     private var panel: ReviewPanel?
     private var currentShotID: String?
+    private var mode: Mode = .shot
 
     init(appState: AppState) {
         self.appState = appState
     }
 
     func open(_ shot: Shot) {
+        mode = .shot
         currentShotID = shot.id
         let root = ReviewTakeoverView(
             shot: shot,
@@ -27,6 +36,33 @@ final class ReviewWindowController {
                 self?.navigate(delta)
             }
         )
+        present(root)
+    }
+
+    func openFrictionStep(_ step: FrictionLogStep) {
+        mode = .frictionStep
+        currentShotID = nil
+        appState.selectedFrictionStepID = step.id
+        let root = FrictionStepTakeoverView(
+            step: step,
+            appState: appState,
+            onClose: { [weak self] in
+                self?.close()
+            },
+            onNavigateStep: { [weak self] delta in
+                self?.navigateFrictionStep(delta)
+            }
+        )
+        present(root)
+    }
+
+    func close() {
+        panel?.orderOut(nil)
+        currentShotID = nil
+        mode = .shot
+    }
+
+    private func present<Content: View>(_ root: Content) {
         let hosting = NSHostingController(rootView: root)
 
         let panel = panel ?? makePanel()
@@ -49,16 +85,23 @@ final class ReviewWindowController {
         #endif
     }
 
-    func close() {
-        panel?.orderOut(nil)
-        currentShotID = nil
+    private func navigate(_ delta: Int) {
+        switch mode {
+        case .shot:
+            guard let currentShotID,
+                  let shot = appState.reviewSibling(from: currentShotID, delta: delta)
+            else { return }
+            open(shot)
+        case .frictionStep:
+            navigateFrictionStep(delta)
+        }
     }
 
-    private func navigate(_ delta: Int) {
-        guard let currentShotID,
-              let shot = appState.reviewSibling(from: currentShotID, delta: delta)
-        else { return }
-        open(shot)
+    private func navigateFrictionStep(_ delta: Int) {
+        guard appState.canStepFrictionStep(delta) else { return }
+        appState.stepFrictionStep(delta)
+        guard let step = appState.selectedFrictionStep else { return }
+        openFrictionStep(step)
     }
 
     private func makePanel() -> ReviewPanel {
@@ -157,6 +200,7 @@ final class ReviewPanel: NSPanel {
 /// Opens the full-screen review window from SwiftUI hosted by AppKit.
 struct ReviewChrome: Sendable {
     var open: @MainActor @Sendable (Shot) -> Void = { _ in }
+    var openFrictionStep: @MainActor @Sendable (FrictionLogStep) -> Void = { _ in }
 }
 
 private enum ReviewChromeKey: EnvironmentKey {

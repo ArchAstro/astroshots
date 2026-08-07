@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		01F71C7E4F92A354272E716C /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75955E0D26EB206BCE2025ED /* StatusItemController.swift */; };
+		0FBA61FD5886CA5737CC4E50 /* FrictionLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAD7F3727B1878855A2E92 /* FrictionLog.swift */; };
 		17BFA74EE76E1E71A5627F33 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */; };
 		30F1181D9C567492F8204CE4 /* ReviewWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 278FA85768F47F8222B1B495 /* ReviewWindowController.swift */; };
 		31AE3C3B00FA4E4A8D5A2CB2 /* ReviewTakeoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71AECECE88B0D8F41B06334C /* ReviewTakeoverView.swift */; };
@@ -21,7 +22,10 @@
 		6646659397470D89CDBB4DAC /* ReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91C394D6B3C96C99B77EDD7 /* ReviewModels.swift */; };
 		699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */; };
 		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
+		76EB28B98DBFABBF892E3A7E /* FrictionLogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33713B379610D87587D40B40 /* FrictionLogListView.swift */; };
+		86F48D75FA114B1E154B6595 /* FrictionLogLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */; };
 		87D9D684AF70B41C69A9A1C7 /* ReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D528EB0C9FF62471B7103498 /* ReviewStore.swift */; };
+		8BB7EC1365F3F71AAD8DB5D8 /* FrictionStepDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2EE3350232CD98BC7DF3D0 /* FrictionStepDetailView.swift */; };
 		8F2395DC60D12581FB418608 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9976B5034C36AABFDFD4B2C8 /* AppState.swift */; };
 		96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */; };
 		9E7A5FC5E617434C14891B39 /* ImageClipboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE183D1FC1B91442E70D281A /* ImageClipboardTests.swift */; };
@@ -33,9 +37,12 @@
 		CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26844F440291050990A83490 /* PreferencesTests.swift */; };
 		CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823B8B4248FDCBE1985DECAE /* Shot.swift */; };
 		D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5089282794B5A6E6B3636886 /* ShotPathTests.swift */; };
+		DABF75392039DF313BC24487 /* FrictionLogTrayJourneyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */; };
 		DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA84FE9C55670A027F3776D /* SettingsPane.swift */; };
+		DCD8CB2F02CA756A627DDE3F /* FrictionStepTakeoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D93DC067ACDFDE15388414 /* FrictionStepTakeoverView.swift */; };
 		E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009EED7A72CCCCF8A86260D /* Preferences.swift */; };
 		F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */; };
+		F39BFBFFE1979733110EA44D /* FrictionLogDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */; };
 		F426C9555D678EC535E2E581 /* ReviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD17CC89BE4C1AA3A933FB87 /* ReviewComponents.swift */; };
 		F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */; };
 		F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84934BBEECF7545EB5C02073 /* Theme.swift */; };
@@ -62,18 +69,23 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		01D93DC067ACDFDE15388414 /* FrictionStepTakeoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionStepTakeoverView.swift; sourceTree = "<group>"; };
 		02F094E7A3E11CE16C3E5ADB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandAssetsTests.swift; sourceTree = "<group>"; };
 		0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayView.swift; sourceTree = "<group>"; };
+		0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogDetailView.swift; sourceTree = "<group>"; };
 		182E7298047007414ABC9862 /* ReviewFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFlowUITests.swift; sourceTree = "<group>"; };
+		2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogTrayJourneyUITests.swift; sourceTree = "<group>"; };
 		239B5944E0638F1D931913A7 /* ShotIndexCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCache.swift; sourceTree = "<group>"; };
 		254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		26844F440291050990A83490 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
 		2788CCB47877372A7EF96688 /* Manifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manifest.swift; sourceTree = "<group>"; };
 		278FA85768F47F8222B1B495 /* ReviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowController.swift; sourceTree = "<group>"; };
+		2A2EE3350232CD98BC7DF3D0 /* FrictionStepDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionStepDetailView.swift; sourceTree = "<group>"; };
 		2B08FD45A80670CAD9391ADB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3009EED7A72CCCCF8A86260D /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		3080B7658C295EC23288CB79 /* Astroshots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astroshots.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		33713B379610D87587D40B40 /* FrictionLogListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogListView.swift; sourceTree = "<group>"; };
 		369606653B9FD1E6FBE4B43D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotWatcherTests.swift; sourceTree = "<group>"; };
 		41A6D30FE0070BBC23546100 /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
@@ -84,6 +96,7 @@
 		70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCacheTests.swift; sourceTree = "<group>"; };
 		71AECECE88B0D8F41B06334C /* ReviewTakeoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewTakeoverView.swift; sourceTree = "<group>"; };
 		75955E0D26EB206BCE2025ED /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
+		75BAD7F3727B1878855A2E92 /* FrictionLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLog.swift; sourceTree = "<group>"; };
 		7B7EC0C57ADC991AFD3F512A /* AstroshotsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		823B8B4248FDCBE1985DECAE /* Shot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shot.swift; sourceTree = "<group>"; };
 		84934BBEECF7545EB5C02073 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -101,6 +114,7 @@
 		DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayView.swift; sourceTree = "<group>"; };
 		DBA84FE9C55670A027F3776D /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
 		DFDC12CB9342C5E685FD8A25 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
+		E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogLoaderTests.swift; sourceTree = "<group>"; };
 		F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -110,6 +124,7 @@
 			children = (
 				39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */,
 				0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */,
+				E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */,
 				BE183D1FC1B91442E70D281A /* ImageClipboardTests.swift */,
 				4705ECE07E4CA31E16A35EDC /* ImagePagingTests.swift */,
 				A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */,
@@ -139,6 +154,9 @@
 			isa = PBXGroup;
 			children = (
 				DFDC12CB9342C5E685FD8A25 /* DetailView.swift */,
+				0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */,
+				33713B379610D87587D40B40 /* FrictionLogListView.swift */,
+				2A2EE3350232CD98BC7DF3D0 /* FrictionStepDetailView.swift */,
 				DBA84FE9C55670A027F3776D /* SettingsPane.swift */,
 				B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */,
 				5679FA304E48ED78A5B24170 /* StreamView.swift */,
@@ -159,6 +177,7 @@
 		4D65A7C0651E7AC4CBD0D13E /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				75BAD7F3727B1878855A2E92 /* FrictionLog.swift */,
 				2788CCB47877372A7EF96688 /* Manifest.swift */,
 				823B8B4248FDCBE1985DECAE /* Shot.swift */,
 			);
@@ -177,6 +196,7 @@
 		6ED3E8142F3162240FD616B1 /* AstroshotsUITests */ = {
 			isa = PBXGroup;
 			children = (
+				2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */,
 				182E7298047007414ABC9862 /* ReviewFlowUITests.swift */,
 			);
 			path = AstroshotsUITests;
@@ -222,6 +242,7 @@
 		EE67D4A632E2D88872DDC94B /* Review */ = {
 			isa = PBXGroup;
 			children = (
+				01D93DC067ACDFDE15388414 /* FrictionStepTakeoverView.swift */,
 				AD17CC89BE4C1AA3A933FB87 /* ReviewComponents.swift */,
 				71AECECE88B0D8F41B06334C /* ReviewTakeoverView.swift */,
 				278FA85768F47F8222B1B495 /* ReviewWindowController.swift */,
@@ -372,6 +393,7 @@
 			files = (
 				F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */,
 				601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */,
+				86F48D75FA114B1E154B6595 /* FrictionLogLoaderTests.swift in Sources */,
 				9E7A5FC5E617434C14891B39 /* ImageClipboardTests.swift in Sources */,
 				AC6530122CF24B9A06DCF3E6 /* ImagePagingTests.swift in Sources */,
 				F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */,
@@ -392,6 +414,11 @@
 				96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */,
 				59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */,
 				B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */,
+				0FBA61FD5886CA5737CC4E50 /* FrictionLog.swift in Sources */,
+				F39BFBFFE1979733110EA44D /* FrictionLogDetailView.swift in Sources */,
+				76EB28B98DBFABBF892E3A7E /* FrictionLogListView.swift in Sources */,
+				8BB7EC1365F3F71AAD8DB5D8 /* FrictionStepDetailView.swift in Sources */,
+				DCD8CB2F02CA756A627DDE3F /* FrictionStepTakeoverView.swift in Sources */,
 				FC5EB07E736FC0E1582FD805 /* ImageClipboard.swift in Sources */,
 				6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */,
 				BB6D913C2F3291617685815E /* OverlayController.swift in Sources */,
@@ -417,6 +444,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DABF75392039DF313BC24487 /* FrictionLogTrayJourneyUITests.swift in Sources */,
 				3B7C5B7B558B59E7414950DF /* ReviewFlowUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
