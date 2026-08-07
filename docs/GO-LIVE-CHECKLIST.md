@@ -107,83 +107,70 @@ access before anything else will work.
 **STOP if:** a test fails, the worktree becomes dirty, or the versions differ.
 Do not publish a package you have not just proven.
 
-### Phase 3: Bootstrap the three public packages — 3–5 minutes
+### Phase 3: Bootstrap public packages — once per package
 
-This phase happens **once**. npm requires each package to exist before GitHub
-trusted publishing can be authorized.
+npm requires each package to exist before GitHub trusted publishing can be
+authorized. Do this from the **monorepo root** after `npm ci` and build.
 
-- [ ] Publish the React engine:
+ArchAstro machines often map `@archastro` → GitHub Packages. Always force
+the scope to the public registry:
 
-  ```bash
-  npm --@archastro:registry=https://registry.npmjs.org \
-    publish --workspace @archastro/react-shot \
-    --access public --provenance=false
-  ```
+```bash
+# From repo root (directory with workspaces: packages/*)
+npm publish \
+  --workspace @archastro/<package> \
+  --access public \
+  --@archastro:registry=https://registry.npmjs.org \
+  --provenance=false
+```
 
-- [ ] Publish the terminal engine:
+Order for a full bootstrap:
 
-  ```bash
-  npm --@archastro:registry=https://registry.npmjs.org \
-    publish --workspace @archastro/tui-shot \
-    --access public --provenance=false
-  ```
+1. `@archastro/react-shot`
+2. `@archastro/tui-shot`
+3. `@archastro/movie-harness` (new — required for `astroshot movie`)
+4. `@archastro/astroshot` **last** (depends on the three engines)
 
-- [ ] Publish the unified CLI **last**:
+`--provenance=false` is only for these first manual publishes. Later releases
+use **Cut npm release** + OIDC provenance via `publish-npm.yml`.
 
-  ```bash
-  npm --@archastro:registry=https://registry.npmjs.org \
-    publish --workspace @archastro/astroshot \
-    --access public --provenance=false
-  ```
-
-The registry override is required. ArchAstro development machines may map the
-`@archastro` scope to GitHub Packages instead of npmjs.
-
-Using `--provenance=false` is correct **only for these first three manual
-publishes**. Future releases use GitHub OIDC and provenance.
-
-**STOP if:** any publish fails. Do not keep moving down the list. Fix that
-package first; npm versions cannot be overwritten.
+**STOP if:** any publish fails. npm versions cannot be overwritten. If
+`workspace not found`, you are not on a commit that contains that package
+under `packages/` (pull `main`).
 
 ### Phase 4: Enable trusted publishing — 3 minutes
 
-- [ ] Confirm npmjs can see all three packages:
+- [ ] Confirm npmjs can see all packages:
 
   ```bash
   for PACKAGE in \
     @archastro/react-shot \
     @archastro/tui-shot \
+    @archastro/movie-harness \
     @archastro/astroshot
   do
-    env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-      npm view "$PACKAGE@0.1.0" name version \
+    npm view "$PACKAGE" name version \
       --registry=https://registry.npmjs.org
   done
   ```
 
-- [ ] Authorize this repository’s GitHub workflow for each package:
+- [ ] Authorize this repository’s GitHub workflow for each package
+      (after the package exists on npmjs):
 
   ```bash
-  env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-    npm trust github @archastro/react-shot \
-    --repo ArchAstro/astroshots \
-    --file publish-npm.yml \
-    --allow-publish \
-    --yes
-
-  env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-    npm trust github @archastro/tui-shot \
-    --repo ArchAstro/astroshots \
-    --file publish-npm.yml \
-    --allow-publish \
-    --yes
-
-  env 'npm_config_@archastro:registry=https://registry.npmjs.org' \
-    npm trust github @archastro/astroshot \
-    --repo ArchAstro/astroshots \
-    --file publish-npm.yml \
-    --allow-publish \
-    --yes
+  for PACKAGE in \
+    @archastro/react-shot \
+    @archastro/tui-shot \
+    @archastro/movie-harness \
+    @archastro/astroshot
+  do
+    npm trust github "$PACKAGE" \
+      --repo ArchAstro/astroshots \
+      --file publish-npm.yml \
+      --allow-publish \
+      --yes \
+      --registry=https://registry.npmjs.org
+  done
   ```
 
 - [ ] Open each npm package page and confirm the GitHub trusted publisher is
@@ -237,24 +224,34 @@ Do not add an npm token to GitHub secrets.
 
 You are done when all five are true:
 
-- [ ] The three npm package pages show version `0.1.0`
-- [ ] `Publish npm package` is green for tag `astroshot-v0.1.0`
-- [ ] The public `npx` command prints help
+- [ ] The four npm package pages show a published version
+      (`react-shot`, `tui-shot`, `movie-harness`, `astroshot`)
+- [ ] `Publish npm package` is green for the latest `astroshot-v*` tag
+- [ ] The public `npx` command prints help, including `astroshot movie`
 - [ ] A project-local install discovers all five skills
 - [x] The signed macOS v0.1.7 DMG is downloadable
 
 ---
 
-## Next npm release (after 0.1.0 is live)
+## Next npm release (after packages are live)
 
-1. Add notes under `## [Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).
-2. **Actions → Cut npm release → patch / minor / major** (or
-   `gh workflow run "Cut npm release" -f bump=patch`).
-3. Confirm **Publish npm package** is green and the three package pages show
-   the new version with provenance.
-4. Smoke: `npx --yes --@archastro:registry=https://registry.npmjs.org @archastro/astroshot@<version> --help`.
+1. Ensure `@archastro/movie-harness` exists on npmjs and has
+   `npm trust github` for `publish-npm.yml` (one-time bootstrap if new).
+2. Add notes under `## [Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).
+3. **Actions → Cut npm release → patch / minor / major** (or
+   `gh workflow run "Cut npm release" -f bump=minor`).
+4. Confirm **Publish npm package** is green and all **four** package pages
+   show the new version with provenance.
+5. Smoke:
 
-The cut workflow bumps all three packages, rolls the changelog, tags
+   ```bash
+   npx --yes --@archastro:registry=https://registry.npmjs.org \
+     @archastro/astroshot@<version> --help
+   npx --yes --@archastro:registry=https://registry.npmjs.org \
+     @archastro/astroshot@<version> movie --help
+   ```
+
+The cut workflow bumps all four packages, rolls the changelog, tags
 `astroshot-vX.Y.Z`, dispatches publish, and opens a PR to main.
 
 Manual fallback (if Actions is unavailable) is still documented in the root
