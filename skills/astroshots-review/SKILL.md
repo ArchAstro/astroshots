@@ -21,10 +21,32 @@ images; Astroshots transports them to a human and writes feedback.
 
 | Frame must prove | Capture skill |
 |---|---|
-| Fixed React, Ink, or terminal executable state | **astroshot** |
+| Fixed React, Ink, or terminal executable state | **astroshot** (still PNG) |
+| Journey **movie** (web / TUI / native window / frames) | **`astroshot movie`** |
 | Routing, auth, live data, or browser shell | **agent-browser** |
 | Reusable end-to-end browser journey | **browser-ui-harness** |
 | Documentation image production and rendered page | **screenshot** |
+
+### Movies — pick `--source` before recording
+
+Agents must run (or follow) the decision table:
+
+```bash
+astroshot movie which-source "<what you need to record>"
+astroshot movie --help
+```
+
+| Intent | `--source` | Do not |
+|--------|------------|--------|
+| Web / SPA / Playwright | `browser` | Desktop-grab Chrome |
+| TUI / CLI / truecolor | `pty` | `desktop.window` on Terminal.app |
+| Native Mac app window | `desktop.window` | Headless browser for AppKit chrome |
+| Custom PNG sequence | `frames` | Invent a new sink path |
+
+`desktop.window` is macOS-only and uses OS `screencapture` (already installed)
+plus the package’s Swift window list — no extra binary download. Needs Screen
+Recording TCC. Movies write **poster PNG + video** under `.astroshot/`; the
+tray streams the poster today.
 
 This skill starts after a capture source exists.
 

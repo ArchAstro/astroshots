@@ -1,5 +1,6 @@
 # Runtime capture output (harnesses write these locally)
 .astroshot/
+.movie-demo-root/
 
 # macOS / Xcode
 .DS_Store

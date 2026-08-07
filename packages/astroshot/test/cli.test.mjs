@@ -20,15 +20,36 @@ function run(...arguments_) {
   return runIn(packageRoot, ...arguments_);
 }
 
-test("documents React, Ink, and arbitrary PTY modes from one executable", () => {
+test("documents React, Ink, PTY, and movie modes from one executable", () => {
   const result = run("--help");
   assert.equal(result.status, 0);
   assert.match(result.stdout, /astroshot react/);
   assert.match(result.stdout, /astroshot ink/);
   assert.match(result.stdout, /astroshot pty/);
+  assert.match(result.stdout, /astroshot movie/);
+  assert.match(result.stdout, /desktop\.window/);
   assert.match(result.stdout, /astroshot init/);
   assert.match(result.stdout, /alias for "astroshot ink"/);
   assert.match(result.stdout, /install-browser/);
+});
+
+test("movie which-source steers agents to the right capture path", () => {
+  const tui = run("movie", "which-source", "ratatui truecolor dashboard");
+  assert.equal(tui.status, 0, tui.stderr);
+  assert.match(tui.stdout, /"recommended": "pty"/);
+
+  const native = run(
+    "movie",
+    "which-source",
+    "SwiftUI native app window bundle id",
+  );
+  assert.equal(native.status, 0, native.stderr);
+  assert.match(native.stdout, /"recommended": "desktop\.window"/);
+
+  const help = run("movie", "--help");
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Which --source should I use/);
+  assert.match(help.stdout, /NEVER screenshot Terminal/);
 });
 
 test("reports the unified package version", () => {

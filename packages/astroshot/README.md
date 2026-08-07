@@ -1,6 +1,7 @@
 # `@archastro/astroshot`
 
-One command for deterministic React, Ink, and arbitrary terminal screenshots.
+One command for deterministic React, Ink, and arbitrary terminal screenshots —
+plus **journey movies** into `.astroshot/`.
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org \
@@ -17,6 +18,30 @@ npx --@archastro:registry=https://registry.npmjs.org \
 npx --@archastro:registry=https://registry.npmjs.org \
   @archastro/astroshot pty ./pty.shot.yaml -o ./terminal.png
 ```
+
+## Movies (`astroshot movie`)
+
+Same binary. Agents: **run `astroshot movie which-source "…"` first**.
+
+| You need to record… | `--source` |
+|---------------------|------------|
+| Web / SPA / agent-browser | `browser` |
+| TUI / CLI / truecolor terminal | `pty` (never desktop of Terminal.app) |
+| Native macOS app window | `desktop.window` |
+| Your own PNG sequence | `frames` |
+
+```bash
+astroshot movie --help
+astroshot movie which-source "ratatui truecolor dashboard"
+astroshot movie run --source browser --feature web --slug home --url https://example.com
+astroshot movie run --source desktop.window --feature app --slug onboard \
+  --bundle-id com.example.App --duration-ms 4000
+astroshot movie list-windows   # macOS
+```
+
+`desktop.window` uses macOS `/usr/sbin/screencapture` (already on the system)
+plus a Swift window list shipped in the package — no separate capture binary
+download. Requires Screen Recording permission for your terminal/IDE.
 
 Use `react` for isolated browser components, `ink` for in-process Ink fixture
 trees, and `pty` for executable terminal applications such as Ratatui, Bubble

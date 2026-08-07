@@ -8,7 +8,7 @@ import path from "node:path";
 import { writeFixtureTemplate } from "./templates.mjs";
 
 function help() {
-  console.log(`astroshot — one CLI for React, Ink, and PTY screenshots
+  console.log(`astroshot — one CLI for React, Ink, PTY stills, and movies
 
 Usage:
   astroshot init react [fixture.tsx] [--force]
@@ -20,14 +20,22 @@ Usage:
   astroshot ink <fixture.tsx> -o <out.png> [options]
   astroshot ink batch <manifest.yaml|json> [options]
   astroshot pty <fixture.yaml|json> -o <out.png> [options]
+  astroshot movie <command> [options]
   astroshot install-browser [--with-deps]
 
 Commands:
-  react              Capture an isolated React component
-  ink                Capture an Ink component fixture
-  pty                Capture any executable in a pseudoterminal
+  react              Capture an isolated React component (still PNG)
+  ink                Capture an Ink component fixture (still PNG)
+  pty                Capture any executable in a pseudoterminal (still PNG)
+  movie              Record a journey movie into .astroshot/ (poster + video)
   init               Generate a React, Ink, or PTY fixture template
   install-browser    Install the shared Chromium runtime
+
+Movie sources (see "astroshot movie which-source"):
+  browser            Web / agent-browser / Playwright viewport
+  pty                Truecolor TUI/CLI (never screenshot Terminal.app)
+  desktop.window     Native macOS app window (uses OS screencapture)
+  frames             Push your own PNG/JPEG sequence
 
 Compatibility: "astroshot tui" remains an alias for "astroshot ink".
 Run "astroshot <mode> --help" for mode options.`);
@@ -88,6 +96,12 @@ Options:
 }
 
 function engineBin(mode) {
+  if (mode === "movie") {
+    const entry = fileURLToPath(import.meta.resolve("@archastro/movie-harness"));
+    // package exports "." → dist/index.js → package root is two levels up from dist
+    const packageRoot = path.dirname(path.dirname(entry));
+    return path.join(packageRoot, "bin", "astroshot-movie.mjs");
+  }
   const packageName =
     mode === "react" ? "@archastro/react-shot" : "@archastro/tui-shot";
   const executable = mode === "react" ? "react-shot.mjs" : "tui-shot.mjs";
@@ -208,6 +222,23 @@ if (command === "react" || command === "ink" || command === "tui" || command ===
     process.exit(arguments_.length === 0 ? 1 : 0);
   }
   runEngine(canonicalMode, arguments_);
+}
+
+if (command === "movie") {
+  // Always forward to movie-harness (including --help / which-source).
+  const result = spawnSync(
+    process.execPath,
+    [engineBin("movie"), ...arguments_],
+    { stdio: "inherit" },
+  );
+  if (result.error) {
+    console.error(
+      `astroshot could not start movie harness: ${result.error.message}`,
+    );
+    process.exit(1);
+  }
+  if (result.signal) process.kill(process.pid, result.signal);
+  process.exit(result.status ?? 1);
 }
 
 console.error(`Unknown command: ${command}`);
