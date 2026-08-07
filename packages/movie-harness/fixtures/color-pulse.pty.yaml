@@ -1,0 +1,15 @@
+version: 1
+command: node
+args:
+  - ./color-pulse.mjs
+cols: 48
+rows: 10
+timeoutMs: 10000
+settleMs: 100
+movieFps: 10
+actions:
+  - waitFor: ready
+  - pauseMs: 100
+  - waitForExit: true
+expectText:
+  - brand

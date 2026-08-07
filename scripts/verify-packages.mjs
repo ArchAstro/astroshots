@@ -25,6 +25,7 @@ const packageVersion = astroshotManifest.version;
 for (const engineName of [
   "@archastro/react-shot",
   "@archastro/tui-shot",
+  "@archastro/movie-harness",
 ]) {
   if (astroshotManifest.dependencies[engineName] !== packageVersion) {
     throw new Error(
@@ -65,8 +66,14 @@ function pack(packageDirectory) {
 }
 
 try {
+  // Engines must build before pack so dist/ is present in the tarball.
+  run("npm", ["run", "build", "--workspace", "@archastro/react-shot"]);
+  run("npm", ["run", "build", "--workspace", "@archastro/tui-shot"]);
+  run("npm", ["run", "build", "--workspace", "@archastro/movie-harness"]);
+
   const reactTarball = pack("packages/react-shot");
   const tuiTarball = pack("packages/tui-shot");
+  const movieTarball = pack("packages/movie-harness");
   const astroshotTarball = pack("packages/astroshot");
 
   fs.writeFileSync(
@@ -91,6 +98,7 @@ try {
       "--no-fund",
       reactTarball,
       tuiTarball,
+      movieTarball,
       astroshotTarball,
       "react@19",
       "react-dom@19",
@@ -109,6 +117,12 @@ try {
     cwd: consumerDir,
   });
   run("npx", ["--no-install", "astroshot", "pty", "--help"], {
+    cwd: consumerDir,
+  });
+  run("npx", ["--no-install", "astroshot", "movie", "--help"], {
+    cwd: consumerDir,
+  });
+  run("npx", ["--no-install", "astroshot", "movie", "which-source", "ratatui tui"], {
     cwd: consumerDir,
   });
   run(
