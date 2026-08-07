@@ -45,6 +45,10 @@ Write from the worktree root:
 - `manifest.json` is harness execution state.
 - `review.json` is human feedback written by the app.
 - The directory containing `.astroshot` defines the worktree/project.
+- Do **not** put one-off harness frames under `.astroshot/friction-logs/` —
+  that reserved tree is for agentic friction-log scenarios (see the
+  **friction-log** skill). Those runs appear in the tray **Friction Logs**
+  tab, not the Shots stream.
 
 Read [the manifest and review contract](references/manifest.md) whenever
 writing a custom integration or interpreting feedback. Read

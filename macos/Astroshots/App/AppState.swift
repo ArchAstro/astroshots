@@ -7,6 +7,24 @@ enum TrayPane: Equatable {
     case stream
     case detail
     case settings
+    case frictionLogDetail
+    /// Compact tray page for one friction-log step (notes + screenshot).
+    case frictionStepDetail
+}
+
+/// Top-level tray tabs: one-off shots vs agentic friction-log scenarios.
+enum TrayTab: String, CaseIterable, Identifiable, Equatable {
+    case shots
+    case frictionLogs
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .shots: return "Shots"
+        case .frictionLogs: return "Friction Logs"
+        }
+    }
 }
 
 @MainActor
@@ -15,6 +33,12 @@ final class AppState {
     var shots: [Shot] = []
     var selectedShotID: String?
     var pane: TrayPane = .stream
+    var activeTab: TrayTab = .shots
+    /// Discovered friction logs across watched worktrees (newest first).
+    var frictionLogs: [FrictionLog] = []
+    var selectedFrictionLogID: String?
+    var selectedFrictionRunID: String?
+    var selectedFrictionStepID: String?
     var unreadCount = 0
     var isWatching = true
     /// True while a background full scan of the watched roots is running.
@@ -24,6 +48,8 @@ final class AppState {
     /// AppKit owns the chromeless review window; SwiftUI and overlays request it
     /// through this callback without knowing window lifecycle details.
     var onReviewRequested: ((Shot) -> Void)?
+    /// Full-screen friction-step viewer (same surface style as shot review).
+    var onFrictionStepReviewRequested: ((FrictionLogStep) -> Void)?
 
     var overlayEnabled: Bool
     var autoDismiss: Bool
@@ -49,7 +75,35 @@ final class AppState {
         return shots.first { $0.id == selectedShotID } ?? shots.first
     }
 
+    var selectedFrictionLog: FrictionLog? {
+        guard let selectedFrictionLogID else { return frictionLogs.first }
+        return frictionLogs.first { $0.id == selectedFrictionLogID }
+            ?? frictionLogs.first
+    }
+
+    var selectedFrictionRun: FrictionLogRun? {
+        guard let log = selectedFrictionLog else { return nil }
+        if let selectedFrictionRunID,
+           let match = log.runs.first(where: { $0.id == selectedFrictionRunID })
+        {
+            return match
+        }
+        return log.latestRun
+    }
+
+    var selectedFrictionStep: FrictionLogStep? {
+        guard let run = selectedFrictionRun else { return nil }
+        if let selectedFrictionStepID,
+           let match = run.steps.first(where: { $0.id == selectedFrictionStepID })
+        {
+            return match
+        }
+        return run.steps.first
+    }
+
     var isEmpty: Bool { shots.isEmpty }
+
+    var isFrictionLogsEmpty: Bool { frictionLogs.isEmpty }
 
     init(
         preferences: Preferences = .shared,
@@ -97,6 +151,9 @@ final class AppState {
         self.watcher.onNewShot = { [weak self] shot in
             self?.handleNewShot(shot)
         }
+        self.watcher.onFrictionLogsChanged = { [weak self] logs in
+            self?.applyFrictionLogs(logs)
+        }
         self.watcher.onScanStateChanged = { [weak self] scanning in
             self?.isScanning = scanning
         }
@@ -134,6 +191,34 @@ final class AppState {
             selectedShotID = shots.first?.id
         } else if let id = selectedShotID, !shots.contains(where: { $0.id == id }) {
             selectedShotID = shots.first?.id
+        }
+    }
+
+    private func applyFrictionLogs(_ logs: [FrictionLog]) {
+        frictionLogs = logs
+        if let selectedFrictionLogID,
+           !logs.contains(where: { $0.id == selectedFrictionLogID })
+        {
+            self.selectedFrictionLogID = logs.first?.id
+            selectedFrictionRunID = nil
+            selectedFrictionStepID = nil
+        } else if selectedFrictionLogID == nil {
+            selectedFrictionLogID = logs.first?.id
+        }
+
+        // Keep step/run selection valid when a run reloads mid-view.
+        if let run = selectedFrictionRun {
+            selectedFrictionRunID = run.id
+            if let selectedFrictionStepID,
+               !run.steps.contains(where: { $0.id == selectedFrictionStepID })
+            {
+                self.selectedFrictionStepID = run.steps.first?.id
+            } else if selectedFrictionStepID == nil {
+                selectedFrictionStepID = run.steps.first?.id
+            }
+        } else {
+            selectedFrictionRunID = nil
+            selectedFrictionStepID = nil
         }
     }
 
@@ -199,18 +284,98 @@ final class AppState {
 
     func selectShot(_ shot: Shot) {
         selectedShotID = shot.id
+        activeTab = .shots
         pane = .detail
     }
 
     func openDetail(_ shot: Shot) {
         selectedShotID = shot.id
+        activeTab = .shots
         pane = .detail
         NotificationCenter.default.post(name: .astroshotsOpenTray, object: nil)
+    }
+
+    func selectTab(_ tab: TrayTab) {
+        activeTab = tab
+        // Tab bar only appears on the list shell; any deep pane yields to stream.
+        if pane == .detail
+            || pane == .frictionLogDetail
+            || pane == .frictionStepDetail
+        {
+            pane = .stream
+        }
+    }
+
+    func selectFrictionLog(_ log: FrictionLog) {
+        selectedFrictionLogID = log.id
+        selectedFrictionRunID = log.latestRun?.id
+        selectedFrictionStepID = log.latestRun?.steps.first?.id
+        activeTab = .frictionLogs
+        pane = .frictionLogDetail
+    }
+
+    func selectFrictionRun(_ run: FrictionLogRun) {
+        selectedFrictionRunID = run.id
+        selectedFrictionStepID = run.steps.first?.id
+        // Stay on the log's step table when switching runs.
+        if pane == .frictionStepDetail {
+            pane = .frictionLogDetail
+        }
+    }
+
+    /// Open the compact tray step page (table row click).
+    func selectFrictionStep(_ step: FrictionLogStep) {
+        selectedFrictionStepID = step.id
+        activeTab = .frictionLogs
+        pane = .frictionStepDetail
+    }
+
+    func stepFrictionStep(_ delta: Int) {
+        guard let run = selectedFrictionRun,
+              let currentID = selectedFrictionStep?.id,
+              let index = run.steps.firstIndex(where: { $0.id == currentID })
+        else { return }
+        let next = index + delta
+        guard run.steps.indices.contains(next) else { return }
+        selectedFrictionStepID = run.steps[next].id
+    }
+
+    func canStepFrictionStep(_ delta: Int) -> Bool {
+        guard let run = selectedFrictionRun,
+              let currentID = selectedFrictionStep?.id,
+              let index = run.steps.firstIndex(where: { $0.id == currentID })
+        else { return false }
+        return run.steps.indices.contains(index + delta)
+    }
+
+    func frictionStepPosition() -> (index: Int, count: Int)? {
+        guard let run = selectedFrictionRun,
+              let currentID = selectedFrictionStep?.id,
+              let index = run.steps.firstIndex(where: { $0.id == currentID })
+        else { return nil }
+        return (index + 1, run.steps.count)
+    }
+
+    func backToFrictionLogs() {
+        pane = .stream
+        activeTab = .frictionLogs
+    }
+
+    func backToFrictionLogDetail() {
+        pane = .frictionLogDetail
+        activeTab = .frictionLogs
     }
 
     func requestReview(_ shot: Shot) {
         selectedShotID = shot.id
         onReviewRequested?(shot)
+    }
+
+    func requestFrictionStepReview(_ step: FrictionLogStep? = nil) {
+        let target = step ?? selectedFrictionStep
+        guard let target else { return }
+        selectedFrictionStepID = target.id
+        onFrictionStepReviewRequested?(target)
     }
 
     #if DEBUG
@@ -337,6 +502,7 @@ final class AppState {
 
     func backToStream() {
         pane = .stream
+        activeTab = .shots
     }
 
     func openSettings() {
@@ -399,14 +565,25 @@ final class AppState {
         shots.removeAll {
             !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
         }
+        frictionLogs.removeAll {
+            !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
+        }
         if let selectedShotID,
            !shots.contains(where: { $0.id == selectedShotID })
         {
             self.selectedShotID = shots.first?.id
         }
+        if let selectedFrictionLogID,
+           !frictionLogs.contains(where: { $0.id == selectedFrictionLogID })
+        {
+            self.selectedFrictionLogID = frictionLogs.first?.id
+            selectedFrictionRunID = nil
+            selectedFrictionStepID = nil
+        }
         guard !watchRootPaths.isEmpty else {
             didStartWatching = false
             watcher.stop()
+            frictionLogs = []
             return
         }
         suppressOverlay = true

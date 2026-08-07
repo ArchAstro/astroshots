@@ -22,6 +22,7 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     private struct ScanResult: Sendable {
         var shots: [Shot]
+        var frictionLogs: [FrictionLog]
         var astroshotDirs: [String]
     }
 
@@ -30,6 +31,8 @@ final class AstroshotWatcher: @unchecked Sendable {
     /// sidecar changes, avoiding a recursive workspace scan per comment.
     var onFeatureShotsChanged: (@MainActor (_ featureDirectoryPath: String, _ shots: [Shot]) -> Void)?
     var onNewShot: (@MainActor (Shot) -> Void)?
+    /// Full friction-log catalog under watched `.astroshot` trees.
+    var onFrictionLogsChanged: (@MainActor ([FrictionLog]) -> Void)?
     /// Fired on main when a background full scan begins / ends.
     var onScanStateChanged: (@MainActor (Bool) -> Void)?
 
@@ -173,6 +176,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                             arrivalOrder: warmOrder
                         )
                     )
+                    self.emitFrictionLogs(warm.frictionLogs)
                 }
                 guard stillCurrent else { return }
 
@@ -216,6 +220,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                     arrivalOrder: reconciledOrder
                 )
             )
+            self.emitFrictionLogs(full.frictionLogs)
             ShotIndexCache.save(
                 roots: roots,
                 astroshotDirs: full.astroshotDirs,
@@ -344,6 +349,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         } else {
             emitShots(orderedShots)
         }
+        emitFrictionLogs(full.frictionLogs)
         if persistCache {
             ShotIndexCache.save(
                 roots: roots,
@@ -383,22 +389,30 @@ final class AstroshotWatcher: @unchecked Sendable {
         scanAllCollectingDirs().shots
     }
 
+    /// Public entry for tests / tooling: friction logs newest-first.
+    func scanAllFrictionLogs() -> [FrictionLog] {
+        scanAllCollectingDirs().frictionLogs
+    }
+
     private func scanAllCollectingDirs() -> ScanResult {
         lock.lock()
         let roots = configuration.roots
         lock.unlock()
 
         var shots: [Shot] = []
+        var frictionLogs: [FrictionLog] = []
         var dirs: [String] = []
         for root in roots {
             guard FileManager.default.fileExists(atPath: root.path) else { continue }
             let partial = scanAstroshotTrees(under: root)
             shots.append(contentsOf: partial.shots)
+            frictionLogs.append(contentsOf: partial.frictionLogs)
             dirs.append(contentsOf: partial.astroshotDirs)
         }
 
         return ScanResult(
             shots: uniqueSortedShots(shots),
+            frictionLogs: sortedFrictionLogs(frictionLogs),
             astroshotDirs: Array(Set(dirs)).sorted()
         )
     }
@@ -407,6 +421,7 @@ final class AstroshotWatcher: @unchecked Sendable {
     private func scanKnownAstroshotDirs(_ dirs: [String]) -> ScanResult {
         let fm = FileManager.default
         var shots: [Shot] = []
+        var frictionLogs: [FrictionLog] = []
         var liveDirs: [String] = []
 
         for path in dirs {
@@ -418,16 +433,19 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard url.lastPathComponent == ShotPath.astroshotDirName else { continue }
             liveDirs.append(url.standardizedFileURL.path)
             shots.append(contentsOf: scanFeatureDirs(in: url))
+            frictionLogs.append(contentsOf: scanFrictionLogs(in: url))
         }
 
         return ScanResult(
             shots: uniqueSortedShots(shots),
+            frictionLogs: sortedFrictionLogs(frictionLogs),
             astroshotDirs: Array(Set(liveDirs)).sorted()
         )
     }
 
     private func scanAstroshotTrees(under root: URL) -> ScanResult {
         var results: [Shot] = []
+        var frictionLogs: [FrictionLog] = []
         var dirs: [String] = []
         let fm = FileManager.default
 
@@ -444,6 +462,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                 if name == ShotPath.astroshotDirName {
                     dirs.append(child.standardizedFileURL.path)
                     results.append(contentsOf: scanFeatureDirs(in: child))
+                    frictionLogs.append(contentsOf: scanFrictionLogs(in: child))
                     continue
                 }
                 if Self.skipDirectoryNames.contains(name) {
@@ -459,7 +478,15 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
 
         walk(root, depth: 0)
-        return ScanResult(shots: results, astroshotDirs: dirs)
+        return ScanResult(
+            shots: results,
+            frictionLogs: frictionLogs,
+            astroshotDirs: dirs
+        )
+    }
+
+    private func sortedFrictionLogs(_ logs: [FrictionLog]) -> [FrictionLog] {
+        logs.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     private func scanFeatureDirs(in astroshot: URL) -> [Shot] {
@@ -476,9 +503,17 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard fm.fileExists(atPath: featureDir.path, isDirectory: &isDir), isDir.boolValue else {
                 continue
             }
+            // Reserved namespace for agentic UX scenario logs — never shots.
+            if featureDir.lastPathComponent == FrictionLogPath.directoryName {
+                continue
+            }
             shots.append(contentsOf: shotsInFeatureDirectory(featureDir))
         }
         return shots
+    }
+
+    private func scanFrictionLogs(in astroshot: URL) -> [FrictionLog] {
+        FrictionLogLoader.loadLogs(inAstroshot: astroshot)
     }
 
     private func shotsInFeatureDirectory(_ featureDir: URL) -> [Shot] {
@@ -623,8 +658,16 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
 
         var featureDirectories = Set<String>()
+        var frictionLogTouched = false
         for eventPath in paths {
             let path = Self.canonicalPath(eventPath)
+            if FrictionLogPath.containsImage(path: path)
+                || path.contains("/\(ShotPath.astroshotDirName)/\(FrictionLogPath.directoryName)/")
+                || path.hasSuffix("/\(ShotPath.astroshotDirName)/\(FrictionLogPath.directoryName)")
+            {
+                frictionLogTouched = true
+                continue
+            }
             if path.hasSuffix("manifest.json") || path.hasSuffix(ReviewStore.sidecarFileName) {
                 featureDirectories.insert(
                     URL(fileURLWithPath: path)
@@ -640,8 +683,50 @@ final class AstroshotWatcher: @unchecked Sendable {
             scheduleSettledIngest(path: path)
         }
         for directory in featureDirectories {
+            // Never treat the reserved friction-logs root as a shot feature.
+            if URL(fileURLWithPath: directory).lastPathComponent
+                == FrictionLogPath.directoryName
+            {
+                frictionLogTouched = true
+                continue
+            }
             scheduleFeatureRefresh(directoryPath: directory)
         }
+        if frictionLogTouched {
+            scheduleFrictionLogRefresh()
+        }
+    }
+
+    private func scheduleFrictionLogRefresh() {
+        let key = "friction-logs"
+        lock.lock()
+        settleWorkItems[key]?.cancel()
+        let nanos = configuration.settleNanos
+        let generation = scanGeneration
+        let work = DispatchWorkItem { [weak self] in
+            self?.refreshFrictionLogs(workItemKey: key, generation: generation)
+        }
+        settleWorkItems[key] = work
+        queue.asyncAfter(deadline: .now() + .nanoseconds(Int(nanos)), execute: work)
+        lock.unlock()
+    }
+
+    private func refreshFrictionLogs(workItemKey: String, generation: Int) {
+        lock.lock()
+        guard scanGeneration == generation else {
+            lock.unlock()
+            return
+        }
+        settleWorkItems[workItemKey] = nil
+        let dirs = Array(knownAstroshotDirs)
+        lock.unlock()
+
+        let logs = sortedFrictionLogs(
+            dirs.flatMap { path in
+                scanFrictionLogs(in: URL(fileURLWithPath: path, isDirectory: true))
+            }
+        )
+        emitFrictionLogs(logs)
     }
 
     /// FSEvents may report `/private/var/...` for a file scanned through
@@ -784,6 +869,15 @@ final class AstroshotWatcher: @unchecked Sendable {
         DispatchQueue.main.async {
             Task { @MainActor in
                 handler?(shots)
+            }
+        }
+    }
+
+    private func emitFrictionLogs(_ logs: [FrictionLog]) {
+        let handler = onFrictionLogsChanged
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                handler?(logs)
             }
         }
     }
