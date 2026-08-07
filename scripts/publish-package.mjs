@@ -9,6 +9,7 @@ const packageName = process.argv[2];
 const allowedPackages = new Map([
   ["@archastro/react-shot", "packages/react-shot/package.json"],
   ["@archastro/tui-shot", "packages/tui-shot/package.json"],
+  ["@archastro/movie-harness", "packages/movie-harness/package.json"],
   ["@archastro/astroshot", "packages/astroshot/package.json"],
 ]);
 
@@ -50,9 +51,20 @@ function npmView(field) {
 
 const publishedVersion = npmView("version");
 if (publishedVersion === null) {
+  // Force both default and @archastro scope to npmjs — developer machines
+  // often map @archastro → GitHub Packages via ~/.npmrc.
   execFileSync(
     "npm",
-    ["publish", "--workspace", packageName, "--access", "public", "--registry", registry],
+    [
+      "publish",
+      "--workspace",
+      packageName,
+      "--access",
+      "public",
+      "--registry",
+      registry,
+      `--@archastro:registry=${registry}`,
+    ],
     { cwd: root, stdio: "inherit" },
   );
   process.exit(0);

@@ -1,15 +1,17 @@
 name: Cut npm release
 
 # Manually trigger from the Actions tab to:
-#   1. Bump all three @archastro/* packages to the same version
+#   1. Bump all four @archastro/* packages to the same version
+#      (react-shot, tui-shot, movie-harness, astroshot)
 #   2. Roll CHANGELOG.md Unreleased → ## [X.Y.Z] (npm)
 #   3. Push tag astroshot-vX.Y.Z
 #   4. Explicitly dispatch Publish npm package (GITHUB_TOKEN tag pushes do
 #      not trigger other workflows)
 #   5. Open a PR back to main so main tracks the bump
 #
-# Same shape as archastro-js release.yml. First-time publish still requires
-# a manual bootstrap + npm trust github (see README / GO-LIVE-CHECKLIST).
+# Same shape as archastro-js release.yml. First-time package publish still
+# requires a manual bootstrap + npm trust github for each new package
+# (see README / GO-LIVE-CHECKLIST).
 
 on:
   workflow_dispatch:
@@ -71,7 +73,12 @@ jobs:
         run: |
           set -euo pipefail
           CUR="$(node -p "require('./packages/astroshot/package.json').version")"
-          for directory in packages/react-shot packages/tui-shot packages/astroshot; do
+          for directory in \
+            packages/react-shot \
+            packages/tui-shot \
+            packages/movie-harness \
+            packages/astroshot
+          do
             package_version="$(node -p "require('./${directory}/package.json').version")"
             if [[ "$package_version" != "$CUR" ]]; then
               echo "Package versions are not aligned ($directory=$package_version, astroshot=$CUR)" >&2
@@ -141,6 +148,7 @@ jobs:
           git add \
             packages/react-shot/package.json \
             packages/tui-shot/package.json \
+            packages/movie-harness/package.json \
             packages/astroshot/package.json \
             package-lock.json \
             CHANGELOG.md
@@ -182,7 +190,7 @@ jobs:
           |--|--|
           | Version | \`$CUR\` → \`$NEXT\` |
           | Tag | \`$TAG\` |
-          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/astroshot\` |
+          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/movie-harness\`, \`@archastro/astroshot\` |
           | Publish | **Publish npm package** (explicitly dispatched after the tag) |
           | Changelog | \`## [$NEXT] (npm)\` rolled from Unreleased |
 

@@ -15,6 +15,12 @@ The two tracks are versioned independently.
 
 - Right-click **Copy Image** on stream rows, tray detail preview, and
   full-screen review so frames paste into other apps.
+- **`astroshot movie`** universal journey capture (`@archastro/movie-harness`):
+  browser, truecolor PTY, raw frames, and macOS `desktop.window`, writing
+  poster PNG + video under `.astroshot/`. Includes agent-facing
+  `which-source` help and Screen Recording TCC guidance.
+- npm release automation ships four packages at one version: `react-shot`,
+  `tui-shot`, `movie-harness`, and the unified `astroshot` CLI.
 
 ## [0.1.15] (macos) - 2026-08-05
 

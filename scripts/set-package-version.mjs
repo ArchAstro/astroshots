@@ -12,10 +12,18 @@ if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/** All public npm packages share one version for each astroshot-v* release. */
 const packagePaths = [
   "packages/react-shot/package.json",
   "packages/tui-shot/package.json",
+  "packages/movie-harness/package.json",
   "packages/astroshot/package.json",
+];
+
+const engineDeps = [
+  "@archastro/react-shot",
+  "@archastro/tui-shot",
+  "@archastro/movie-harness",
 ];
 
 for (const packagePath of packagePaths) {
@@ -24,8 +32,14 @@ for (const packagePath of packagePaths) {
   packageJson.version = version;
 
   if (packageJson.name === "@archastro/astroshot") {
-    packageJson.dependencies["@archastro/react-shot"] = version;
-    packageJson.dependencies["@archastro/tui-shot"] = version;
+    for (const dep of engineDeps) {
+      if (!(dep in (packageJson.dependencies ?? {}))) {
+        throw new Error(
+          `@archastro/astroshot is missing dependency ${dep}; cannot set release version`,
+        );
+      }
+      packageJson.dependencies[dep] = version;
+    }
   }
 
   fs.writeFileSync(absolutePath, `${JSON.stringify(packageJson, null, 2)}\n`);
@@ -37,5 +51,5 @@ execFileSync("npm", ["install", "--package-lock-only"], {
 });
 
 console.log(
-  `Set all screenshot packages and unified renderer dependencies to ${version}.`,
+  `Set react-shot, tui-shot, movie-harness, and astroshot (+ engine deps) to ${version}.`,
 );
