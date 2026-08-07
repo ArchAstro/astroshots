@@ -1,0 +1,67 @@
+{
+  "name": "@archastro/movie-harness",
+  "version": "0.1.0",
+  "description": "Universal movie capture harness for browser, PTY, desktop, and raw frames into .astroshot/",
+  "keywords": [
+    "astroshots",
+    "movie",
+    "screencast",
+    "playwright",
+    "pty",
+    "harness"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchAstro/astroshots.git",
+    "directory": "packages/movie-harness"
+  },
+  "homepage": "https://github.com/ArchAstro/astroshots#readme",
+  "bugs": "https://github.com/ArchAstro/astroshots/issues",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "astroshot-movie": "bin/astroshot-movie.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "native",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "test": "npm run build && vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run clean && npm run build"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@xterm/headless": "^5.5.0",
+    "playwright": "1.61.1",
+    "yaml": "^2.8.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "1.2.0-beta.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.0"
+  }
+}

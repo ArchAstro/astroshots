@@ -1,7 +1,7 @@
 {
   "name": "@archastro/astroshot",
   "version": "0.1.0",
-  "description": "One CLI for deterministic React and terminal UI screenshots",
+  "description": "One CLI for deterministic React, terminal, and movie UI captures",
   "keywords": [
     "react",
     "ink",
@@ -9,6 +9,8 @@
     "ratatui",
     "terminal",
     "screenshot",
+    "movie",
+    "screencast",
     "visual-testing"
   ],
   "license": "MIT",
@@ -56,7 +58,7 @@
     "README.md"
   ],
   "scripts": {
-    "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot",
+    "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot && npm run build --workspace @archastro/movie-harness",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {
@@ -68,6 +70,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
+    "@archastro/movie-harness": "0.1.0",
     "@archastro/react-shot": "0.1.0",
     "@archastro/tui-shot": "0.1.0"
   }
