@@ -175,14 +175,24 @@ struct EmptyFrictionLogsView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("How to author")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.muted)
+                    .textCase(.uppercase)
+                    .tracking(0.3)
                 codeLine(".astroshot/friction-logs/<slug>/prompt.md")
                 codeLine("runs/<run-id>/log.jsonl + screenshots")
+                Text("In a coding agent: use the friction-log skill → Author, then Run.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10))
             .padding(.horizontal, 28)
+            .accessibilityIdentifier("friction.empty.cta")
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

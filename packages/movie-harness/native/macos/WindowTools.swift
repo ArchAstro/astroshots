@@ -21,6 +21,8 @@ struct WindowRow: Encodable {
   let x: Int
   let y: Int
   let onScreen: Bool
+  /// CGWindow layer (0 = normal). Popovers / floating chrome often use > 0.
+  let layer: Int
 }
 
 struct ScreenAccessReport: Encodable {
@@ -50,7 +52,10 @@ func listWindows() -> [WindowRow] {
   var rows: [WindowRow] = []
   for w in info {
     let layer = w[kCGWindowLayer as String] as? Int ?? -1
-    guard layer == 0 else { continue }
+    // Layer 0 = normal windows. Menu-bar trays / NSPopover often sit above 0
+    // (floating ~3, modal panel ~8). Skip Dock / main menu / status chrome
+    // (typically ≥20) which are huge, blank under screencapture, or unusable.
+    guard layer >= 0, layer <= 15 else { continue }
 
     let id = w[kCGWindowNumber as String] as? Int ?? 0
     let pid = w[kCGWindowOwnerPID as String] as? Int ?? 0
@@ -62,6 +67,7 @@ func listWindows() -> [WindowRow] {
     let height = (bounds?["Height"] as? NSNumber)?.intValue ?? 0
     let x = (bounds?["X"] as? NSNumber)?.intValue ?? 0
     let y = (bounds?["Y"] as? NSNumber)?.intValue ?? 0
+    // Popovers can be small; keep a low floor but drop 1×1 placeholders.
     if width < 2 || height < 2 { continue }
 
     rows.append(
@@ -75,13 +81,21 @@ func listWindows() -> [WindowRow] {
         height: height,
         x: x,
         y: y,
-        onScreen: onScreen
+        onScreen: onScreen,
+        layer: layer
       )
     )
   }
 
-  // Largest first — better default when multiple windows share a bundle id.
-  return rows.sorted { ($0.width * $0.height) > ($1.width * $1.height) }
+  // Prefer larger + on-screen + lower layer so normal windows win over
+  // tiny floating helpers when multiple match a bundle id.
+  return rows.sorted {
+    let area0 = $0.width * $0.height
+    let area1 = $1.width * $1.height
+    if area0 != area1 { return area0 > area1 }
+    if $0.onScreen != $1.onScreen { return $0.onScreen && !$1.onScreen }
+    return $0.layer < $1.layer
+  }
 }
 
 func hostIdentity() -> (name: String, bundleId: String?) {

@@ -58,6 +58,13 @@ struct FrictionStepDetailView: View {
                     .accessibilityIdentifier("friction.step.position")
             }
 
+            // Visible ← → labels so keyboard shortcuts aren't tooltip-only.
+            Text("← →")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.muted2)
+                .help("Keyboard: left/right arrow keys")
+                .accessibilityLabel("Use left and right arrow keys to change steps")
+
             Button {
                 appState.stepFrictionStep(-1)
             } label: {
@@ -71,6 +78,7 @@ struct FrictionStepDetailView: View {
             .opacity(appState.canStepFrictionStep(-1) ? 1 : 0.32)
             .disabled(!appState.canStepFrictionStep(-1))
             .help("Previous step (←)")
+            .accessibilityLabel("Previous step")
             .keyboardShortcut(.leftArrow, modifiers: [])
 
             Button {
@@ -86,6 +94,7 @@ struct FrictionStepDetailView: View {
             .opacity(appState.canStepFrictionStep(1) ? 1 : 0.32)
             .disabled(!appState.canStepFrictionStep(1))
             .help("Next step (→)")
+            .accessibilityLabel("Next step")
             .keyboardShortcut(.rightArrow, modifiers: [])
         }
         .padding(.horizontal, 10)

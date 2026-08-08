@@ -60,6 +60,9 @@ final class AppState {
     /// startup sequence (tray + folder panel). Driven by an explicit preference
     /// flag, not merely empty roots.
     var shouldPresentFirstRunStartup: Bool
+    /// True when the tray was opened from a seeded UI-test / friction fixture
+    /// (not a live multi-root watcher session).
+    var isFixtureSession = false
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher

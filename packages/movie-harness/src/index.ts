@@ -22,9 +22,11 @@ export { recordBrowserMovie } from "./sources/browser.js";
 export {
   assertDesktopToolchain,
   checkScreenRecordingAccess,
+  describeDesktopWindow,
   desktopMatchFromFlags,
   ensureScreenRecordingAccess,
   formatScreenRecordingDeniedHelp,
+  isNearlyBlankPng,
   listDesktopWindows,
   matchDesktopWindow,
   openScreenRecordingSettings,

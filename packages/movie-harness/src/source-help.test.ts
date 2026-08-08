@@ -38,6 +38,17 @@ describe("source selection help", () => {
     expect(recommendSource("native mac app").source).toBe("desktop.window");
   });
 
+  it("recommends desktop.window for menu-bar / tray / Astroshots intents", () => {
+    expect(
+      recommendSource("record the Astroshots menu-bar tray").source,
+    ).toBe("desktop.window");
+    expect(recommendSource("capture Astroshots tray").source).toBe(
+      "desktop.window",
+    );
+    expect(recommendSource("status-item popover of my LSUIElement app").source)
+      .toBe("desktop.window");
+  });
+
   it("recommends browser for web intent", () => {
     expect(recommendSource("agent-browser SPA signup flow").source).toBe(
       "browser",
