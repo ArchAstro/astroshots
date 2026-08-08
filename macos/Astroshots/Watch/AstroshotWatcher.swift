@@ -557,6 +557,12 @@ final class AstroshotWatcher: @unchecked Sendable {
 
         let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalPath)
         let mtime = (attrs?[.modificationDate] as? Date) ?? Date()
+        let videoFileName = Self.resolveVideoFileName(
+            fileName: parts.fileName,
+            featureDirectory: featureDir,
+            manifestVideo: meta.video,
+            manifestKind: meta.kind
+        )
 
         return Shot(
             path: canonicalPath,
@@ -572,8 +578,46 @@ final class AstroshotWatcher: @unchecked Sendable {
             runID: meta.runID,
             status: meta.status,
             capturedAt: meta.capturedAt ?? mtime,
-            review: review
+            review: review,
+            kind: meta.kind ?? (videoFileName != nil ? "movie" : nil),
+            videoFileName: videoFileName,
+            durationMs: meta.durationMs,
+            movieSource: meta.source,
+            chapters: meta.chapters
         )
+    }
+
+    /// Prefer explicit manifest `video`; otherwise pick a sibling with the same
+    /// stem and a known movie extension (so posters stream even if metadata is thin).
+    private static func resolveVideoFileName(
+        fileName: String,
+        featureDirectory: URL,
+        manifestVideo: String?,
+        manifestKind: String?
+    ) -> String? {
+        if let manifestVideo, !manifestVideo.isEmpty {
+            let explicit = featureDirectory.appendingPathComponent(manifestVideo)
+            if FileManager.default.fileExists(atPath: explicit.path) {
+                return manifestVideo
+            }
+            // Still surface the basename so detail can show it even if missing.
+            return manifestVideo
+        }
+
+        let stem = (fileName as NSString).deletingPathExtension
+        for ext in ["webm", "mp4", "mov", "m4v"] {
+            let candidate = "\(stem).\(ext)"
+            let url = featureDirectory.appendingPathComponent(candidate)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return candidate
+            }
+        }
+
+        // kind:movie without a discoverable video still marks the row as a movie.
+        if let manifestKind, manifestKind.caseInsensitiveCompare("movie") == .orderedSame {
+            return nil
+        }
+        return nil
     }
 
     // MARK: FSEvents

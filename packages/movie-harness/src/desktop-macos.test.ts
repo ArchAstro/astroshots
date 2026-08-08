@@ -36,8 +36,15 @@ describe.skipIf(!isMac)("desktop.window macOS", () => {
   });
 
   it("matches by window id and records a short movie", async () => {
+    // Prefer a normal on-screen app window (layer 0), not floating system chrome.
     const windows = listDesktopWindows().filter(
-      (w) => w.width >= 200 && w.height >= 200 && w.onScreen,
+      (w) =>
+        w.width >= 200 &&
+        w.height >= 200 &&
+        w.onScreen &&
+        (w.layer ?? 0) === 0 &&
+        w.owner !== "Dock" &&
+        w.owner !== "Window Server",
     );
     expect(windows.length).toBeGreaterThan(0);
     const target = windows[0]!;
@@ -66,6 +73,10 @@ describe.skipIf(!isMac)("desktop.window macOS", () => {
       );
       expect(manifest.shots[0].source).toBe("desktop.window");
       expect(manifest.shots[0].kind).toBe("movie");
+      // Description should be human-readable, not a raw flag dump.
+      expect(String(manifest.shots[0].description ?? "")).not.toMatch(
+        /desktop\.window id=/,
+      );
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

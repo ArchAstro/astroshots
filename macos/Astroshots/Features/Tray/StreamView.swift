@@ -3,6 +3,7 @@ import SwiftUI
 struct StreamView: View {
     @Environment(AppState.self) private var appState
     @State private var filter: StreamFilter = .toReview
+    @State private var moviesOnly = false
     @State private var collapsedGroupIDs: Set<String> = []
 
     var body: some View {
@@ -21,6 +22,17 @@ struct StreamView: View {
 
                     Spacer()
 
+                    if movieCount > 0 {
+                        StreamFilterChip(
+                            title: "Movies",
+                            systemImage: "film",
+                            isActive: moviesOnly
+                        ) {
+                            moviesOnly.toggle()
+                        }
+                        .accessibilityIdentifier("stream.filter.movies")
+                    }
+
                     if filter == .toReview {
                         SeenAllButton(
                             count: pendingCount,
@@ -28,12 +40,22 @@ struct StreamView: View {
                             accessibilityIdentifier: "stream.seen.all"
                         ) {
                             Task {
-                                await appState.markAllSeen(appState.shots)
+                                await appState.markAllSeen(
+                                    moviesOnly
+                                        ? appState.shots.filter(\.isMovie)
+                                        : appState.shots
+                                )
                             }
                         }
                     }
 
-                    HistoryButton(isActive: filter == .history) {
+                    StreamFilterChip(
+                        title: filter == .history ? "Unseen" : "History",
+                        systemImage: filter == .history
+                            ? "eye"
+                            : "clock.arrow.circlepath",
+                        isActive: filter == .history
+                    ) {
                         filter = filter == .history ? .toReview : .history
                     }
                 }
@@ -85,7 +107,8 @@ struct StreamView: View {
     }
 
     private var displayedGroups: [StreamShotGroup] {
-        StreamGrouping.contiguousGroups(appState.shots).compactMap { group in
+        let base = moviesOnly ? appState.shots.filter(\.isMovie) : appState.shots
+        return StreamGrouping.contiguousGroups(base).compactMap { group in
             let visibleShots: [Shot]
             switch filter {
             case .toReview:
@@ -103,11 +126,17 @@ struct StreamView: View {
     }
 
     private var pendingCount: Int {
-        appState.shots.filter { ($0.review?.state ?? .pending) != .seen }.count
+        let pool = moviesOnly ? appState.shots.filter(\.isMovie) : appState.shots
+        return pool.filter { ($0.review?.state ?? .pending) != .seen }.count
     }
 
     private var seenCount: Int {
-        appState.shots.count - pendingCount
+        let pool = moviesOnly ? appState.shots.filter(\.isMovie) : appState.shots
+        return pool.filter { ($0.review?.state ?? .pending) == .seen }.count
+    }
+
+    private var movieCount: Int {
+        appState.shots.filter(\.isMovie).count
     }
 }
 
@@ -204,21 +233,28 @@ private struct SeenAllButton: View {
     }
 }
 
-private struct HistoryButton: View {
+private struct StreamFilterChip: View {
+    let title: String
+    let systemImage: String
     let isActive: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 28, height: 28)
-                .foregroundStyle(isActive ? Theme.purple : Theme.ink2)
-                .background(
-                    isActive ? Theme.purpleSoft : Theme.surface,
-                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                )
-                .contentShape(Rectangle())
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold))
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .foregroundStyle(isActive ? Theme.purple : Theme.ink2)
+            .background(
+                isActive ? Theme.purpleSoft : Theme.surface,
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(isActive ? "Return to unseen frames" : "Show seen frame history")
@@ -321,6 +357,15 @@ struct ShotRow: View {
                             .stroke(Theme.line, lineWidth: 1)
                     )
                     .overlay {
+                        if shot.isMovie {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(7)
+                                .background(.black.opacity(0.55), in: Circle())
+                        }
+                    }
+                    .overlay {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
@@ -331,8 +376,12 @@ struct ShotRow: View {
                     }
             }
             .buttonStyle(.plain)
-            .help("Open full-screen review")
-            .accessibilityLabel("Review \(shot.title) full screen")
+            .help(shot.isMovie ? "Open full-screen review of movie poster" : "Open full-screen review")
+            .accessibilityLabel(
+                shot.isMovie
+                    ? "Review movie \(shot.title) full screen"
+                    : "Review \(shot.title) full screen"
+            )
             .accessibilityIdentifier("stream.review.\(shot.fileName)")
 
             Button(action: action) {
@@ -350,6 +399,7 @@ struct ShotRow: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
+                            .help("\(shot.feature) · \(shot.title)")
                         Spacer(minLength: 4)
                         Text(Self.timeString(shot.capturedAt))
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
@@ -359,8 +409,12 @@ struct ShotRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
+                        .help(shot.description.isEmpty ? shot.fileName : shot.description)
 
                     HStack(spacing: 5) {
+                        if shot.isMovie {
+                            MovieKindBadge(durationLabel: shot.durationLabel)
+                        }
                         reviewDot
                         Text(reviewLabel)
                             .font(.system(size: 9.5, weight: .semibold))
@@ -435,6 +489,25 @@ struct ShotRow: View {
 private enum StreamFilter: Hashable {
     case toReview
     case history
+}
+
+struct MovieKindBadge: View {
+    var durationLabel: String?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "film")
+                .font(.system(size: 8, weight: .bold))
+            Text(durationLabel.map { "Movie · \($0)" } ?? "Movie")
+                .font(.system(size: 9, weight: .bold))
+        }
+        .foregroundStyle(Theme.purple)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(Theme.purpleSoft, in: Capsule())
+        .accessibilityLabel(durationLabel.map { "Movie, \($0)" } ?? "Movie")
+        .accessibilityIdentifier("stream.movie.badge")
+    }
 }
 
 private struct ReviewedStreamView: View {

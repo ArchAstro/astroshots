@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 import { MovieSession } from "../session.js";
 import type { MovieArtifact, MovieSessionOptions, Size } from "../types.js";
@@ -18,6 +19,8 @@ export interface DesktopWindowInfo {
   x: number;
   y: number;
   onScreen: boolean;
+  /** CGWindow layer; 0 = normal, >0 = floating/popover chrome. */
+  layer?: number;
 }
 
 export interface DesktopWindowMatch {
@@ -28,6 +31,11 @@ export interface DesktopWindowMatch {
   pid?: number;
   /** When multiple match, pick largest (default) or first. */
   pick?: "largest" | "first";
+  /**
+   * Prefer on-screen windows when several match (default true).
+   * Off-screen / empty host windows often produce black frames.
+   */
+  preferOnScreen?: boolean;
 }
 
 export type DesktopWindowMovieOptions = Omit<MovieSessionOptions, "source"> & {
@@ -36,6 +44,11 @@ export type DesktopWindowMovieOptions = Omit<MovieSessionOptions, "source"> & {
   durationMs?: number;
   /** Include cursor in frames (screencapture -C). Default false. */
   cursor?: boolean;
+  /**
+   * Allow mostly-blank / black posters to encode (default false).
+   * Off-screen windows and denied Screen Recording often produce black frames.
+   */
+  allowBlank?: boolean;
 };
 
 const SCREENCAPTURE = "/usr/sbin/screencapture";
@@ -288,7 +301,7 @@ export function matchDesktopWindow(
       .slice(0, 8)
       .map(
         (w) =>
-          `  id=${w.id} pid=${w.pid} bundle=${w.bundleId ?? "?"} owner=${JSON.stringify(w.owner)} title=${JSON.stringify(w.title)} ${w.width}x${w.height}`,
+          `  id=${w.id} pid=${w.pid} layer=${w.layer ?? "?"} bundle=${w.bundleId ?? "?"} owner=${JSON.stringify(w.owner)} title=${JSON.stringify(w.title)} ${w.width}x${w.height} onScreen=${w.onScreen}`,
       )
       .join("\n");
     throw new Error(
@@ -298,11 +311,117 @@ export function matchDesktopWindow(
     );
   }
 
+  const preferOnScreen = match.preferOnScreen !== false;
+  if (preferOnScreen && match.windowId === undefined) {
+    const onScreen = candidates.filter((w) => w.onScreen);
+    if (onScreen.length > 0) candidates = onScreen;
+  }
+
   if (match.pick === "first") return candidates[0]!;
-  // Default largest (list is already size-sorted, but re-sort for safety).
-  return [...candidates].sort(
-    (a, b) => b.width * b.height - a.width * a.height,
-  )[0]!;
+  // Default: largest area, then lower layer (normal windows over floaters).
+  return [...candidates].sort((a, b) => {
+    const area = b.width * b.height - a.width * a.height;
+    if (area !== 0) return area;
+    return (a.layer ?? 0) - (b.layer ?? 0);
+  })[0]!;
+}
+
+/** Human-readable manifest description for a captured window. */
+export function describeDesktopWindow(target: DesktopWindowInfo): string {
+  const name = target.bundleId?.split(".").pop() || target.owner || "window";
+  const title = target.title.trim();
+  const size = `${target.width}×${target.height}`;
+  const where = target.onScreen ? "on-screen" : "off-screen";
+  const layer =
+    target.layer !== undefined && target.layer > 0
+      ? `, layer ${target.layer}`
+      : "";
+  if (title) {
+    return `${name}: “${title}” (${size}, ${where}${layer})`;
+  }
+  return `${name} window (${size}, ${where}${layer})`;
+}
+
+/**
+ * True when a PNG is almost entirely very dark (typical failed/off-screen capture).
+ * Samples up to ~4k pixels across a simple grid; supports 8-bit RGB/RGBA.
+ */
+export function isNearlyBlankPng(
+  filePath: string,
+  options?: { maxMeanLuma?: number; minDarkFraction?: number },
+): boolean {
+  const maxMeanLuma = options?.maxMeanLuma ?? 12;
+  const minDarkFraction = options?.minDarkFraction ?? 0.97;
+  let data: Buffer;
+  try {
+    data = fs.readFileSync(filePath);
+  } catch {
+    return true;
+  }
+  if (data.length < 33 || data.toString("ascii", 1, 4) !== "PNG") return true;
+
+  // Minimal PNG scan: find IDAT chunks, inflate, average luma on a grid.
+  const width = data.readUInt32BE(16);
+  const height = data.readUInt32BE(20);
+  const bitDepth = data[24];
+  const colorType = data[25];
+  if (!width || !height || bitDepth !== 8) return false;
+  // 2 = RGB, 6 = RGBA
+  if (colorType !== 2 && colorType !== 6) return false;
+  const channels = colorType === 6 ? 4 : 3;
+
+  const idatParts: Buffer[] = [];
+  let offset = 8;
+  while (offset + 8 <= data.length) {
+    const len = data.readUInt32BE(offset);
+    const type = data.toString("ascii", offset + 4, offset + 8);
+    const start = offset + 8;
+    const end = start + len;
+    if (end + 4 > data.length) break;
+    if (type === "IDAT") idatParts.push(data.subarray(start, end));
+    if (type === "IEND") break;
+    offset = end + 4;
+  }
+  if (idatParts.length === 0) return true;
+
+  let inflated: Buffer;
+  try {
+    inflated = zlib.inflateSync(Buffer.concat(idatParts));
+  } catch {
+    return false; // can't decode — don't claim blank
+  }
+
+  const stride = 1 + width * channels; // filter byte + row
+  const expected = stride * height;
+  if (inflated.length < expected) return false;
+
+  // Only sample rows that use filter type 0 (None) for correct RGB bytes.
+  // For filtered rows, still sample raw bytes as a coarse darkness heuristic.
+  let samples = 0;
+  let dark = 0;
+  let lumaSum = 0;
+  const stepY = Math.max(1, Math.floor(height / 32));
+  const stepX = Math.max(1, Math.floor(width / 32));
+  for (let y = 0; y < height; y += stepY) {
+    const rowStart = y * stride;
+    const filter = inflated[rowStart] ?? 0;
+    for (let x = 0; x < width; x += stepX) {
+      const i = rowStart + 1 + x * channels;
+      const r = inflated[i] ?? 0;
+      const g = inflated[i + 1] ?? 0;
+      const b = inflated[i + 2] ?? 0;
+      // filter≠0 means bytes aren't raw RGB; still treat very low triples as dark.
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      lumaSum += luma;
+      if (luma <= maxMeanLuma) dark += 1;
+      samples += 1;
+      void filter;
+    }
+  }
+  if (samples === 0) return true;
+  const mean = lumaSum / samples;
+  const darkFraction = dark / samples;
+  return mean <= maxMeanLuma && darkFraction >= minDarkFraction;
 }
 
 function captureWindowPng(
@@ -386,6 +505,16 @@ export async function recordDesktopWindowMovie(
   const windows = listDesktopWindows();
   const target = matchDesktopWindow(windows, options.match);
 
+  if (!target.onScreen && !options.allowBlank) {
+    throw new Error(
+      `Matched window id=${target.id} (${target.bundleId ?? target.owner}) is off-screen ` +
+        `(${target.width}×${target.height} at ${target.x},${target.y}). ` +
+        "Off-screen windows usually produce black movies. Bring the window on-screen " +
+        "(open the tray/popover) or pass --allow-blank to record anyway.\n" +
+        `Hint: ${describeDesktopWindow(target)}`,
+    );
+  }
+
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "astroshot-desktop-"));
   const probe = path.join(tmp, "probe.png");
   try {
@@ -393,6 +522,17 @@ export async function recordDesktopWindowMovie(
   } catch (error) {
     fs.rmSync(tmp, { recursive: true, force: true });
     throw error;
+  }
+
+  if (!options.allowBlank && isNearlyBlankPng(probe)) {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    throw new Error(
+      `Probe frame for window id=${target.id} is nearly blank/black. ` +
+        "Screen Recording may be denied for this host app, the window may be empty, " +
+        "or the popover may not be visible. Fix visibility/TCC, or pass --allow-blank.\n" +
+        `Window: ${describeDesktopWindow(target)}\n` +
+        "Run: astroshot movie check-screen-access",
+    );
   }
 
   const probed = readPngSize(probe);
@@ -407,9 +547,7 @@ export async function recordDesktopWindowMovie(
     size,
     fps,
     source: "desktop.window",
-    description:
-      options.description ??
-      `desktop.window id=${target.id} ${target.bundleId ?? target.owner} ${JSON.stringify(target.title)}`,
+    description: options.description ?? describeDesktopWindow(target),
   });
 
   // Seed with probe frame so we never end empty if duration is tiny.

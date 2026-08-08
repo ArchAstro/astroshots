@@ -60,6 +60,7 @@ struct FrictionLogDetailView: View {
                 }
                 if let run = appState.selectedFrictionRun {
                     runPicker(log: log, selected: run)
+                    improveRollup(run: run)
                     stepsTable(run: run)
                 } else {
                     noRunsCard
@@ -152,6 +153,41 @@ struct FrictionLogDetailView: View {
                 .stroke(Theme.line, lineWidth: 1)
         )
         .accessibilityIdentifier("friction.prompt.body")
+    }
+
+    @ViewBuilder
+    private func improveRollup(run: FrictionLogRun) -> some View {
+        let improves = run.steps.flatMap { step in
+            step.improve.map { note in (step: step, note: note) }
+        }
+        if !improves.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.bubble.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.amber)
+                    Text("Improve rollup · \(improves.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                }
+                ForEach(Array(improves.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(String(format: "%02d", item.step.step))
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Theme.amber)
+                        Text(item.note)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(Theme.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.amberSoft.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityIdentifier("friction.improve.rollup")
+        }
     }
 
     private func runPicker(log: FrictionLog, selected: FrictionLogRun) -> some View {

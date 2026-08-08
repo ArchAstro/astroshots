@@ -28,6 +28,28 @@ struct TrayView: View {
         appState.isEmpty && appState.isFrictionLogsEmpty
     }
 
+    private var statusLabel: String {
+        if appState.needsWatchRootSetup { return "setup" }
+        if appState.isScanning { return "scanning" }
+        if appState.isFixtureSession { return "seeded" }
+        if isCatalogEmpty { return "idle" }
+        return "live"
+    }
+
+    private var statusColor: Color {
+        if appState.needsWatchRootSetup || appState.isScanning { return Theme.amber }
+        if appState.isFixtureSession { return Theme.blue }
+        if isCatalogEmpty { return Theme.muted }
+        return Theme.green
+    }
+
+    private var statusDotColor: Color {
+        if appState.needsWatchRootSetup || appState.isScanning { return Theme.amber }
+        if appState.isFixtureSession { return Theme.blue }
+        if isCatalogEmpty { return Color(hex: 0xB0AAA2) }
+        return Color(hex: 0x20A37F)
+    }
+
     private var showsTabBar: Bool {
         appState.pane != .settings
             && appState.pane != .detail
@@ -129,33 +151,18 @@ struct TrayView: View {
 
             HStack(spacing: 5) {
                 Circle()
-                    .fill(
-                        appState.needsWatchRootSetup
-                            ? Theme.amber
-                            : (appState.isScanning
-                                ? Theme.amber
-                                : (isCatalogEmpty ? Color(hex: 0xB0AAA2) : Color(hex: 0x20A37F)))
-                    )
+                    .fill(statusDotColor)
                     .frame(width: 5, height: 5)
                     .shadow(
-                        color: appState.needsWatchRootSetup
-                            || isCatalogEmpty
-                            || appState.isScanning
-                            ? .clear
-                            : Color(hex: 0x20A37F).opacity(0.35),
+                        color: statusLabel == "live"
+                            ? Color(hex: 0x20A37F).opacity(0.35)
+                            : .clear,
                         radius: 3
                     )
-                Text(
-                    appState.needsWatchRootSetup
-                        ? "setup"
-                        : (appState.isScanning ? "scanning" : (isCatalogEmpty ? "idle" : "live"))
-                )
+                Text(statusLabel)
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(
-                        appState.needsWatchRootSetup || appState.isScanning
-                            ? Theme.amber
-                            : (isCatalogEmpty ? Theme.muted : Theme.green)
-                    )
+                    .foregroundStyle(statusColor)
+                    .accessibilityIdentifier("tray.status")
             }
 
             Spacer(minLength: 4)
@@ -168,17 +175,33 @@ struct TrayView: View {
                 appState.openSettings()
             }
 
-            iconButton(
-                systemImage: "pin",
-                title: isPinned ? "Back to menu bar" : "Keep visible",
-                active: isPinned
-            ) {
+            // Labeled pin control (friction log: icon-only was easy to miss).
+            Button {
                 if isPinned {
                     trayChrome.close()
                 } else {
                     trayChrome.openPinned()
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: isPinned ? "pin.slash" : "pin")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(isPinned ? "Unpin" : "Pin")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(isPinned ? Theme.purple : Theme.ink2)
+                .padding(.horizontal, 8)
+                .frame(height: 28)
+                .background(
+                    isPinned ? Theme.purpleSoft : Theme.surface,
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help(isPinned ? "Back to menu bar" : "Keep tray visible as a window")
+            .accessibilityLabel(isPinned ? "Unpin tray" : "Pin tray keep visible")
+            .accessibilityIdentifier("tray.pin")
 
             if !isPinned {
                 iconButton(systemImage: "xmark", title: "Close") {
