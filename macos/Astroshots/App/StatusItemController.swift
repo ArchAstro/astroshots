@@ -133,14 +133,14 @@ final class StatusItemController: NSObject {
     /// Loads every sibling under the worktree so detail paging has a real set.
     func openTray(atImagePath path: String) {
         guard loadTestShots(atImagePath: path) != nil else { return }
-        showPopover()
+        presentTraySurface()
     }
 
     /// Seeds siblings and opens the tray already drilled into detail for `path`.
     func openTrayDetail(atImagePath path: String) {
         guard let shot = loadTestShots(atImagePath: path) else { return }
         appState.selectShot(shot)
-        showPopover()
+        presentTraySurface()
     }
 
     /// Seeds a complete multi-worktree stream for grouped-stream UI proofs.
@@ -163,8 +163,38 @@ final class StatusItemController: NSObject {
             appState.selectedFrictionRunID = logs.first?.latestRun?.id
             appState.selectedFrictionStepID = logs.first?.latestRun?.steps.first?.id
         }
+        presentTraySurface()
+    }
+
+    /// UI-test / friction / movie-capture launches prefer a real on-screen
+    /// panel so `astroshot movie desktop.window` can target Astroshots chrome.
+    /// Interactive menu-bar use still defaults to the status-item popover.
+    private func presentTraySurface() {
+        #if DEBUG
+        if Self.shouldPresentPinnedTrayForAutomation {
+            appState.isFixtureSession = true
+            openPinnedWindow(forceOnScreen: true)
+            return
+        }
+        #endif
         showPopover()
     }
+
+    #if DEBUG
+    /// True when launched under UI-test / friction-log capture env vars.
+    static var shouldPresentPinnedTrayForAutomation: Bool {
+        let env = ProcessInfo.processInfo.environment
+        if env["ASTROSHOTS_UI_TEST_POPOVER"] == "1" {
+            // Escape hatch: force classic popover for specific UI tests.
+            return false
+        }
+        return env["ASTROSHOTS_UI_TEST_TRAY_ROOT"] != nil
+            || env["ASTROSHOTS_UI_TEST_TRAY_PATH"] != nil
+            || env["ASTROSHOTS_UI_TEST_DETAIL_PATH"] != nil
+            || env["ASTROSHOTS_FRICTION_CAPTURE_DIR"] != nil
+            || env["ASTROSHOTS_UI_TEST_PINNED"] == "1"
+    }
+    #endif
 
     #if DEBUG
     /// Shows the production overlay without auto-dismiss so UI automation can
@@ -184,42 +214,43 @@ final class StatusItemController: NSObject {
         openTray(atRootPath: fixtureRoot)
 
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0001-open-tray-stream.png"))
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0002-stream-chrome-tabs.png"))
+            // Pinned NSWindow needs an extra beat for hosting layout before capture.
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0001-open-tray-stream.png"))
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0002-stream-chrome-tabs.png"))
 
             if let shot = self.appState.shots.first {
                 self.appState.selectShot(shot)
             }
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0003-shot-detail.png"))
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0003-shot-detail.png"))
 
             self.appState.backToStream()
             self.appState.selectTab(.frictionLogs)
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0004-friction-logs-list.png"))
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0004-friction-logs-list.png"))
 
             if let log = self.appState.frictionLogs.first {
                 self.appState.selectFrictionLog(log)
             }
-            try? await Task.sleep(nanoseconds: 450_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0005-friction-log-detail.png"))
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0005-friction-log-detail.png"))
 
             // Step detail is its own tray page (not inline under the table).
             if let run = self.appState.selectedFrictionRun, let first = run.steps.first {
                 self.appState.selectFrictionStep(first)
             }
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0006-friction-step-detail.png"))
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0006-friction-step-detail.png"))
 
             if let run = self.appState.selectedFrictionRun, run.steps.count > 1 {
                 self.appState.selectFrictionStep(run.steps[1])
             } else {
                 self.appState.stepFrictionStep(1)
             }
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self.capturePopover(to: out.appendingPathComponent("0007-friction-step-two.png"))
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            self.captureTraySurface(to: out.appendingPathComponent("0007-friction-step-two.png"))
 
             try? "ok".write(
                 to: out.appendingPathComponent("CAPTURE_OK"),
@@ -231,8 +262,42 @@ final class StatusItemController: NSObject {
         }
     }
 
-    private func capturePopover(to url: URL) {
-        guard let view = popover?.contentViewController?.view else { return }
+    private func captureTraySurface(to url: URL) {
+        // Prefer the on-screen pinned window (automation / movie capture path).
+        if let window = pinnedWindow, window.isVisible {
+            window.layoutIfNeeded()
+            if let content = window.contentView {
+                content.layoutSubtreeIfNeeded()
+                let bounds = content.bounds
+                if bounds.width > 1, bounds.height > 1,
+                   let rep = content.bitmapImageRepForCachingDisplay(in: bounds)
+                {
+                    content.cacheDisplay(in: bounds, to: rep)
+                    if let data = rep.representation(using: .png, properties: [:]) {
+                        try? data.write(to: url, options: .atomic)
+                        return
+                    }
+                }
+            }
+            // Fallback: CGWindow capture of the real window (matches desktop.window).
+            let windowID = CGWindowID(window.windowNumber)
+            if let cgImage = CGWindowListCreateImage(
+                .null,
+                .optionIncludingWindow,
+                windowID,
+                [.boundsIgnoreFraming, .bestResolution]
+            ) {
+                let rep = NSBitmapImageRep(cgImage: cgImage)
+                if let data = rep.representation(using: .png, properties: [:]) {
+                    try? data.write(to: url, options: .atomic)
+                    return
+                }
+            }
+        }
+
+        let view = popover?.contentViewController?.view
+            ?? pinnedWindow?.contentViewController?.view
+        guard let view else { return }
         view.layoutSubtreeIfNeeded()
         view.window?.layoutIfNeeded()
         let bounds = view.bounds
@@ -405,7 +470,7 @@ final class StatusItemController: NSObject {
 
     // MARK: - Pinned window
 
-    private func openPinnedWindow() {
+    private func openPinnedWindow(forceOnScreen: Bool = false) {
         closePopover()
         if pinnedWindow == nil {
             let root = TrayView(isPinned: true)
@@ -413,26 +478,59 @@ final class StatusItemController: NSObject {
                 .environment(\.trayChrome, trayChromeForPinned())
                 .environment(\.reviewChrome, reviewChrome())
             let hosting = NSHostingController(rootView: root)
-            let window = NSPanel(
+            // Use a normal titled window (not floating panel) so CGWindowList
+            // reports layer 0 + onScreen when agents run desktop.window capture.
+            let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: Theme.trayWidth, height: Theme.trayHeight),
-                styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
+                styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
             window.title = "Astroshots"
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isFloatingPanel = true
-            window.level = .floating
-            window.hidesOnDeactivate = false
+            window.titleVisibility = .visible
+            window.titlebarAppearsTransparent = false
+            window.level = .normal
             window.isReleasedWhenClosed = false
+            window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
             window.contentViewController = hosting
             window.setContentSize(NSSize(width: Theme.trayWidth, height: Theme.trayHeight))
-            window.center()
+            window.setFrameAutosaveName("AstroshotsPinnedTray")
             pinnedWindow = window
         }
+        placePinnedWindowOnScreen(force: forceOnScreen)
+        // Accessory (menu-bar-only) apps can still host normal windows; force
+        // activation so the tray is on-screen for desktop.window capture.
+        if forceOnScreen {
+            NSApp.setActivationPolicy(.accessory)
+        }
         pinnedWindow?.makeKeyAndOrderFront(nil)
+        pinnedWindow?.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Centers the pinned tray on the main screen so it is on-screen and
+    /// capturable (avoids the off-screen 0,1192 popover host artifact).
+    private func placePinnedWindowOnScreen(force: Bool) {
+        guard let window = pinnedWindow else { return }
+        let size = NSSize(width: Theme.trayWidth, height: Theme.trayHeight)
+        window.setContentSize(size)
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+            window.center()
+            return
+        }
+        let visible = screen.visibleFrame
+        let origin = NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.midY - size.height / 2
+        )
+        window.setFrame(
+            NSRect(origin: origin, size: NSSize(width: size.width, height: size.height + 28)),
+            display: true
+        )
+        if force {
+            // Clear any remembered off-screen frame from a previous session.
+            window.setFrameOrigin(origin)
+        }
     }
 
     private func closePinnedWindow() {

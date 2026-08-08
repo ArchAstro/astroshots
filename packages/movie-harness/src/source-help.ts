@@ -16,6 +16,7 @@ Pick the FIRST row that matches the thing you need to record:
 | A TUI / CLI / Ink / Ratatui / truecolor terminal | pty                 | SGR→xterm truecolor path; NEVER screenshot Terminal.app |
 | Color-critical terminal (brand purple, etc.)     | pty                 | Host terminal themes remapping 16 colors would lie |
 | A native macOS app window (SwiftUI, Electron…)   | desktop.window      | Real window pixels via screencapture; needs Screen Recording |
+| Menu-bar / tray / status-item / LSUIElement app  | desktop.window      | Real app chrome; list-windows may include popover layers |
 | The whole monitor / multi-window desktop         | desktop.display     | (not implemented yet — use desktop.window or frames) |
 | Frames from any other tool (Unity, remote, custom)| frames              | You push PNG/JPEG; harness only encodes + sinks |
 | You already have PNG frames on disk              | frames              | Multi-process start/push-frame/stop |
@@ -129,6 +130,7 @@ export const SOURCE_CATALOG: Record<SourceKindHelp, SourceAdvice> = {
       "macOS native window pixels via CGWindowList + screencapture -l sampling.",
     useWhen: [
       "SwiftUI / AppKit / Electron / any real Mac window",
+      "Menu-bar / tray / status-item / LSUIElement apps (e.g. Astroshots)",
       "You need the actual app chrome and OS rendering",
     ],
     neverWhen: [
@@ -211,6 +213,9 @@ export function formatSourceCatalog(): string {
 /**
  * Lightweight advisor for agents: pass free-text intent, get a recommended source.
  * This is heuristic — the decision table is authoritative.
+ *
+ * Order matters: TUI beats native (don't desktop Terminal.app); native/menu-bar
+ * beats browser so "record the Astroshots tray" never defaults to Chromium.
  */
 export function recommendSource(intent: string): {
   source: SourceKindHelp;
@@ -229,11 +234,15 @@ export function recommendSource(intent: string): {
     };
   }
   if (
-    /\b(swiftui|appkit|electron|native app|macos app|mac app|native mac|menu ?bar|desktop window|bundle[- ]?id|window id)\b/.test(
+    /\b(swiftui|appkit|electron|native app|macos app|mac app|native mac|menu[- ]?bar|menubar|status[- ]?item|lsuielement|popover|desktop window|bundle[- ]?id|window id|window[- ]?id)\b/.test(
       text,
     ) ||
-    /\b(swiftui|appkit|electron)\b/.test(text) ||
-    (/\bnative\b/.test(text) && /\b(window|app|desktop|macos|mac)\b/.test(text))
+    // "tray" alone is ambiguous (web trays exist); with an app name / menu-bar
+    // product context, treat as native desktop capture.
+    /\b(tray|menu bar tray)\b/.test(text) ||
+    /\bastroshots?\b/.test(text) ||
+    (/\bnative\b/.test(text) &&
+      /\b(window|app|desktop|macos|mac|chrome|ui)\b/.test(text))
   ) {
     return {
       source: "desktop.window",

@@ -1,4 +1,5 @@
 import AppKit
+import AVKit
 import SwiftUI
 
 struct DetailView: View {
@@ -8,6 +9,7 @@ struct DetailView: View {
     @State private var submissionError: String?
     @State private var isSubmitting = false
     @State private var activeSubmissionID: UUID?
+    @State private var showInlinePlayer = false
     @FocusState private var feedbackFocused: Bool
 
     var body: some View {
@@ -127,6 +129,10 @@ struct DetailView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                                     .layoutPriority(1)
                                 Spacer(minLength: 4)
+                                if shot.isMovie {
+                                    MovieKindBadge(durationLabel: shot.durationLabel)
+                                        .fixedSize()
+                                }
                                 ReviewBadge(state: shot.review?.state ?? .pending)
                                     .fixedSize()
                             }
@@ -134,7 +140,23 @@ struct DetailView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink2)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .padding(.bottom, 12)
+                                .padding(.bottom, shot.isMovie ? 8 : 12)
+
+                            if shot.isMovie {
+                                movieActions(for: shot)
+                                    .padding(.bottom, 8)
+                                if showInlinePlayer, let videoPath = shot.videoPath {
+                                    MovieInlinePlayer(path: videoPath)
+                                        .frame(height: 180)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .padding(.bottom, 12)
+                                        .accessibilityIdentifier("detail.movie.player")
+                                }
+                                if !shot.chapters.isEmpty {
+                                    chaptersCard(shot.chapters)
+                                        .padding(.bottom, 12)
+                                }
+                            }
 
                             compactReviewControls(for: shot)
                                 .padding(.bottom, 12)
@@ -143,6 +165,21 @@ struct DetailView: View {
                                 row("Tree", shot.worktree)
                                 row("Feature", shot.feature)
                                 row("File", shot.fileName)
+                                if shot.isMovie {
+                                    row("Kind", "Movie")
+                                    if let video = shot.videoFileName, !video.isEmpty {
+                                        row("Video", video)
+                                    }
+                                    if let duration = shot.durationLabel {
+                                        row("Duration", duration)
+                                    }
+                                    if let source = shot.movieSource, !source.isEmpty {
+                                        row("Source", source)
+                                    }
+                                    if !shot.chapters.isEmpty {
+                                        row("Chapters", "\(shot.chapters.count)")
+                                    }
+                                }
                                 row("Time", iso(shot.capturedAt))
                                 if let url = shot.url, !url.isEmpty {
                                     row("URL", url)
@@ -187,6 +224,7 @@ struct DetailView: View {
                     isSubmitting = false
                     activeSubmissionID = nil
                     feedbackFocused = false
+                    showInlinePlayer = false
                 }
             } else {
                 EmptyStreamView()
@@ -221,6 +259,92 @@ struct DetailView: View {
             return "\(sequence) · \(shot.slug)"
         }
         return shot.slug
+    }
+
+    @ViewBuilder
+    private func movieActions(for shot: Shot) -> some View {
+        let videoURL = shot.videoPath.map { URL(fileURLWithPath: $0) }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    showInlinePlayer.toggle()
+                } label: {
+                    Label(
+                        showInlinePlayer ? "Hide player" : "Play in tray",
+                        systemImage: showInlinePlayer ? "rectangle.compress.vertical" : "play.rectangle.fill"
+                    )
+                }
+                .buttonStyle(ReviewActionButtonStyle(tone: .primary))
+                .disabled(videoURL == nil)
+                .accessibilityIdentifier("detail.movie.play")
+
+                Button {
+                    if let videoURL {
+                        NSWorkspace.shared.open(videoURL)
+                    }
+                } label: {
+                    Label("Open movie", systemImage: "arrow.up.forward.app")
+                }
+                .buttonStyle(ReviewActionButtonStyle(tone: .quiet))
+                .disabled(videoURL == nil)
+                .help(
+                    videoURL == nil
+                        ? "Video file is missing next to this poster"
+                        : "Open \(shot.videoFileName ?? "movie") in the default player"
+                )
+                .accessibilityIdentifier("detail.movie.open")
+            }
+
+            if videoURL == nil, shot.videoFileName != nil {
+                Text("Video missing on disk")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.amber)
+            } else if videoURL == nil {
+                Text("Poster only — no video path in manifest")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.muted2)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("detail.movie.actions")
+    }
+
+    private func chaptersCard(_ chapters: [ManifestChapter]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Chapters")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.muted)
+                .textCase(.uppercase)
+                .tracking(0.4)
+            ForEach(Array(chapters.enumerated()), id: \.offset) { _, chapter in
+                HStack(spacing: 8) {
+                    Text(Self.chapterTimeLabel(chapter.tMs))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.purple)
+                        .frame(width: 44, alignment: .leading)
+                    Text(chapter.title ?? chapter.slug ?? "chapter")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.purpleSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityIdentifier("detail.movie.chapters")
+    }
+
+    private static func chapterTimeLabel(_ tMs: Int?) -> String {
+        guard let tMs, tMs >= 0 else { return "—" }
+        let total = Double(tMs) / 1000
+        if total < 60 {
+            return String(format: "%.1fs", total)
+        }
+        let m = Int(total) / 60
+        let s = Int(total) % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     private func row(_ label: String, _ value: String) -> some View {
@@ -371,6 +495,15 @@ struct DetailView: View {
 
     private func iso(_ date: Date) -> String {
         Self.isoFormatter.string(from: date)
+    }
+}
+
+private struct MovieInlinePlayer: View {
+    let path: String
+
+    var body: some View {
+        VideoPlayer(player: AVPlayer(url: URL(fileURLWithPath: path)))
+            .background(Color.black)
     }
 }
 

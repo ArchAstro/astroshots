@@ -54,7 +54,7 @@ run --source …
   pty             --fixture path.yaml|json   # truecolor TUI — preferred for terminals
   pty-demo        [--color 7c5cff]           # truecolor smoke, no program
   desktop.window  --bundle-id ID | --window-id N | --title-regex RE | --owner NAME | --pid N
-                  [--duration-ms 3000] [--fps 10] [--cursor]
+                  [--duration-ms 3000] [--fps 10] [--cursor] [--allow-blank]
   frames          [--demo-frames N]          # or use start/push-frame/stop
 
 Common options
@@ -448,6 +448,7 @@ async function cmdRun(args: Args): Promise<number> {
       match,
       durationMs,
       cursor: Boolean(args.cursor),
+      allowBlank: Boolean(args["allow-blank"]),
       fps: common.fps ?? 10,
     });
     process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);

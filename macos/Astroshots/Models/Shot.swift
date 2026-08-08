@@ -32,11 +32,97 @@ struct Shot: Identifiable, Hashable, Sendable {
     /// File modification time (used for ordering + display).
     let capturedAt: Date
     /// App-owned human review state from the feature's `review.json` sidecar.
-    var review: ReviewSnapshot? = nil
+    var review: ReviewSnapshot?
+    /// Manifest `kind` when present (`movie`, …).
+    let kind: String?
+    /// Video basename next to the poster when this frame is a movie.
+    let videoFileName: String?
+    /// Movie duration in milliseconds when known.
+    let durationMs: Int?
+    /// Capture source from the movie harness (`browser`, `desktop.window`, …).
+    let movieSource: String?
+    /// Chapter markers from the movie harness (slug + offset ms).
+    let chapters: [ManifestChapter]
+
+    init(
+        path: String,
+        worktree: String,
+        worktreePath: String,
+        feature: String,
+        fileName: String,
+        sequence: String?,
+        slug: String,
+        title: String,
+        description: String,
+        url: String?,
+        runID: String?,
+        status: FeatureStatus?,
+        capturedAt: Date,
+        review: ReviewSnapshot? = nil,
+        kind: String? = nil,
+        videoFileName: String? = nil,
+        durationMs: Int? = nil,
+        movieSource: String? = nil,
+        chapters: [ManifestChapter] = []
+    ) {
+        self.path = path
+        self.worktree = worktree
+        self.worktreePath = worktreePath
+        self.feature = feature
+        self.fileName = fileName
+        self.sequence = sequence
+        self.slug = slug
+        self.title = title
+        self.description = description
+        self.url = url
+        self.runID = runID
+        self.status = status
+        self.capturedAt = capturedAt
+        self.review = review
+        self.kind = kind
+        self.videoFileName = videoFileName
+        self.durationMs = durationMs
+        self.movieSource = movieSource
+        self.chapters = chapters
+    }
 
     var isFailure: Bool {
         status == .fail || slug.localizedCaseInsensitiveContains("fail")
             || title.localizedCaseInsensitiveContains("fail")
+    }
+
+    /// True when this stream row is a journey movie (poster + optional video).
+    var isMovie: Bool {
+        if let kind, kind.caseInsensitiveCompare("movie") == .orderedSame {
+            return true
+        }
+        return videoFileName != nil
+    }
+
+    /// Absolute path to the sibling video file when it exists on disk.
+    var videoPath: String? {
+        guard let videoFileName, !videoFileName.isEmpty else { return nil }
+        let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
+        let candidate = dir.appendingPathComponent(videoFileName)
+        return FileManager.default.fileExists(atPath: candidate.path)
+            ? candidate.path
+            : nil
+    }
+
+    /// Short duration label for stream/detail chips (`2.8s`, `1:05`).
+    var durationLabel: String? {
+        guard let durationMs, durationMs > 0 else { return nil }
+        let totalSeconds = Double(durationMs) / 1000
+        if totalSeconds < 60 {
+            let rounded = (totalSeconds * 10).rounded() / 10
+            if rounded == rounded.rounded(.towardZero) {
+                return "\(Int(rounded))s"
+            }
+            return String(format: "%.1fs", rounded)
+        }
+        let minutes = Int(totalSeconds) / 60
+        let seconds = Int(totalSeconds) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 
     /// Short badge label: last path segment, trimmed (`firstlanding-wt4` → `wt4` when possible).
