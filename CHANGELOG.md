@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.0] (npm) - 2026-08-09
+
 ### Added
 
 - **Friction Logs** tray tab: list agentic UX scenarios under
