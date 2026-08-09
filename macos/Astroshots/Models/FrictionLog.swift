@@ -83,6 +83,8 @@ struct FrictionLog: Identifiable, Hashable, Sendable {
 
     var latestRun: FrictionLogRun? { runs.first }
 
+    var runCount: Int { runs.count }
+
     var stepCount: Int { latestRun?.steps.count ?? 0 }
 
     var improveCount: Int {
@@ -103,9 +105,45 @@ struct FrictionLogRun: Identifiable, Hashable, Sendable {
     let steps: [FrictionLogStep]
     let capturedAt: Date
     let status: FrictionLogStatus?
+
+    /// Human label for chips/list — prefers a short clock from skill-style
+    /// `YYYYMMDDTHHMMSSZ` ids, else a trimmed raw id.
+    var displayTitle: String {
+        if let parsed = Self.parseSkillRunID(runID) {
+            return Self.chipDateFormatter.string(from: parsed)
+        }
+        if runID.count > 16 {
+            return String(runID.suffix(14))
+        }
+        return runID
+    }
+
+    var stepCountLabel: String {
+        steps.count == 1 ? "1 step" : "\(steps.count) steps"
+    }
+
+    /// Best-effort parse of `20260809T140000Z` / `20260809T140000Z-1`.
+    static func parseSkillRunID(_ raw: String) -> Date? {
+        let head = raw.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: true)
+            .first
+            .map(String.init) ?? raw
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        return formatter.date(from: head)
+    }
+
+    private static let chipDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.timeZone = TimeZone.current
+        f.dateFormat = "MMM d · HH:mm"
+        return f
+    }()
 }
 
-/// One JSONL line: what the agent did, screenshots, and UX notes.
+/// One JSONL line: what the agent did, screenshots, UX notes, and spoken transcript.
 struct FrictionLogStep: Identifiable, Hashable, Sendable {
     var id: String { "\(step)-\(stepID)" }
 
@@ -113,6 +151,9 @@ struct FrictionLogStep: Identifiable, Hashable, Sendable {
     let stepID: String
     let title: String
     let description: String
+    /// Spoken-word narrative for narrated video / continuous voiceover.
+    /// Empty when an older run omitted the field.
+    let transcript: String
     /// Absolute paths to screenshot files for this step.
     let screenshotPaths: [String]
     let good: [String]
@@ -121,6 +162,10 @@ struct FrictionLogStep: Identifiable, Hashable, Sendable {
     let capturedAt: Date?
 
     var primaryScreenshotPath: String? { screenshotPaths.first }
+
+    var hasTranscript: Bool {
+        !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 // MARK: - Loading
@@ -140,6 +185,10 @@ enum FrictionLogLoader {
         var id: String?
         var title: String?
         var description: String?
+        /// Spoken narration; aliases: `narration`, `voiceover`.
+        var transcript: String?
+        var narration: String?
+        var voiceover: String?
         var screenshots: [String]?
         var screenshot: String?
         var good: [String]?
@@ -272,6 +321,9 @@ enum FrictionLogLoader {
                 ?? humanize(stepID)
             let description = doc.description?.trimmingCharacters(in: .whitespacesAndNewlines)
                 ?? ""
+            let transcriptRaw = doc.transcript ?? doc.narration ?? doc.voiceover
+            let transcript = transcriptRaw?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let names: [String]
             if let list = doc.screenshots, !list.isEmpty {
                 names = list
@@ -301,6 +353,7 @@ enum FrictionLogLoader {
                     stepID: stepID,
                     title: title,
                     description: description,
+                    transcript: transcript,
                     screenshotPaths: absolute,
                     good: good.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty },

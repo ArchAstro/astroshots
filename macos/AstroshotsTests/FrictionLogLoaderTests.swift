@@ -14,8 +14,8 @@ struct FrictionLogLoaderTests {
 
         let log = root.appendingPathComponent("log.jsonl")
         let line = """
-        {"step":1,"id":"land","title":"Land","description":"Opened home","screenshots":["0001-land.png"],"good":["Clear CTA"],"improve":["Trust strip low"],"url":"/"}
-        {"step":2,"id":"cart","title":"Cart","description":"Opened cart","screenshot":"missing.png","good":[],"improve":["Empty state is thin"]}
+        {"step":1,"id":"land","title":"Land","description":"Opened home","transcript":"I land on home. The CTA is clear, but the trust strip sits low. Next I open the cart.","screenshots":["0001-land.png"],"good":["Clear CTA"],"improve":["Trust strip low"],"url":"/"}
+        {"step":2,"id":"cart","title":"Cart","description":"Opened cart","narration":"From home I open the cart. The empty state is thin.","screenshot":"missing.png","good":[],"improve":["Empty state is thin"]}
         """
         try line.write(to: log, atomically: true, encoding: .utf8)
 
@@ -27,8 +27,28 @@ struct FrictionLogLoaderTests {
         #expect(steps[0].screenshotPaths[0].hasSuffix("0001-land.png"))
         #expect(steps[0].good == ["Clear CTA"])
         #expect(steps[0].improve == ["Trust strip low"])
+        #expect(steps[0].hasTranscript)
+        #expect(steps[0].transcript.contains("land on home"))
         #expect(steps[1].screenshotPaths.isEmpty)
         #expect(steps[1].improve == ["Empty state is thin"])
+        #expect(steps[1].transcript.contains("open the cart"))
+    }
+
+    @Test func parsesMissingTranscriptAsEmpty() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("friction-no-tx-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let log = root.appendingPathComponent("log.jsonl")
+        try """
+        {"step":1,"id":"legacy","title":"Legacy","description":"No transcript field","screenshots":[],"good":[],"improve":[]}
+        """.write(to: log, atomically: true, encoding: .utf8)
+
+        let steps = FrictionLogLoader.parseJSONL(at: log, runDirectory: root)
+        #expect(steps.count == 1)
+        #expect(steps[0].transcript.isEmpty)
+        #expect(!steps[0].hasTranscript)
     }
 
     @Test func loadsNestedRunAndPrompt() throws {
@@ -78,6 +98,77 @@ struct FrictionLogLoaderTests {
         #expect(log.runs.count == 1)
         #expect(log.runs[0].runID == "20260807T120000Z")
         #expect(log.runs[0].steps.count == 1)
+        #expect(log.stepCount == 1)
+        #expect(log.goodCount == 1)
+    }
+
+    @Test func humanizesSkillStyleRunIDs() {
+        let run = FrictionLogRun(
+            runID: "20260809T140000Z",
+            directoryPath: "/tmp",
+            steps: [],
+            capturedAt: Date(),
+            status: nil
+        )
+        #expect(FrictionLogRun.parseSkillRunID("20260809T140000Z") != nil)
+        #expect(FrictionLogRun.parseSkillRunID("20260809T140000Z-1") != nil)
+        // Display title is locale/timezone dependent; just require a short non-raw label.
+        #expect(run.displayTitle != run.runID)
+        #expect(run.displayTitle.count < run.runID.count)
+        #expect(run.stepCountLabel == "0 steps")
+    }
+
+    @Test func loadsAllNestedRunsNewestFirst() throws {
+        let worktree = FileManager.default.temporaryDirectory
+            .appendingPathComponent("friction-multirun-\(UUID().uuidString)", isDirectory: true)
+        let slugDir = worktree
+            .appendingPathComponent(".astroshot/friction-logs/checkout", isDirectory: true)
+        try FileManager.default.createDirectory(at: slugDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: worktree) }
+
+        try "# prompt".write(
+            to: slugDir.appendingPathComponent("prompt.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        // Older run
+        let older = slugDir.appendingPathComponent("runs/20260101T100000Z", isDirectory: true)
+        try FileManager.default.createDirectory(at: older, withIntermediateDirectories: true)
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: older.appendingPathComponent("0001-a.png"))
+        try """
+        {"step":1,"id":"a","title":"A","description":"older","transcript":"Older run.","screenshots":["0001-a.png"],"good":[],"improve":[]}
+        """.write(to: older.appendingPathComponent("log.jsonl"), atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1_700_000_000)],
+            ofItemAtPath: older.path
+        )
+
+        // Empty stub (skill created dir then aborted) — must not appear
+        let empty = slugDir.appendingPathComponent("runs/20260101T110000Z", isDirectory: true)
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        try Data().write(to: empty.appendingPathComponent("log.jsonl"))
+
+        // Newer run
+        let newer = slugDir.appendingPathComponent("runs/20260101T120000Z", isDirectory: true)
+        try FileManager.default.createDirectory(at: newer, withIntermediateDirectories: true)
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: newer.appendingPathComponent("0001-b.png"))
+        try """
+        {"step":1,"id":"b","title":"B","description":"newer","transcript":"Newer run.","screenshots":["0001-b.png"],"good":["ok"],"improve":[]}
+        """.write(to: newer.appendingPathComponent("log.jsonl"), atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1_800_000_000)],
+            ofItemAtPath: newer.path
+        )
+
+        let logs = FrictionLogLoader.loadLogs(
+            inAstroshot: worktree.appendingPathComponent(".astroshot", isDirectory: true)
+        )
+        #expect(logs.count == 1)
+        let log = try #require(logs.first)
+        #expect(log.runs.count == 2, "Empty stub must be dropped; both real runs must load")
+        #expect(log.runs.map(\.runID) == ["20260101T120000Z", "20260101T100000Z"])
+        #expect(log.latestRun?.runID == "20260101T120000Z")
         #expect(log.stepCount == 1)
         #expect(log.goodCount == 1)
     }

@@ -350,6 +350,32 @@ struct FrictionStepTakeoverView: View {
                 }
                 .padding(16)
 
+                if currentStep.hasTranscript {
+                    Rectangle().fill(Theme.line).frame(height: 1)
+
+                    // Peer section to Looks good / Can improve (same rail rhythm).
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "text.bubble.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Theme.purple)
+                            Text("Transcript")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.ink)
+                            Spacer(minLength: 0)
+                        }
+
+                        Text(currentStep.transcript)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.ink2)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                    }
+                    .padding(16)
+                    .accessibilityIdentifier("friction.takeover.transcript")
+                }
+
                 Rectangle().fill(Theme.line).frame(height: 1)
 
                 railNotes(

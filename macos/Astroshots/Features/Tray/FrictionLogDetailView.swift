@@ -190,44 +190,100 @@ struct FrictionLogDetailView: View {
         }
     }
 
+    /// Run history control. Matches `StreamFilterChip`: 28pt pills, radius 6,
+    /// purpleSoft selection — no nested card (chips sit on paper like stream filters).
     private func runPicker(log: FrictionLog, selected: FrictionLogRun) -> some View {
-        Group {
-            if log.runs.count > 1 {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(log.runCount == 1 ? "Run" : "Runs")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.muted)
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+                if log.runCount > 1 {
+                    Text("\(log.runCount)")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.muted2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Theme.surface, in: Capsule())
+                }
+                Spacer(minLength: 4)
+                Text(selected.stepCountLabel)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.muted2)
+                    .help(selected.runID)
+            }
+
+            if log.runCount == 1 {
+                // One attempt: identity line only (no one-item “picker”).
+                HStack(spacing: 8) {
+                    Text(selected.displayTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(selected.runID)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Theme.muted2)
+                        .lineLimit(1)
+                        .textSelection(.enabled)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Color.white.opacity(0.72),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Theme.line, lineWidth: 1)
+                )
+            } else {
+                // Segmented history: one compact pill per attempt (newest first).
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        ForEach(log.runs) { run in
+                        ForEach(Array(log.runs.enumerated()), id: \.element.id) { index, run in
+                            let isSelected = run.id == selected.id
+                            let isLatest = index == 0
                             Button {
+                                // Color swap only — same frequency band as stream filters.
                                 appState.selectFrictionRun(run)
                             } label: {
-                                Text(run.runID)
-                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(
-                                        run.id == selected.id ? Theme.purple : Theme.ink2
-                                    )
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 5)
-                                    .background(
-                                        run.id == selected.id ? Theme.purpleSoft : Theme.surface,
-                                        in: Capsule()
-                                    )
+                                HStack(spacing: 5) {
+                                    Text(run.displayTitle)
+                                        .font(.system(size: 10.5, weight: .semibold))
+                                        .lineLimit(1)
+                                    if isLatest {
+                                        Text("Latest")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .opacity(isSelected ? 0.9 : 0.72)
+                                    }
+                                }
+                                .padding(.horizontal, 9)
+                                .frame(height: 28)
+                                .foregroundStyle(isSelected ? Theme.purple : Theme.ink2)
+                                .background(
+                                    isSelected ? Theme.purpleSoft : Theme.surface,
+                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                )
+                                .contentShape(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                )
                             }
                             .buttonStyle(.plain)
+                            .help(run.runID)
+                            .accessibilityIdentifier("friction.run.\(run.runID)")
+                            .accessibilityLabel(
+                                "\(isLatest ? "Latest run" : "Run") \(run.displayTitle), \(run.stepCountLabel)"
+                            )
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
                     }
                 }
-            } else {
-                HStack(spacing: 6) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.purple)
-                    Text(selected.runID)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Theme.ink2)
-                    Spacer()
-                    Text("\(selected.steps.count) steps")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.muted)
-                }
+                .accessibilityIdentifier("friction.runs.picker")
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Run history, \(log.runCount) runs")
             }
         }
     }
@@ -304,6 +360,11 @@ struct FrictionLogDetailView: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 4) {
+                        if step.hasTranscript {
+                            Image(systemName: "text.bubble.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Theme.purple.opacity(0.85))
+                        }
                         if !step.screenshotPaths.isEmpty {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 9, weight: .semibold))

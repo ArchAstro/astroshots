@@ -33,7 +33,10 @@ done
 
 require_reference "skills/friction-log/SKILL.md" ".astroshot/friction-logs"
 require_reference "skills/friction-log/SKILL.md" "log.jsonl"
+require_reference "skills/friction-log/SKILL.md" "transcript"
+require_reference "skills/friction-log/SKILL.md" "Transitions"
 require_reference "skills/friction-log/references/contract.md" "screenshots"
+require_reference "skills/friction-log/references/contract.md" "transcript"
 
 # Guard the two easy-to-miss safety properties in the browser guidance:
 # inspection examples must not use agent-browser's default-clicking `find`

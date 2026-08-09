@@ -212,6 +212,19 @@ struct FrictionStepDetailView: View {
                 }
             }
 
+            // Same callout pattern as Looks good / Can improve (accent soft fill +
+            // thin accent stroke) so transcript is one of three peer note cards.
+            if step.hasTranscript {
+                proseCallout(
+                    title: "Transcript",
+                    icon: "text.bubble.fill",
+                    body: step.transcript,
+                    accent: Theme.purple,
+                    soft: Theme.purpleSoft
+                )
+                .accessibilityIdentifier("friction.step.transcript")
+            }
+
             notesSection(
                 title: "Looks good",
                 icon: "hand.thumbsup.fill",
@@ -256,6 +269,40 @@ struct FrictionStepDetailView: View {
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, 16)
+    }
+
+    /// Prose callout (transcript) — peer layout to list callouts below.
+    private func proseCallout(
+        title: String,
+        icon: String,
+        body: String,
+        accent: Color,
+        soft: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(accent)
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: 0)
+            }
+            Text(body)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.ink2)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft.opacity(0.45), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(accent.opacity(0.18), lineWidth: 1)
+        )
     }
 
     private func notesSection(

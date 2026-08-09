@@ -237,6 +237,21 @@ final class StatusItemController: NSObject {
             try? await Task.sleep(nanoseconds: 500_000_000)
             self.captureTraySurface(to: out.appendingPathComponent("0005-friction-log-detail.png"))
 
+            // When the fixture has multiple runs, flip to the next run so the
+            // run picker / history UI is visible with a non-default selection.
+            if let log = self.appState.selectedFrictionLog, log.runs.count > 1 {
+                self.appState.selectFrictionRun(log.runs[1])
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                self.captureTraySurface(
+                    to: out.appendingPathComponent("0005b-friction-run-history.png")
+                )
+                // Return to newest so step captures match the default path.
+                if let latest = log.latestRun {
+                    self.appState.selectFrictionRun(latest)
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+            }
+
             // Step detail is its own tray page (not inline under the table).
             if let run = self.appState.selectedFrictionRun, let first = run.steps.first {
                 self.appState.selectFrictionStep(first)

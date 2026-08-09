@@ -66,19 +66,35 @@ private struct FrictionLogRow: View {
                 }
 
                 if let run = log.latestRun {
+                    // Footer: history summary (count + latest) · relative time —
+                    // same density language as stream row footers.
                     HStack(spacing: 6) {
                         Image(systemName: "play.circle.fill")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.purple)
-                        Text(run.runID)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Theme.ink2)
-                            .lineLimit(1)
+                        if log.runCount > 1 {
+                            Text("\(log.runCount) runs")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.purple)
+                            Text("·")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.muted2)
+                            Text("Latest \(run.displayTitle)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.ink2)
+                                .lineLimit(1)
+                        } else {
+                            Text(run.displayTitle)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.ink2)
+                                .lineLimit(1)
+                        }
                         Spacer(minLength: 4)
                         Text(relativeTime(run.capturedAt))
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Theme.muted)
                     }
+                    .help(run.runID)
                 } else {
                     Text("Prompt only · no runs yet")
                         .font(.system(size: 10, weight: .medium))

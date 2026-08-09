@@ -67,8 +67,9 @@ Details: [`macos/README.md`](macos/README.md).
 4. **Review** — Click a screenshot for a chromeless, screen-sized review
    takeover. A human can send feedback or mark the current image Seen;
    Astroshots writes that state to `review.json` for agents and harnesses.
-   Friction log steps open in-tab with good/improve notes and screenshots
-   (author/run with the **friction-log** skill).
+   Friction log steps open in-tab with good/improve notes, spoken
+   `transcript` narration, and screenshots (author/run with the
+   **friction-log** skill).
 
 ### The tray
 

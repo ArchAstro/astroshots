@@ -207,8 +207,8 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
         try fixturePNG(width: 960, height: 540, label: "Land").write(to: stepA)
         try fixturePNG(width: 960, height: 540, label: "Create").write(to: stepB)
         try """
-        {"step":1,"id":"land","title":"Land on home","description":"Opened / as a new user.","screenshots":["0001-land.png"],"good":["Hero is readable"],"improve":["CTA label is generic"],"url":"/","captured_at":"2026-08-07T12:10:00Z"}
-        {"step":2,"id":"create","title":"Create project","description":"Clicked Create and filled the form.","screenshots":["0002-create.png"],"good":["Fields are labeled"],"improve":["Submit stays disabled without explanation"],"url":"/projects/new","captured_at":"2026-08-07T12:11:00Z"}
+        {"step":1,"id":"land","title":"Land on home","description":"Opened / as a new user.","transcript":"I open the product as a new user. The hero is readable, but the primary CTA label is generic. Next I start creating a project.","screenshots":["0001-land.png"],"good":["Hero is readable"],"improve":["CTA label is generic"],"url":"/","captured_at":"2026-08-07T12:10:00Z"}
+        {"step":2,"id":"create","title":"Create project","description":"Clicked Create and filled the form.","transcript":"From home I click Create and fill the form. Fields are labeled clearly, yet Submit stays disabled with no explanation when required values are short.","screenshots":["0002-create.png"],"good":["Fields are labeled"],"improve":["Submit stays disabled without explanation"],"url":"/projects/new","captured_at":"2026-08-07T12:11:00Z"}
         """.write(
             to: frictionRun.appendingPathComponent("log.jsonl"),
             atomically: true,
@@ -224,6 +224,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "open-tray-stream",
                 "title": "Open tray on seeded stream",
                 "description": "Launched Astroshots against the fixture root; Shots tab shows frames.",
+                "transcript": "I launch Astroshots against the fixture root. The Shots tab already shows frames, so the stream is alive. Next I scan the chrome and tabs.",
                 "screenshots": ["0001-open-tray-stream.png"],
                 "good": [],
                 "improve": [],
@@ -234,6 +235,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "stream-chrome",
                 "title": "Scan stream chrome and tabs",
                 "description": "Observed status, stream list, and Shots | Friction Logs tab bar.",
+                "transcript": "Looking over the chrome, status and stream list are clear, and the Shots versus Friction Logs tabs are easy to find. I open a shot for a closer look.",
                 "screenshots": ["0002-stream-chrome-tabs.png"],
                 "good": [],
                 "improve": [],
@@ -244,6 +246,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "shot-detail",
                 "title": "Open a shot detail",
                 "description": "Opened a stream row into compact detail with preview and metadata.",
+                "transcript": "A stream row opens into compact detail with preview and metadata. That works cleanly. From here I switch over to Friction Logs.",
                 "screenshots": ["0003-shot-detail.png"],
                 "good": [],
                 "improve": [],
@@ -254,6 +257,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "friction-list",
                 "title": "Switch to Friction Logs",
                 "description": "Selected Friction Logs tab and saw the scenario list.",
+                "transcript": "I select Friction Logs and the scenario list appears. Next I open one of the logs.",
                 "screenshots": ["0004-friction-logs-list.png"],
                 "good": [],
                 "improve": [],
@@ -264,6 +268,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "friction-detail",
                 "title": "Open a friction log",
                 "description": "Opened a log; step table and run metadata visible.",
+                "transcript": "Opening a log shows the step table and run metadata. I dive into a step to read the notes.",
                 "screenshots": ["0005-friction-log-detail.png", "0005b-friction-prompt.png"],
                 "good": [],
                 "improve": [],
@@ -274,6 +279,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "friction-step",
                 "title": "Inspect step notes",
                 "description": "Reviewed screenshot plus Looks good / Can improve panels.",
+                "transcript": "The step view pairs the screenshot with Looks good and Can improve panels. I move to the next step to confirm navigation holds up.",
                 "screenshots": ["0006-friction-step-detail.png"],
                 "good": [],
                 "improve": [],
@@ -284,6 +290,7 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
                 "id": "step-nav",
                 "title": "Navigate to next step",
                 "description": "Moved to step 2 and confirmed selection/position update.",
+                "transcript": "Stepping forward updates selection and position as expected. The friction-log path through the tray holds together end to end.",
                 "screenshots": ["0007-friction-step-two.png"],
                 "good": [],
                 "improve": [],

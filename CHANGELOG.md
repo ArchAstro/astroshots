@@ -11,6 +11,20 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- Friction-log steps require a **`transcript`** field: short spoken narrative
+  (actions + good + bad) with cross-step transitions for narrated video.
+  Skill + on-disk contract document the voice rules; the app loads and shows
+  transcripts in the tray step detail and full-screen takeover (older logs
+  without the field still load with an empty transcript).
+- Friction Logs **run history** follows tray filter-chip patterns: list footer
+  shows run count + human latest time; detail uses `StreamFilterChip`-style
+  28pt pills under a `RUNS` section header (no nested card). Skill documents
+  unique run dirs and cleaning empty stubs.
+- Step **transcript** is a peer callout to Looks good / Can improve (same soft
+  fill + accent stroke) in tray detail and full-screen takeover.
+
 ## [0.2.0] (macos) - 2026-08-09
 
 ### Added
