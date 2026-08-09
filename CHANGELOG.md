@@ -11,7 +11,7 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
-## [0.2.0] (npm) - 2026-08-09
+## [0.2.0] (macos) - 2026-08-09
 
 ### Added
 
@@ -25,6 +25,11 @@ The two tracks are versioned independently.
   status + labeled Pin/Unpin) so agents can `desktop.window` Astroshots itself.
 - Right-click **Copy Image** on stream rows, tray detail preview, and
   full-screen review so frames paste into other apps.
+
+## [0.2.0] (npm) - 2026-08-09
+
+### Added
+
 - **`astroshot movie`** universal journey capture (`@archastro/movie-harness`):
   browser, truecolor PTY, raw frames, and macOS `desktop.window`, writing
   poster PNG + video under `.astroshot/`. Includes agent-facing
