@@ -53,9 +53,12 @@ test("movie which-source steers agents to the right capture path", () => {
 });
 
 test("reports the unified package version", () => {
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"),
+  );
   const result = run("--version");
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /^0\.1\.0\s*$/);
+  assert.equal(result.stdout.trim(), packageJson.version);
 });
 
 test("documents each mode and keeps tui as an Ink compatibility alias", () => {
