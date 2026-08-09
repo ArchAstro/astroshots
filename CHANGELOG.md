@@ -13,6 +13,14 @@ The two tracks are versioned independently.
 
 ### Added
 
+- **Friction Logs** tray tab: list agentic UX scenarios under
+  `.astroshot/friction-logs/`, step through JSONL runs with screenshots and
+  Looks good / Can improve notes, improve rollup, and keyboard ← → step nav.
+- **Movies as first-class review frames** in the Shots stream: Movie duration
+  badges, play overlay, **Movies** filter, Play in tray / Open movie, chapters
+  list, and Kind / Video / Duration / Source metadata from the manifest.
+- Fixture / UI-test launches open a **pinned on-screen tray window** (seeded
+  status + labeled Pin/Unpin) so agents can `desktop.window` Astroshots itself.
 - Right-click **Copy Image** on stream rows, tray detail preview, and
   full-screen review so frames paste into other apps.
 - **`astroshot movie`** universal journey capture (`@archastro/movie-harness`):
@@ -21,6 +29,15 @@ The two tracks are versioned independently.
   `which-source` help and Screen Recording TCC guidance.
 - npm release automation ships four packages at one version: `react-shot`,
   `tui-shot`, `movie-harness`, and the unified `astroshot` CLI.
+
+### Fixed
+
+- `astroshot movie which-source` recommends `desktop.window` for Astroshots /
+  menu-bar / tray intents (no longer defaults those to browser).
+- `list-windows` includes floating/popover layers; prefers on-screen windows;
+  refuses nearly blank or off-screen captures by default (`--allow-blank`).
+- Movie stream descriptions are human-readable instead of raw
+  `desktop.window id=…` dumps.
 
 ## [0.1.15] (macos) - 2026-08-05
 
