@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.2] (macos) - 2026-08-10
+
 ### Added
 
 - **Movie playback controls:** tray and full-screen review now provide play/pause,
