@@ -53,6 +53,7 @@ private struct FrictionLogRow: View {
                     }
                 }
 
+                // Quiet meta row — worktree + slug only; counts live as plain text.
                 HStack(spacing: 6) {
                     WorktreeChip(label: log.worktreeShort)
                     Text(log.slug)
@@ -60,35 +61,18 @@ private struct FrictionLogRow: View {
                         .foregroundStyle(Theme.muted2)
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    metric(icon: "list.number", value: "\(log.stepCount)")
-                    metric(icon: "hand.thumbsup", value: "\(log.goodCount)", tint: Theme.green)
-                    metric(icon: "exclamationmark.bubble", value: "\(log.improveCount)", tint: Theme.amber)
+                    Text(metaSummary(for: log))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
                 }
 
                 if let run = log.latestRun {
-                    // Footer: history summary (count + latest) · relative time —
-                    // same density language as stream row footers.
                     HStack(spacing: 6) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.purple)
-                        if log.runCount > 1 {
-                            Text("\(log.runCount) runs")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Theme.purple)
-                            Text("·")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Theme.muted2)
-                            Text("Latest \(run.displayTitle)")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Theme.ink2)
-                                .lineLimit(1)
-                        } else {
-                            Text(run.displayTitle)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Theme.ink2)
-                                .lineLimit(1)
-                        }
+                        Text(runFooter(log: log, run: run))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(1)
                         Spacer(minLength: 4)
                         Text(relativeTime(run.capturedAt))
                             .font(.system(size: 10, weight: .medium))
@@ -117,14 +101,22 @@ private struct FrictionLogRow: View {
         .accessibilityIdentifier("friction.row.\(log.slug)")
     }
 
-    private func metric(icon: String, value: String, tint: Color = Theme.muted2) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
-            Text(value)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+    private func metaSummary(for log: FrictionLog) -> String {
+        var parts: [String] = []
+        if log.stepCount > 0 {
+            parts.append(log.stepCount == 1 ? "1 step" : "\(log.stepCount) steps")
         }
-        .foregroundStyle(tint)
+        if log.improveCount > 0 {
+            parts.append("\(log.improveCount) improve")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func runFooter(log: FrictionLog, run: FrictionLogRun) -> String {
+        if log.runCount > 1 {
+            return "\(log.runCount) runs · \(run.displayTitle)"
+        }
+        return run.displayTitle
     }
 
     private func relativeTime(_ date: Date) -> String {

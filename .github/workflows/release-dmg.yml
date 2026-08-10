@@ -69,6 +69,13 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
+      - name: Install Metal toolchain (mlx-swift)
+        working-directory: macos
+        run: |
+          set -euo pipefail
+          source scripts/xcode-env.sh
+          ensure_mlx_build_prereqs
+
       - name: Import Developer ID certificate
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}

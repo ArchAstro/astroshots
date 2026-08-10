@@ -5,6 +5,12 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
+# MLX Audio Swift (Qwen3-TTS) → pulls mlx-swift, mlx-swift-lm, Hub client.
+packages:
+  mlx-audio-swift:
+    url: https://github.com/Blaizzy/mlx-audio-swift
+    branch: main
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -22,7 +28,14 @@ targets:
     type: application
     platform: macOS
     sources:
-      - Astroshots
+      - path: Astroshots
+        excludes:
+          - "**/Resources/narration_harness.py"
+    dependencies:
+      - package: mlx-audio-swift
+        product: MLXAudioCore
+      - package: mlx-audio-swift
+        product: MLXAudioTTS
     entitlements:
       path: Astroshots/Astroshots.entitlements
     info:

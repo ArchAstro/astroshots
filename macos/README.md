@@ -5,22 +5,36 @@ new frames as desktop overlays, and streams them from every worktree in one list
 
 Design source: [`../docs/mocks/astroshots-menubar.html`](../docs/mocks/astroshots-menubar.html).
 
-Requires macOS 14+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-(`brew install xcodegen`).
+Requires macOS 14+ (Apple Silicon for narration), Xcode 16+,
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+Narration pulls **mlx-audio-swift** (→ **mlx-swift**). First CLI build needs the
+Metal toolchain and skips the mlx CUDA package-plugin fingerprint check:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain   # once per machine
+# every xcodebuild:
+xcodebuild … -skipPackagePluginValidation
+```
+
+`./scripts/bootstrap.sh` and `scripts/xcode-env.sh` handle this for you.
 
 ## Getting started
 
 ```bash
-./scripts/bootstrap.sh      # xcodegen generate → Astroshots.xcodeproj
+./scripts/bootstrap.sh      # Metal prereqs + xcodegen → Astroshots.xcodeproj
 open Astroshots.xcodeproj
 ```
 
 Or from the CLI:
 
 ```bash
+source scripts/xcode-env.sh && ensure_mlx_build_prereqs
 xcodegen generate
-xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platform=macOS' build
-xcodebuild -project Astroshots.xcodeproj -scheme Astroshots -destination 'platform=macOS' test
+xcodebuild -project Astroshots.xcodeproj -scheme Astroshots \
+  -destination 'platform=macOS' "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}" build
+xcodebuild -project Astroshots.xcodeproj -scheme Astroshots \
+  -destination 'platform=macOS' "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}" test
 ```
 
 ## Behavior

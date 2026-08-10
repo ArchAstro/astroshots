@@ -13,6 +13,14 @@ The two tracks are versioned independently.
 
 ### Added
 
+- **Narrated friction-log videos (opt-in):** Settings → Narration enables on-device
+  **mlx-audio-swift** (MLX Swift) + Qwen3-TTS. The app checks Apple Silicon,
+  downloads the HF model in the background with a progress bar, loads weights
+  in-process, then exposes **Make narrated video** on friction-log run detail.
+  Renders serialize through a job queue into `narration-<runID>.mp4` beside the
+  run’s screenshots.
+- CI/macOS builds: install Metal toolchain + `-skipPackagePluginValidation` for
+  mlx-swift (see `macos/scripts/xcode-env.sh`).
 - Friction-log steps require a **`transcript`** field: short spoken narrative
   (actions + good + bad) with cross-step transitions for narrated video.
   Skill + on-disk contract document the voice rules; the app loads and shows

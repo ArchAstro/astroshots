@@ -124,13 +124,26 @@ jobs:
 
   test:
     name: macOS app
+    # mlx-swift first compile is heavy (Metal shaders + C++ backend).
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
       - name: Install XcodeGen
         run: brew install xcodegen
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install Metal toolchain (mlx-swift)
+        working-directory: macos
+        run: |
+          set -euo pipefail
+          source scripts/xcode-env.sh
+          ensure_mlx_build_prereqs
 
       - name: Generate project
         working-directory: macos
@@ -140,11 +153,13 @@ jobs:
         working-directory: macos
         run: |
           set -euo pipefail
+          source scripts/xcode-env.sh
           xcodebuild \
             -project Astroshots.xcodeproj \
             -scheme Astroshots \
             -destination 'platform=macOS' \
             -derivedDataPath build/DerivedData-test \
+            "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -154,11 +169,13 @@ jobs:
         working-directory: macos
         run: |
           set -euo pipefail
+          source scripts/xcode-env.sh
           xcodebuild \
             -project Astroshots.xcodeproj \
             -scheme AstroshotsReviewUITests \
             -destination 'platform=macOS' \
             -derivedDataPath build/DerivedData-review-ui \
+            "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

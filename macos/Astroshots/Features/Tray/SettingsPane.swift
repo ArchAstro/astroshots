@@ -153,11 +153,85 @@ struct SettingsPane: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 9))
                     }
+
+                    narrationCard
                 }
                 .padding(12)
             }
             .scrollIndicators(.hidden)
         }
+    }
+
+    private var narrationCard: some View {
+        let readiness = appState.narration.readiness
+        return card {
+            Text("Narration")
+                .font(.system(size: 12, weight: .semibold))
+            Text(
+                "Opt-in. Uses on-device mlx-audio-swift (MLX Swift) with Qwen3-TTS to turn friction-log transcripts into narrated MP4s."
+            )
+            .font(.system(size: 10))
+            .foregroundStyle(Theme.muted)
+            .padding(.bottom, 4)
+
+            toggleRow(
+                "Enable narration",
+                isOn: appState.narrationEnabled
+            ) { enabled in
+                appState.setNarrationEnabled(enabled)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    statusDot(for: readiness)
+                    Text(readiness.statusLine)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+
+                if let fraction = readiness.progressFraction {
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.linear)
+                        .tint(Theme.purple)
+                        .accessibilityIdentifier("settings.narration.progress")
+                }
+
+                if case .failed = readiness {
+                    Button("Retry setup") {
+                        appState.narration.retry()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+                    .accessibilityIdentifier("settings.narration.retry")
+                }
+
+                Text("Requires Apple Silicon. Qwen3-TTS downloads via Hugging Face into the MLX Hub cache; generation runs in-process.")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.top, 6)
+            .accessibilityIdentifier("settings.narration")
+        }
+    }
+
+    private func statusDot(for readiness: NarrationReadiness) -> some View {
+        let color: Color = {
+            switch readiness {
+            case .ready: return Theme.green
+            case .failed, .unsupported: return Theme.red
+            case .disabled: return Theme.muted2
+            case .checking, .loadingModel, .downloadingModel:
+                return Theme.amber
+            }
+        }()
+        return Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
     }
 
     @ViewBuilder

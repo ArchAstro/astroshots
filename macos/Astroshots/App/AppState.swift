@@ -53,6 +53,10 @@ final class AppState {
 
     var overlayEnabled: Bool
     var autoDismiss: Bool
+    /// Opt-in narrated friction-log videos (MLX Audio + Qwen3-TTS).
+    var narrationEnabled: Bool
+    let narration: NarrationModelManager
+    let narrationQueue: NarrationJobQueue
     var watchRootPaths: [String]
     /// True when no watch roots are configured (empty stream / setup CTA).
     var needsWatchRootSetup: Bool
@@ -112,6 +116,8 @@ final class AppState {
         preferences: Preferences = .shared,
         watcher: AstroshotWatcher? = nil,
         overlayController: OverlayController = OverlayController(),
+        narration: NarrationModelManager? = nil,
+        narrationQueue: NarrationJobQueue? = nil,
         automaticallyStartsWatching: Bool = true
     ) {
         let rootPaths = preferences.watchRootPaths
@@ -130,8 +136,12 @@ final class AppState {
         #endif
         self.preferences = preferences
         self.overlayController = overlayController
+        let narrationManager = narration ?? .shared
+        self.narration = narrationManager
+        self.narrationQueue = narrationQueue ?? NarrationJobQueue(modelManager: narrationManager)
         overlayEnabled = preferences.overlayEnabled
         autoDismiss = preferences.autoDismiss
+        narrationEnabled = preferences.narrationEnabled
         watchRootPaths = rootPaths
         needsWatchRootSetup = needsSetup
         shouldPresentFirstRunStartup = presentFirstRun
@@ -522,6 +532,23 @@ final class AppState {
               let index = shots.firstIndex(where: { $0.id == current })
         else { return }
         selectedShotID = shots[index + delta].id
+    }
+
+    func setNarrationEnabled(_ enabled: Bool) {
+        narrationEnabled = enabled
+        narration.setEnabled(enabled)
+    }
+
+    @discardableResult
+    func enqueueNarration(for log: FrictionLog, run: FrictionLogRun) -> Bool {
+        do {
+            _ = try narrationQueue.enqueue(log: log, run: run)
+            showToast("Narration queued")
+            return true
+        } catch {
+            showToast(error.localizedDescription)
+            return false
+        }
     }
 
     func setOverlayEnabled(_ enabled: Bool) {
