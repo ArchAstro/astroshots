@@ -1,5 +1,6 @@
-import Testing
+import AVKit
 import Foundation
+import Testing
 @testable import Astroshots
 
 struct ManifestParserTests {
@@ -83,6 +84,17 @@ struct ManifestParserTests {
 }
 
 struct ShotMovieMetadataTests {
+    @MainActor
+    @Test func nativePlayerExposesInlinePlaybackControls() {
+        let playerView = MoviePlayerView.configuredAVPlayerView()
+
+        #expect(playerView.controlsStyle == .inline)
+        #expect(playerView.showsFullScreenToggleButton)
+        #expect(playerView.showsFrameSteppingButtons)
+        #expect(MoviePlayerView.backend(for: "/tmp/movie.mp4") == .avKit)
+        #expect(MoviePlayerView.backend(for: "/tmp/movie.webm") == .webKit)
+    }
+
     @Test func isMovieFromKindAndDurationLabel() {
         let movie = Shot(
             path: "/tmp/wt/.astroshot/f/0001-journey.png",

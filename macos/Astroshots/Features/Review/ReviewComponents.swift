@@ -1,4 +1,291 @@
+import AVKit
 import SwiftUI
+import WebKit
+
+/// Stable AppKit-backed movie player used in both compact and full-screen review.
+/// SwiftUI's `VideoPlayer` currently crashes while constructing its AVKit bridge
+/// on macOS 26.5, so the player and its lifecycle live in `AVPlayerView`.
+struct MoviePlayerView: NSViewRepresentable {
+    enum Backend: Equatable {
+        case avKit
+        case webKit
+    }
+
+    let path: String
+    var autoplay = false
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        var path: String?
+        var autoplay = false
+        var player: AVPlayer?
+        var webView: WKWebView?
+        var statusObservation: NSKeyValueObservation?
+        weak var container: MoviePlayerContainerView?
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard let status = message.body as? String else { return }
+            if status == "ready" {
+                container?.showPlayer()
+            } else if status == "error" {
+                container?.showError("This movie could not be played.")
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: any Error
+        ) {
+            container?.showError("This movie could not be loaded.")
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: any Error
+        ) {
+            container?.showError("This movie could not be loaded.")
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> MoviePlayerContainerView {
+        let container = MoviePlayerContainerView()
+        context.coordinator.container = container
+        installPlayer(in: container, coordinator: context.coordinator)
+        return container
+    }
+
+    func updateNSView(_ container: MoviePlayerContainerView, context: Context) {
+        guard context.coordinator.path != path
+                || context.coordinator.autoplay != autoplay
+        else { return }
+        installPlayer(in: container, coordinator: context.coordinator)
+    }
+
+    static func dismantleNSView(
+        _ container: MoviePlayerContainerView,
+        coordinator: Coordinator
+    ) {
+        removePlayer(from: container, coordinator: coordinator)
+        coordinator.container = nil
+    }
+
+    /// Internal so the focused regression test can assert native controls.
+    static func configuredAVPlayerView() -> AVPlayerView {
+        let playerView = AVPlayerView()
+        playerView.controlsStyle = .inline
+        playerView.videoGravity = .resizeAspect
+        playerView.showsFullScreenToggleButton = true
+        playerView.showsFrameSteppingButtons = true
+        playerView.showsSharingServiceButton = false
+        playerView.updatesNowPlayingInfoCenter = false
+        return playerView
+    }
+
+    static func backend(for path: String) -> Backend {
+        URL(fileURLWithPath: path).pathExtension.lowercased() == "webm"
+            ? .webKit
+            : .avKit
+    }
+
+    private func installPlayer(
+        in container: MoviePlayerContainerView,
+        coordinator: Coordinator
+    ) {
+        Self.removePlayer(from: container, coordinator: coordinator)
+
+        coordinator.path = path
+        coordinator.autoplay = autoplay
+        coordinator.container = container
+        container.showLoading()
+
+        switch Self.backend(for: path) {
+        case .avKit:
+            installAVPlayer(in: container, coordinator: coordinator)
+        case .webKit:
+            installWebPlayer(in: container, coordinator: coordinator)
+        }
+    }
+
+    private func installAVPlayer(
+        in container: MoviePlayerContainerView,
+        coordinator: Coordinator
+    ) {
+        let playerView = Self.configuredAVPlayerView()
+        pin(playerView, in: container.playerHost)
+
+        let player = AVPlayer(url: URL(fileURLWithPath: path))
+        coordinator.player = player
+        playerView.player = player
+        coordinator.statusObservation = player.currentItem?.observe(
+            \.status,
+            options: [.initial, .new]
+        ) { [weak container] item, _ in
+            DispatchQueue.main.async {
+                switch item.status {
+                case .readyToPlay:
+                    container?.showPlayer()
+                case .failed:
+                    container?.showError("This movie could not be played.")
+                case .unknown:
+                    container?.showLoading()
+                @unknown default:
+                    container?.showError("This movie could not be played.")
+                }
+            }
+        }
+
+        if autoplay {
+            player.play()
+        }
+    }
+
+    private func installWebPlayer(
+        in container: MoviePlayerContainerView,
+        coordinator: Coordinator
+    ) {
+        let configuration = WKWebViewConfiguration()
+        configuration.mediaTypesRequiringUserActionForPlayback = autoplay ? [] : .all
+        configuration.userContentController.add(coordinator, name: "movieStatus")
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: Self.webMovieScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.underPageBackgroundColor = .black
+        webView.navigationDelegate = coordinator
+        pin(webView, in: container.playerHost)
+
+        let videoURL = URL(fileURLWithPath: path)
+        webView.loadFileURL(
+            videoURL,
+            allowingReadAccessTo: videoURL.deletingLastPathComponent()
+        )
+        coordinator.webView = webView
+    }
+
+    private func pin(_ child: NSView, in container: NSView) {
+        child.frame = container.bounds
+        child.autoresizingMask = [.width, .height]
+        container.addSubview(child)
+    }
+
+    private static func removePlayer(
+        from container: MoviePlayerContainerView,
+        coordinator: Coordinator
+    ) {
+        coordinator.statusObservation?.invalidate()
+        coordinator.statusObservation = nil
+        coordinator.player?.pause()
+        coordinator.player = nil
+        coordinator.webView?.configuration.userContentController
+            .removeScriptMessageHandler(forName: "movieStatus")
+        coordinator.webView?.navigationDelegate = nil
+        coordinator.webView?.stopLoading()
+        coordinator.webView = nil
+        coordinator.path = nil
+        container.playerHost.subviews.forEach { $0.removeFromSuperview() }
+    }
+
+    private static let webMovieScript = """
+    (() => {
+      document.documentElement.style.background = '#000';
+      document.body.style.cssText = 'margin:0;background:#000;overflow:hidden';
+      const video = document.querySelector('video');
+      if (!video) {
+        window.webkit.messageHandlers.movieStatus.postMessage('error');
+        return;
+      }
+      video.controls = true;
+      video.style.cssText = 'width:100vw;height:100vh;object-fit:contain;background:#000';
+      const ready = () => window.webkit.messageHandlers.movieStatus.postMessage('ready');
+      const failed = () => window.webkit.messageHandlers.movieStatus.postMessage('error');
+      if (video.readyState >= 2) ready();
+      else video.addEventListener('loadeddata', ready, { once: true });
+      video.addEventListener('error', failed, { once: true });
+    })();
+    """
+}
+
+final class MoviePlayerContainerView: NSView {
+    let playerHost = NSView()
+
+    private let loadingOverlay = NSView()
+    private let spinner = NSProgressIndicator()
+    private let statusLabel = NSTextField(labelWithString: "Loading movie…")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+
+        playerHost.frame = bounds
+        playerHost.autoresizingMask = [.width, .height]
+        addSubview(playerHost)
+
+        loadingOverlay.frame = bounds
+        loadingOverlay.autoresizingMask = [.width, .height]
+        loadingOverlay.wantsLayer = true
+        loadingOverlay.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.82).cgColor
+        addSubview(loadingOverlay)
+
+        spinner.style = .spinning
+        spinner.controlSize = .regular
+        spinner.appearance = NSAppearance(named: .darkAqua)
+
+        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.textColor = NSColor.white.withAlphaComponent(0.76)
+        statusLabel.alignment = .center
+
+        let stack = NSStackView(views: [spinner, statusLabel])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        loadingOverlay.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: loadingOverlay.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: loadingOverlay.centerYAnchor),
+        ])
+
+        showLoading()
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    func showLoading() {
+        statusLabel.stringValue = "Loading movie…"
+        spinner.isHidden = false
+        spinner.startAnimation(nil)
+        loadingOverlay.isHidden = false
+    }
+
+    func showPlayer() {
+        spinner.stopAnimation(nil)
+        loadingOverlay.isHidden = true
+    }
+
+    func showError(_ message: String) {
+        spinner.stopAnimation(nil)
+        spinner.isHidden = true
+        statusLabel.stringValue = message
+        loadingOverlay.isHidden = false
+    }
+}
 
 struct ReviewBadge: View {
     let state: ReviewState
