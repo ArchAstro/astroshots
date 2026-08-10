@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.1] (macos) - 2026-08-10
+
 ### Added
 
 - **Software Update (Sparkle):** standard `SPUStandardUpdaterController` owned
