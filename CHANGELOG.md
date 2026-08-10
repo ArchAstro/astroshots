@@ -11,6 +11,19 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **Movie playback controls:** tray and full-screen review now provide play/pause,
+  scrubbing, volume, full-screen controls, and a polished loading state for both
+  Astroshot WebM captures and MP4/MOV movies.
+
+### Fixed
+
+- **Tray movie stability:** replaced the crashing SwiftUI AVKit bridge with
+  lifecycle-owned native players.
+- **Tray navigation:** redesigned the header and tabs around the clearer Agent
+  Rooms hierarchy, with balanced tab hit areas and a compact selected pill.
+
 ## [0.2.1] (macos) - 2026-08-10
 
 ### Added
