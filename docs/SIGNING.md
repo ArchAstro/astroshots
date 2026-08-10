@@ -150,6 +150,7 @@ You need **all** of these names:
 - `APPLE_API_KEY_ID`
 - `APPLE_API_ISSUER_ID`
 - `APPLE_API_KEY_BASE64`
+- `SPARKLE_ED_PRIVATE_KEY` (Sparkle auto-update; step 10b)
 
 Quick check:
 
@@ -162,6 +163,7 @@ need=(
   APPLE_API_KEY_ID
   APPLE_API_ISSUER_ID
   APPLE_API_KEY_BASE64
+  SPARKLE_ED_PRIVATE_KEY
 )
 have="$(gh secret list --repo "$GH_REPO" --json name --jq '.[].name')"
 for s in "${need[@]}"; do
@@ -172,6 +174,47 @@ done
 ```
 
 Every line should say **OK**. If any say **MISS**, go back to that step.
+
+---
+
+### 10b. Sparkle EdDSA key (auto-update)
+
+Astroshots uses [Sparkle](https://sparkle-project.org) for in-app updates. The
+**public** key is already embedded in `macos/project.yml` as `SUPublicEDKey`.
+CI needs the matching **private** key to sign each release zip + appcast.
+
+If keys were generated on this machine (account `ai.archastro.Astroshots`):
+
+```bash
+# Export from Keychain (only if the private key file is not already saved):
+#   generate_keys --account ai.archastro.Astroshots -x ~/.config/astroshots/sparkle_ed_private_key
+
+# Upload the private key file contents as a GitHub secret (do not commit this file):
+gh secret set SPARKLE_ED_PRIVATE_KEY --repo "$GH_REPO" \
+  < ~/.config/astroshots/sparkle_ed_private_key
+```
+
+Public key currently in the app (must match the secret):
+
+```text
+kddwW0gHUJ6CvdcYukaQd+cfNxEEHwQZHjzUYsjtVgc=
+```
+
+If you rotate keys: generate a new pair, update `SUPublicEDKey` in
+`macos/project.yml`, ship that app build with Developer ID (Sparkle can rotate
+EdDSA when Apple code signing stays the same), then replace the secret.
+
+Feed URL (`SUFeedURL`) — **not** `releases/latest` (this repo’s “Latest”
+badge is often the npm `astroshot-v*` release):
+
+```text
+https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml
+```
+
+Each **Release DMG** run uploads `Astroshots-X.Y.Z.dmg` (manual install),
+`Astroshots-X.Y.Z.zip` (Sparkle update archive), and a cumulative
+`appcast.xml` to the versioned GitHub Release **and** refreshes the stable
+`appcast` release asset (what installed apps poll).
 
 ---
 
@@ -237,6 +280,6 @@ open build/Astroshots.dmg
 
 ## What this is for
 
-On **version tags** (`v*`), the **Release DMG** workflow imports the `.p12`, builds Astroshots, **Developer ID signs** it, builds a DMG, **notarizes** with the API key, **staples** the ticket, and attaches it to the GitHub Release. That install should open without right-click → Open.
+On **version tags** (`v*`), the **Release DMG** workflow imports the `.p12`, builds Astroshots, **Developer ID signs** it, builds a DMG, **notarizes** with the API key, **staples** the ticket, builds a Sparkle update **zip**, signs an **appcast** with the EdDSA private key, and attaches DMG + zip + `appcast.xml` to the GitHub Release. That install should open without right-click → Open; installed apps can **Check for Updates…** against `releases/latest/download/appcast.xml`.
 
 PRs only run unit tests (no notarization).

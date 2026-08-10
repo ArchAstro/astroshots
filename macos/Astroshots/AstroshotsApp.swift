@@ -4,8 +4,10 @@ import SwiftUI
 /// overlay flash for new frames, detail drill-in. See docs/mocks/astroshots-menubar.html.
 ///
 /// Status item interaction is AppKit (`StatusItemController`): left-click opens
-/// the tray popover; right-click offers Open, Settings, version information,
-/// and Quit. `MenuBarExtra` cannot host a native context menu, so it is not used.
+/// the tray popover; right-click offers Open, Settings, Check for Updates…,
+/// version, and Quit. `MenuBarExtra` cannot host a native context menu, so it
+/// is not used. Software Update uses Sparkle (`SPUStandardUpdaterController`
+/// owned by `AppDelegate`).
 @main
 struct AstroshotsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate

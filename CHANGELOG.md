@@ -13,6 +13,15 @@ The two tracks are versioned independently.
 
 ### Added
 
+- **Software Update (Sparkle):** standard `SPUStandardUpdaterController` owned
+  by the app delegate; **Check for Updates…** on the status-item menu (target/
+  action on the controller); Settings → Software Update with automatic check /
+  download toggles (Sparkle’s documented preferences pattern). Release CI
+  publishes a signed update zip + cumulative `appcast.xml` beside the notarized
+  DMG (`SPARKLE_ED_PRIVATE_KEY` — see `docs/SIGNING.md`). Upgrade stages log
+  to Console under subsystem `ai.archastro.Astroshots` category
+  `SoftwareUpdate` (startup, appcast load, found/no update, download, extract,
+  install, relaunch, errors).
 - **Narrated friction-log videos (opt-in):** Settings → Narration enables on-device
   **mlx-audio-swift** (MLX Swift) + Qwen3-TTS. The app checks Apple Silicon,
   downloads the HF model in the background with a progress bar, loads weights

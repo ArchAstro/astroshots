@@ -1,10 +1,21 @@
 import AppKit
+import Sparkle
 
-/// Owns the shared `AppState` and menu-bar status item for the LSUIElement app.
+/// Owns the shared `AppState`, menu-bar status item, and Sparkle updater for
+/// the LSUIElement app.
+///
+/// Sparkle setup follows the standard Cocoa pattern: hold an
+/// `SPUStandardUpdaterController`, wire “Check for Updates…” to
+/// `checkForUpdates:`, and read feed/public-key from Info.plist.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var appState: AppState!
     private var statusItemController: StatusItemController!
+    /// Standard Sparkle controller (scheduler + update UI). Nil under XCTest /
+    /// UI-test launches so automated runs never hit the network.
+    private(set) var updaterController: SPUStandardUpdaterController?
+    /// Strong ref: `SPUStandardUpdaterController` keeps the delegate weakly.
+    private var softwareUpdateDelegate: SoftwareUpdateDelegate?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         #if DEBUG
@@ -24,6 +35,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = StatusItemController(appState: state)
         statusItemController = controller
         controller.install()
+
+        // Sparkle: start after the status item exists. Skip UI-test launches.
+        let isUITestLaunch = ProcessInfo.processInfo.environment.keys.contains {
+            $0.hasPrefix("ASTROSHOTS_UI_TEST_") || $0 == "ASTROSHOTS_FRICTION_CAPTURE_DIR"
+        }
+        if !isUITestLaunch {
+            // startingUpdater: true begins scheduled background checks using
+            // SUFeedURL / SUPublicEDKey from Info.plist. Delegate logs every
+            // stage of the upgrade flow to Console (category SoftwareUpdate).
+            let updateDelegate = SoftwareUpdateDelegate()
+            softwareUpdateDelegate = updateDelegate
+            let sparkle = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: updateDelegate,
+                userDriverDelegate: nil
+            )
+            updaterController = sparkle
+            updateDelegate.logStartup(updater: sparkle.updater)
+            state.updaterSettings = UpdaterSettingsModel(updater: sparkle.updater)
+            controller.attachUpdaterController(sparkle)
+
+            #if DEBUG
+            // Local verification only: ASTROSHOTS_CHECK_UPDATES_ON_LAUNCH=1 forces a
+            // user-initiated check after the run loop is up.
+            if ProcessInfo.processInfo.environment["ASTROSHOTS_CHECK_UPDATES_ON_LAUNCH"] == "1" {
+                SoftwareUpdateLog.logger.info("debug forced check-on-launch")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    sparkle.checkForUpdates(nil)
+                }
+            }
+            #endif
+        }
 
         #if DEBUG
         let env = ProcessInfo.processInfo.environment

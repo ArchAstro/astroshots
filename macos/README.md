@@ -186,8 +186,59 @@ the same installer contract before release.
 | `.github/workflows/ci.yml` | PRs / pushes | Tests + ad-hoc branded DMG proof |
 | `.github/workflows/cut-release.yml` | Manual: patch / minor / major | Bump + changelog + tag `vX.Y.Z` + **dispatch Release DMG** + PR |
 | `.github/workflows/cut-npm-release.yml` | Manual: patch / minor / major | Bump npm packages + changelog + tag `astroshot-v*` + publish dispatch + PR |
-| `.github/workflows/release-dmg.yml` | tags `v*` or dispatch | Signed + notarized `Astroshots-X.Y.Z.dmg` on the GitHub Release |
+| `.github/workflows/release-dmg.yml` | tags `v*` or dispatch | Signed + notarized `Astroshots-X.Y.Z.dmg`, Sparkle zip, and `appcast.xml` on the GitHub Release |
 | `.github/workflows/publish-npm.yml` | tags `astroshot-v*` or dispatch | Publish `@archastro/*` with OIDC trusted publishing |
+
+### Auto-update (Sparkle)
+
+The app embeds [Sparkle 2](https://sparkle-project.org):
+
+- Feed: `https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml`
+  (dedicated release — not GitHub “Latest”, which is often the npm track)
+- Public key: `SUPublicEDKey` in `project.yml`
+- UI: status-item **Check for Updates…** + Settings → Updates
+
+```bash
+./scripts/package-dmg.sh
+# → build/Astroshots-X.Y.Z.dmg  (manual install)
+# → build/Astroshots-X.Y.Z.zip  (in-app update archive)
+
+./scripts/generate-appcast.sh \
+  --zip build/Astroshots-X.Y.Z.zip \
+  --version X.Y.Z \
+  --out ../appcast.xml
+```
+
+CI secret `SPARKLE_ED_PRIVATE_KEY` and key rotation: [`docs/SIGNING.md`](../docs/SIGNING.md) step **10b**.
+
+#### Watching upgrade logs (release testing)
+
+Every Sparkle stage is written to the unified system log:
+
+| Field | Value |
+|-------|--------|
+| subsystem | `ai.archastro.Astroshots` |
+| category | `SoftwareUpdate` |
+
+```bash
+# Live stream while you cut/install successive versions:
+log stream --style compact --predicate \
+  'subsystem == "ai.archastro.Astroshots" AND category == "SoftwareUpdate"'
+```
+
+In **Console.app**: search `subsystem:ai.archastro.Astroshots category:SoftwareUpdate`
+(include Info/Debug; “Include Info Messages”).
+
+Typical lines for a successful upgrade:
+
+1. `startup installed=… feed=…`
+2. `mayPerformCheck type=user-initiated|background`
+3. `appcastLoaded itemCount=…`
+4. `foundUpdate 0.2.1 [18] …` **or** `noUpdate …`
+5. `willDownload` → `didDownload` → `willExtract` → `didExtract`
+6. `willInstall` → `willRelaunch` → `cycleFinished … ok`
+
+Errors surface as `downloadFailed`, `aborted`, or `cycleFinished … error=`.
 
 ```bash
 # macOS app

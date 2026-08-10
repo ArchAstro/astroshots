@@ -6,10 +6,14 @@ options:
   createIntermediateGroups: true
 
 # MLX Audio Swift (Qwen3-TTS) → pulls mlx-swift, mlx-swift-lm, Hub client.
+# Sparkle → in-app auto-updates from the GitHub Releases appcast.
 packages:
   mlx-audio-swift:
     url: https://github.com/Blaizzy/mlx-audio-swift
     branch: main
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.5
 
 settings:
   base:
@@ -36,6 +40,8 @@ targets:
         product: MLXAudioCore
       - package: mlx-audio-swift
         product: MLXAudioTTS
+      - package: Sparkle
+        product: Sparkle
     entitlements:
       path: Astroshots/Astroshots.entitlements
     info:
@@ -49,9 +55,23 @@ targets:
         NSHumanReadableCopyright: "Copyright © 2026 ArchAstro Inc."
         # Menu-bar app: no Dock icon.
         LSUIElement: true
+        # Sparkle feed must NOT use releases/latest — this repo has dual tracks
+        # (macOS v* and npm astroshot-v*), and GitHub “Latest” is often npm.
+        # CI keeps a dedicated non-latest `appcast` release with the cumulative feed.
+        SUFeedURL: https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml
+        SUPublicEDKey: kddwW0gHUJ6CvdcYukaQd+cfNxEEHwQZHjzUYsjtVgc=
+        # Ask once (second launch) whether to check automatically; default yes.
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: false
+        SUScheduledCheckInterval: 86400
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.archastro.Astroshots
+      configs:
+        # Ad-hoc Debug + Hardened Runtime blocks loading the Sparkle framework
+        # under Library Validation; Apple Development / Developer ID are fine.
+        Debug:
+          ENABLE_LIBRARY_VALIDATION: NO
 
   AstroshotsTests:
     type: bundle.unit-test

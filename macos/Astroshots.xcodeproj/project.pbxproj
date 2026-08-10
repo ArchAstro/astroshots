@@ -12,10 +12,12 @@
 		0FBA61FD5886CA5737CC4E50 /* FrictionLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAD7F3727B1878855A2E92 /* FrictionLog.swift */; };
 		17BFA74EE76E1E71A5627F33 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */; };
 		1B4177ACA9522A6931715AEE /* NarrationJobQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F84D4D30E15FCC4EECC1C2 /* NarrationJobQueue.swift */; };
+		2F836D593A00F10CAF192EAB /* SoftwareUpdateLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC5FF9EEBB57A3DF50450A /* SoftwareUpdateLog.swift */; };
 		30F1181D9C567492F8204CE4 /* ReviewWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 278FA85768F47F8222B1B495 /* ReviewWindowController.swift */; };
 		31AE3C3B00FA4E4A8D5A2CB2 /* ReviewTakeoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71AECECE88B0D8F41B06334C /* ReviewTakeoverView.swift */; };
 		342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */; };
 		351739C9880F7D8D2B6F27EF /* NarrationModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B879878D858221AB43F32C45 /* NarrationModelManager.swift */; };
+		38BC032AD4BD97860E99A346 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2184DE30F2A57B5CCF1B3EBD /* Sparkle */; };
 		395A03C70C98F97840F02AF8 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9AEB54D8607EFEF17F160806 /* MLXAudioCore */; };
 		3B7C5B7B558B59E7414950DF /* ReviewFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 182E7298047007414ABC9862 /* ReviewFlowUITests.swift */; };
 		3D70DEAA463D3459B886ED95 /* NarrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7975C24FB04A3D1A9DA4227 /* NarrationTests.swift */; };
@@ -40,7 +42,9 @@
 		A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */; };
 		AC6530122CF24B9A06DCF3E6 /* ImagePagingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4705ECE07E4CA31E16A35EDC /* ImagePagingTests.swift */; };
 		AC966A901816D42D9B701C48 /* NarrationVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C52CACF01C306AEEF350902 /* NarrationVideoComposer.swift */; };
+		AD510E9E9E9507B92967E0BE /* SoftwareUpdateDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E64F943CCC3A0ED542021C6 /* SoftwareUpdateDelegate.swift */; };
 		B0595108F32E7E3BCBC52B40 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDC12CB9342C5E685FD8A25 /* DetailView.swift */; };
+		B6692FB16CC577D445C39EBF /* UpdaterSettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F779226DD82B193FF1F471C /* UpdaterSettingsModel.swift */; };
 		BB6D913C2F3291617685815E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A6D30FE0070BBC23546100 /* OverlayController.swift */; };
 		CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26844F440291050990A83490 /* PreferencesTests.swift */; };
 		CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823B8B4248FDCBE1985DECAE /* Shot.swift */; };
@@ -92,6 +96,7 @@
 		278FA85768F47F8222B1B495 /* ReviewWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowController.swift; sourceTree = "<group>"; };
 		2A2EE3350232CD98BC7DF3D0 /* FrictionStepDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionStepDetailView.swift; sourceTree = "<group>"; };
 		2B08FD45A80670CAD9391ADB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		2F779226DD82B193FF1F471C /* UpdaterSettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterSettingsModel.swift; sourceTree = "<group>"; };
 		3009EED7A72CCCCF8A86260D /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		3080B7658C295EC23288CB79 /* Astroshots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astroshots.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		33713B379610D87587D40B40 /* FrictionLogListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogListView.swift; sourceTree = "<group>"; };
@@ -114,7 +119,9 @@
 		8F2AB8506FCE8107DD28D547 /* Astroshots.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Astroshots.entitlements; sourceTree = "<group>"; };
 		976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroshotWatcher.swift; sourceTree = "<group>"; };
 		9976B5034C36AABFDFD4B2C8 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9E64F943CCC3A0ED542021C6 /* SoftwareUpdateDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdateDelegate.swift; sourceTree = "<group>"; };
 		A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManifestParserTests.swift; sourceTree = "<group>"; };
+		A9CC5FF9EEBB57A3DF50450A /* SoftwareUpdateLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdateLog.swift; sourceTree = "<group>"; };
 		AD17CC89BE4C1AA3A933FB87 /* ReviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewComponents.swift; sourceTree = "<group>"; };
 		B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotThumbnail.swift; sourceTree = "<group>"; };
 		B879878D858221AB43F32C45 /* NarrationModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationModelManager.swift; sourceTree = "<group>"; };
@@ -139,6 +146,7 @@
 			files = (
 				395A03C70C98F97840F02AF8 /* MLXAudioCore in Frameworks */,
 				08F526815789732E0FE35991 /* MLXAudioTTS in Frameworks */,
+				38BC032AD4BD97860E99A346 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,8 +179,11 @@
 				9976B5034C36AABFDFD4B2C8 /* AppState.swift */,
 				CEA37DEE55FC5E2992C0612C /* ImageClipboard.swift */,
 				3009EED7A72CCCCF8A86260D /* Preferences.swift */,
+				9E64F943CCC3A0ED542021C6 /* SoftwareUpdateDelegate.swift */,
+				A9CC5FF9EEBB57A3DF50450A /* SoftwareUpdateLog.swift */,
 				75955E0D26EB206BCE2025ED /* StatusItemController.swift */,
 				84934BBEECF7545EB5C02073 /* Theme.swift */,
+				2F779226DD82B193FF1F471C /* UpdaterSettingsModel.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -335,6 +346,7 @@
 			packageProductDependencies = (
 				9AEB54D8607EFEF17F160806 /* MLXAudioCore */,
 				A0AA92FD0D7D7B2179262BCF /* MLXAudioTTS */,
+				2184DE30F2A57B5CCF1B3EBD /* Sparkle */,
 			);
 			productName = Astroshots;
 			productReference = 3080B7658C295EC23288CB79 /* Astroshots.app */;
@@ -407,6 +419,7 @@
 			mainGroup = DE6CFFA16895E75CF05C030A;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				E1468B51650BF95A1383EAE9 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				AEA07F9C6D8218B742DF9C79 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -485,10 +498,13 @@
 				CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */,
 				57ED4434B7E830DD91FE67B9 /* ShotIndexCache.swift in Sources */,
 				A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */,
+				AD510E9E9E9507B92967E0BE /* SoftwareUpdateDelegate.swift in Sources */,
+				2F836D593A00F10CAF192EAB /* SoftwareUpdateLog.swift in Sources */,
 				01F71C7E4F92A354272E716C /* StatusItemController.swift in Sources */,
 				F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */,
 				F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */,
 				342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */,
+				B6692FB16CC577D445C39EBF /* UpdaterSettingsModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -556,6 +572,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Astroshots/Astroshots.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_LIBRARY_VALIDATION = NO;
 				INFOPLIST_FILE = Astroshots/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -800,9 +817,22 @@
 				kind = branch;
 			};
 		};
+		E1468B51650BF95A1383EAE9 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.5;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2184DE30F2A57B5CCF1B3EBD /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1468B51650BF95A1383EAE9 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		9AEB54D8607EFEF17F160806 /* MLXAudioCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AEA07F9C6D8218B742DF9C79 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
