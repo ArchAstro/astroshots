@@ -8,8 +8,11 @@ Design source: [`../docs/mocks/astroshots-menubar.html`](../docs/mocks/astroshot
 Requires macOS 14+ (Apple Silicon for narration), Xcode 16+,
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
-Narration pulls **mlx-audio-swift** (→ **mlx-swift**). First CLI build needs the
-Metal toolchain and skips the mlx CUDA package-plugin fingerprint check:
+Narration pulls **mlx-audio-swift** (→ **mlx-swift**). That stack needs:
+
+- **Swift tools 6.2+** (Xcode 26+; GitHub Actions uses `macos-26`)
+- **Metal toolchain** for mlx-swift shaders
+- **`-skipPackagePluginValidation`** (mlx CUDA plugin fingerprint on macOS CLI)
 
 ```bash
 xcodebuild -downloadComponent MetalToolchain   # once per machine
@@ -17,7 +20,7 @@ xcodebuild -downloadComponent MetalToolchain   # once per machine
 xcodebuild … -skipPackagePluginValidation
 ```
 
-`./scripts/bootstrap.sh` and `scripts/xcode-env.sh` handle this for you.
+`./scripts/bootstrap.sh` and `scripts/xcode-env.sh` handle the Metal/flags side.
 
 ## Getting started
 

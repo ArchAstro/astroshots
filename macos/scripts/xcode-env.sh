@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Shared environment for building Astroshots with mlx-audio-swift / mlx-swift.
 #
-# MLX Swift needs:
-#   1. Metal Toolchain (metal compiler) — not always present on clean Xcode installs / CI
-#   2. -skipPackagePluginValidation — mlx-swift ships a CUDA build plugin for Linux that
-#      fails fingerprint validation on macOS command-line builds
+# Requirements:
+#   - Swift tools ≥ 6.2 (Xcode 26+) — mlx-audio-swift Package.swift is 6.2
+#   - Metal Toolchain (metal compiler) for mlx-swift shaders
+#   - -skipPackagePluginValidation — mlx-swift CUDA plugin fingerprint fails on
+#     macOS CLI builds
+#
+# CI: run the macOS app job on macos-26 with Xcode 26 selected.
 #
 # Source this file, then invoke xcodebuild with "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}".
 #
