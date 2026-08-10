@@ -184,7 +184,7 @@ echo "==> Generating appcast (version=$VERSION prefix=$DOWNLOAD_URL_PREFIX)"
   --link "$LINK" \
   --maximum-versions "$MAXIMUM_VERSIONS" \
   --maximum-deltas 0 \
-  -o appcast.xml \
+  -o "$WORK/appcast.xml" \
   "$WORK"
 
 if [[ ! -f "$WORK/appcast.xml" ]]; then
