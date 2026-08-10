@@ -124,8 +124,9 @@ jobs:
 
   test:
     name: macOS app
+    # mlx-audio-swift requires Swift tools 6.2 → Xcode 26 on macos-26.
     # mlx-swift first compile is heavy (Metal shaders + C++ backend).
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -133,10 +134,21 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Select Xcode
+      - name: Select Xcode 26 (Swift 6.2)
         run: |
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          set -euo pipefail
+          # Prefer the image default Xcode.app (26.6 on current macos-26 images).
+          if [[ -d /Applications/Xcode_26.6.app ]]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          elif [[ -d /Applications/Xcode.app ]]; then
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          else
+            echo "error: no Xcode 26 install found" >&2
+            ls /Applications/Xcode*.app || true
+            exit 1
+          fi
           xcodebuild -version
+          swift --version
 
       - name: Install Metal toolchain (mlx-swift)
         working-directory: macos
