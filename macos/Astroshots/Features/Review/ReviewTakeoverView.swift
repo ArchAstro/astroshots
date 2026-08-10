@@ -144,7 +144,7 @@ struct ReviewTakeoverView: View {
             ZStack {
                 Color(hex: 0x2A2A29)
 
-                reviewImage
+                reviewMedia
                     .frame(
                         maxWidth: max(240, proxy.size.width - 72),
                         maxHeight: max(180, proxy.size.height - 72)
@@ -205,8 +205,20 @@ struct ReviewTakeoverView: View {
     }
 
     @ViewBuilder
-    private var reviewImage: some View {
-        if let image = NSImage(contentsOfFile: currentShot.path) {
+    private var reviewMedia: some View {
+        if currentShot.isMovie, let videoPath = currentShot.videoPath {
+            MoviePlayerView(path: videoPath)
+                .aspectRatio(movieAspectRatio, contentMode: .fit)
+                .background(Color.black)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.34), radius: 28, y: 12)
+                .accessibilityLabel("Movie player for \(currentShot.title)")
+                .accessibilityIdentifier("review.movie.player")
+        } else if let image = NSImage(contentsOfFile: currentShot.path) {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -236,6 +248,13 @@ struct ReviewTakeoverView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityIdentifier("review.image")
         }
+    }
+
+    private var movieAspectRatio: CGFloat {
+        guard let image = NSImage(contentsOfFile: currentShot.path),
+              image.size.width > 0, image.size.height > 0
+        else { return 16 / 9 }
+        return image.size.width / image.size.height
     }
 
     private var feedbackRail: some View {

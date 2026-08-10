@@ -1,5 +1,4 @@
 import AppKit
-import AVKit
 import SwiftUI
 
 struct DetailView: View {
@@ -146,7 +145,7 @@ struct DetailView: View {
                                 movieActions(for: shot)
                                     .padding(.bottom, 8)
                                 if showInlinePlayer, let videoPath = shot.videoPath {
-                                    MovieInlinePlayer(path: videoPath)
+                                    MoviePlayerView(path: videoPath)
                                         .frame(height: 180)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .padding(.bottom, 12)
@@ -495,15 +494,6 @@ struct DetailView: View {
 
     private func iso(_ date: Date) -> String {
         Self.isoFormatter.string(from: date)
-    }
-}
-
-private struct MovieInlinePlayer: View {
-    let path: String
-
-    var body: some View {
-        VideoPlayer(player: AVPlayer(url: URL(fileURLWithPath: path)))
-            .background(Color.black)
     }
 }
 
