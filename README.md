@@ -39,6 +39,8 @@ No project picker. No account. No cloud. Just files on disk and a camera icon in
 6. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
 
 Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
+Installed copies can **Check for Updates…** (Sparkle) against the latest GitHub
+Release appcast.
 
 ### From source
 

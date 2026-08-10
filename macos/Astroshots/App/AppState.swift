@@ -67,6 +67,9 @@ final class AppState {
     /// True when the tray was opened from a seeded UI-test / friction fixture
     /// (not a live multi-root watcher session).
     var isFixtureSession = false
+    /// Sparkle settings model; set by `AppDelegate` after the updater starts.
+    /// Nil under unit/UI tests.
+    var updaterSettings: UpdaterSettingsModel?
 
     private var toastTask: Task<Void, Never>?
     private let watcher: AstroshotWatcher

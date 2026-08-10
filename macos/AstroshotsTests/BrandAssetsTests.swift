@@ -51,13 +51,17 @@ struct BrandAssetsTests {
         #expect(items.map(\.title) == [
             "Open Astroshots",
             "Settings…",
+            "Check for Updates…",
             "",
             StatusItemController.versionMenuTitle(),
             "",
             "Quit Astroshots",
         ])
         #expect(items[1].isEnabled)
-        #expect(!items[3].isEnabled)
+        // "Check for Updates…" stays disabled until AppDelegate attaches Sparkle
+        // (unit tests never start the updater).
+        #expect(!items[2].isEnabled)
+        #expect(!items[4].isEnabled)
 
         let settingsAction = try #require(items[1].action)
         #expect(NSApp.sendAction(settingsAction, to: items[1].target, from: items[1]))
@@ -74,5 +78,16 @@ struct BrandAssetsTests {
                 ]
             ) == "Version 1.2.3 (45)"
         )
+    }
+
+    @Test
+    func sparkleFeedAndPublicKeyAreEmbedded() throws {
+        let info = try #require(Bundle.main.infoDictionary)
+        let feed = try #require(info["SUFeedURL"] as? String)
+        // Must not use releases/latest — dual npm/macOS tracks fight over that badge.
+        #expect(feed == "https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml")
+
+        let publicKey = try #require(info["SUPublicEDKey"] as? String)
+        #expect(publicKey == "kddwW0gHUJ6CvdcYukaQd+cfNxEEHwQZHjzUYsjtVgc=")
     }
 }

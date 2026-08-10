@@ -92,7 +92,7 @@ jobs:
           chmod +x macos/scripts/ci-import-certificate.sh
           ./macos/scripts/ci-import-certificate.sh
 
-      - name: Build, sign, notarize DMG
+      - name: Build, sign, notarize DMG + Sparkle zip
         working-directory: macos
         env:
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
@@ -120,15 +120,70 @@ jobs:
           fi
 
           chmod +x scripts/package-dmg.sh
+          mkdir -p "$GITHUB_WORKSPACE/dist"
           ./scripts/package-dmg.sh \
             --out "$GITHUB_WORKSPACE/dist/Astroshots-${VERSION}.dmg"
+          # package-dmg also writes Astroshots-${VERSION}.zip next to the DMG.
+          if [[ ! -f "$GITHUB_WORKSPACE/dist/Astroshots-${VERSION}.zip" ]]; then
+            echo "error: expected Sparkle zip missing" >&2
+            exit 1
+          fi
           ls -lh "$GITHUB_WORKSPACE/dist/"
+
+      - name: Generate Sparkle appcast
+        working-directory: macos
+        env:
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPARKLE_ED_PRIVATE_KEY:-}" ]]; then
+            echo "error: SPARKLE_ED_PRIVATE_KEY secret is required for appcast signing" >&2
+            echo "See docs/SIGNING.md (Sparkle EdDSA keys)." >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          chmod +x scripts/generate-appcast.sh
+
+          # Seed from the previous latest appcast when present so history is kept.
+          PREV_APPCAST="$GITHUB_WORKSPACE/dist/appcast-prev.xml"
+          mkdir -p /tmp/astroshots-prev-appcast
+          # Without a tag, gh downloads from the latest published release.
+          if gh release download --pattern 'appcast.xml' \
+               --dir /tmp/astroshots-prev-appcast \
+               --clobber 2>/dev/null \
+            && [[ -f /tmp/astroshots-prev-appcast/appcast.xml ]]; then
+            cp /tmp/astroshots-prev-appcast/appcast.xml "$PREV_APPCAST"
+            echo "Seeded appcast from latest GitHub Release"
+          fi
+          # Also accept a checked-in seed (first Sparkle release).
+          if [[ ! -f "$PREV_APPCAST" && -f "$GITHUB_WORKSPACE/appcast.xml" ]]; then
+            cp "$GITHUB_WORKSPACE/appcast.xml" "$PREV_APPCAST"
+            echo "Seeded appcast from repo appcast.xml"
+          fi
+
+          OUT_APPCAST="$GITHUB_WORKSPACE/dist/appcast.xml"
+          if [[ -f "$PREV_APPCAST" ]]; then
+            cp "$PREV_APPCAST" "$OUT_APPCAST"
+          fi
+
+          ./scripts/generate-appcast.sh \
+            --zip "$GITHUB_WORKSPACE/dist/Astroshots-${VERSION}.zip" \
+            --version "$VERSION" \
+            --out "$OUT_APPCAST"
+          ls -lh "$OUT_APPCAST"
+          # Keep a copy at repo-relative path for local inspection in the artifact.
+          cp "$OUT_APPCAST" "$GITHUB_WORKSPACE/appcast.xml"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Astroshots-dmg
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/appcast.xml
           if-no-files-found: error
           retention-days: 90
 
@@ -138,15 +193,39 @@ jobs:
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ ! "$TAG" =~ ^v ]]; then
-            echo "error: expected a version tag (v*), got: $TAG" >&2
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: expected a version tag (vX.Y.Z), got: $TAG" >&2
             exit 1
           fi
+          VERSION="${TAG#v}"
+          ASSETS=(
+            "dist/Astroshots-${VERSION}.dmg"
+            "dist/Astroshots-${VERSION}.zip"
+            "dist/appcast.xml"
+          )
+          for asset in "${ASSETS[@]}"; do
+            if [[ ! -f "$asset" ]]; then
+              echo "error: missing release asset: $asset" >&2
+              exit 1
+            fi
+          done
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --title "Astroshots $TAG" \
               --generate-notes \
-              dist/*.dmg
+              "${ASSETS[@]}"
           else
-            gh release upload "$TAG" dist/*.dmg --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          fi
+
+          # Stable Sparkle feed (not GitHub “Latest” — that badge is often the
+          # npm astroshot-v* release). App SUFeedURL points here.
+          if ! gh release view appcast >/dev/null 2>&1; then
+            gh release create appcast \
+              --title "Astroshots Sparkle appcast" \
+              --notes "Cumulative Sparkle appcast for the macOS app. Not an app version; updated by Release DMG." \
+              --latest=false \
+              dist/appcast.xml
+          else
+            gh release upload appcast dist/appcast.xml --clobber
           fi

@@ -313,3 +313,5 @@ and opens a PR to main.
 - [ ] `Release DMG` is green (auto-dispatched)
 - [ ] The GitHub Release is public
 - [ ] `Astroshots-X.Y.Z.dmg` is attached, signed, and notarized
+- [ ] `Astroshots-X.Y.Z.zip` (Sparkle update archive) and `appcast.xml` are
+      attached; `SPARKLE_ED_PRIVATE_KEY` is set in repo secrets

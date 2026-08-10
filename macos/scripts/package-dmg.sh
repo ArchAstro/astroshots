@@ -159,8 +159,27 @@ sign_app() {
     ent_args=(--entitlements "$entitlements")
   fi
 
-  # Sign nested code first if any, then the bundle. --deep is discouraged for
-  # modern notarization; ditto'd Release apps are usually flat enough.
+  # Sign nested code first (Sparkle.framework, XPC services, dylibs), then the
+  # outer bundle. --deep is discouraged for modern notarization. Use -depth so
+  # nested frameworks/XPC bundles are signed before their parents.
+  local nested
+  while IFS= read -r nested; do
+    [[ -n "$nested" ]] || continue
+    codesign \
+      --force \
+      --options runtime \
+      --timestamp \
+      --sign "$IDENTITY" \
+      "$nested"
+  done < <(
+    find "$app/Contents" -depth \( \
+      -name "*.dylib" -o \
+      -name "*.so" -o \
+      -name "*.xpc" -o \
+      -name "*.framework" \
+    \) 2>/dev/null
+  )
+
   codesign \
     --force \
     --options runtime \
@@ -393,7 +412,21 @@ fi
 STABLE="$ROOT/build/Astroshots.dmg"
 cp "$OUT_DMG" "$STABLE"
 
+# Sparkle prefers a zip of the .app for in-app updates (symlinks preserved).
+# DMG remains the manual install path.
+OUT_ZIP="${OUT_DMG%.dmg}.zip"
+if [[ "$OUT_ZIP" == "$OUT_DMG" ]]; then
+  OUT_ZIP="$ROOT/build/Astroshots-${VERSION}.zip"
+fi
+echo "==> Creating Sparkle update zip: $OUT_ZIP"
+rm -f "$OUT_ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT_ZIP"
+STABLE_ZIP="$ROOT/build/Astroshots.zip"
+cp "$OUT_ZIP" "$STABLE_ZIP"
+
 echo "==> Done"
 echo "    $OUT_DMG"
 echo "    $STABLE"
-ls -lh "$OUT_DMG"
+echo "    $OUT_ZIP"
+echo "    $STABLE_ZIP"
+ls -lh "$OUT_DMG" "$OUT_ZIP"

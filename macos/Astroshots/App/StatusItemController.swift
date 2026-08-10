@@ -1,8 +1,9 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 /// AppKit status item: left-click toggles the tray popover; right-click shows
-/// app actions, settings, version information, and Quit.
+/// app actions, settings, Check for Updates…, version, and Quit.
 ///
 /// `MenuBarExtra` cannot attach a native context menu, so menu-bar interaction
 /// is owned here instead of SwiftUI's menu-bar extra.
@@ -14,11 +15,25 @@ final class StatusItemController: NSObject {
     private var pinnedWindow: NSWindow?
     private var reviewWindowController: ReviewWindowController?
     private(set) var contextMenu: NSMenu?
+    private var checkForUpdatesMenuItem: NSMenuItem?
     private var observationTask: Task<Void, Never>?
+    /// Sparkle controller; menu item target/action point at this when set.
+    private var updaterController: SPUStandardUpdaterController?
 
     init(appState: AppState) {
         self.appState = appState
         super.init()
+    }
+
+    /// Idiomatic Sparkle menu wiring: target the standard controller and use
+    /// `checkForUpdates:`. The controller’s `validateMenuItem:` disables the
+    /// item while a check is already running (`canCheckForUpdates`).
+    func attachUpdaterController(_ controller: SPUStandardUpdaterController) {
+        updaterController = controller
+        if let item = checkForUpdatesMenuItem {
+            item.target = controller
+            item.action = #selector(SPUStandardUpdaterController.checkForUpdates(_:))
+        }
     }
 
     func install() {
@@ -75,6 +90,18 @@ final class StatusItemController: NSObject {
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        // Placeholder target until AppDelegate attaches SPUStandardUpdaterController.
+        // Title matches Apple / Sparkle convention (ellipsis for a further UI step).
+        let checkItem = NSMenuItem(
+            title: "Check for Updates…",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        checkItem.target = nil
+        checkItem.isEnabled = false
+        menu.addItem(checkItem)
+        checkForUpdatesMenuItem = checkItem
 
         menu.addItem(.separator())
 

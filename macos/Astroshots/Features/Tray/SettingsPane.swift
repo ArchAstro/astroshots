@@ -154,11 +154,22 @@ struct SettingsPane: View {
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 9))
                     }
 
+                    updatesCard
+
                     narrationCard
                 }
                 .padding(12)
             }
             .scrollIndicators(.hidden)
+        }
+    }
+
+    /// Sparkle preferences UI — same shape as Sparkle’s documented SwiftUI sample:
+    /// model seeded from `SPUUpdater`, write only on user change (via didSet).
+    @ViewBuilder
+    private var updatesCard: some View {
+        if let settings = appState.updaterSettings {
+            SoftwareUpdateSettingsCard(settings: settings)
         }
     }
 
@@ -277,5 +288,74 @@ struct SettingsPane: View {
             return "~" + path.dropFirst(home.count)
         }
         return path
+    }
+}
+
+/// Software Update card: binds to Sparkle’s `SPUUpdater` through
+/// `UpdaterSettingsModel` (idiomatic Sparkle + SwiftUI Observation).
+private struct SoftwareUpdateSettingsCard: View {
+    @Bindable var settings: UpdaterSettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Software Update")
+                .font(.system(size: 12, weight: .semibold))
+            Text("Checks GitHub Releases for new versions and installs them in place.")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.muted)
+                .padding(.bottom, 4)
+
+            HStack {
+                Text("Automatically check for updates")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Toggle("", isOn: $settings.automaticallyChecksForUpdates)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("settings.auto-check-updates")
+            }
+            .padding(.top, 4)
+
+            HStack {
+                Text("Automatically download updates")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        settings.automaticallyChecksForUpdates
+                            ? Theme.ink
+                            : Theme.muted
+                    )
+                Spacer()
+                Toggle("", isOn: $settings.automaticallyDownloadsUpdates)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(!settings.automaticallyChecksForUpdates)
+                    .accessibilityIdentifier("settings.auto-download-updates")
+            }
+            .padding(.top, 4)
+
+            Button("Check for Updates…") {
+                settings.checkForUpdates()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+            .disabled(!settings.canCheckForUpdates)
+            .padding(.top, 6)
+            .accessibilityIdentifier("settings.check-for-updates")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.line, lineWidth: 1)
+                )
+        )
     }
 }
