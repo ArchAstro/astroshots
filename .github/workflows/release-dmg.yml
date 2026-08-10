@@ -146,11 +146,13 @@ jobs:
           VERSION="${TAG#v}"
           chmod +x scripts/generate-appcast.sh
 
-          # Seed from the previous latest appcast when present so history is kept.
+          # Seed from the dedicated stable feed release so history is kept.
+          # Do not use GitHub's “Latest” release: the npm astroshot-v* track
+          # often owns that badge and does not contain the macOS appcast.
           PREV_APPCAST="$GITHUB_WORKSPACE/dist/appcast-prev.xml"
           mkdir -p /tmp/astroshots-prev-appcast
-          # Without a tag, gh downloads from the latest published release.
-          if gh release download --pattern 'appcast.xml' \
+          if gh release download appcast \
+               --pattern 'appcast.xml' \
                --dir /tmp/astroshots-prev-appcast \
                --clobber 2>/dev/null \
             && [[ -f /tmp/astroshots-prev-appcast/appcast.xml ]]; then
