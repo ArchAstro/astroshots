@@ -57,71 +57,34 @@ struct TrayView: View {
             && appState.pane != .frictionStepDetail
     }
 
+    /// Equal-width text tabs — matches agent-rooms tray (no icons, no purple chips).
     private var tabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(TrayTab.allCases) { tab in
+        HStack(spacing: 2) {
+            ForEach(Array(TrayTab.allCases.enumerated()), id: \.element.id) { index, tab in
                 Button {
                     appState.selectTab(tab)
                 } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: tab == .shots ? "camera.fill" : "list.bullet.rectangle")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text(tab.label)
-                            .font(.system(size: 11, weight: .semibold))
-                        if tab == .shots, !appState.isEmpty {
-                            Text("\(appState.shots.count)")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(
-                                    appState.activeTab == tab ? Theme.purple : Theme.muted2
-                                )
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(
-                                    (appState.activeTab == tab ? Theme.purpleSoft : Theme.surface),
-                                    in: Capsule()
-                                )
-                        }
-                        if tab == .frictionLogs, !appState.isFrictionLogsEmpty {
-                            Text("\(appState.frictionLogs.count)")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(
-                                    appState.activeTab == tab ? Theme.purple : Theme.muted2
-                                )
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(
-                                    (appState.activeTab == tab ? Theme.purpleSoft : Theme.surface),
-                                    in: Capsule()
-                                )
-                        }
-                    }
-                    .foregroundStyle(
-                        appState.activeTab == tab ? Theme.ink : Theme.muted2
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(
-                        appState.activeTab == tab
-                            ? Color.white.opacity(0.92)
-                            : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(
-                                appState.activeTab == tab ? Theme.line : Color.clear,
-                                lineWidth: 1
-                            )
-                    )
-                    .contentShape(Rectangle())
+                    Text(tab.label)
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(appState.activeTab == tab ? Theme.ink : Theme.muted)
+                        .background(
+                            appState.activeTab == tab ? Color.white : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(
+                    KeyEquivalent(Character("\(index + 1)")),
+                    modifiers: .command
+                )
                 .accessibilityIdentifier("tray.tab.\(tab.rawValue)")
+                .accessibilityAddTraits(appState.activeTab == tab ? .isSelected : [])
             }
         }
-        .padding(4)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 14)
         .padding(.bottom, 8)
     }
 

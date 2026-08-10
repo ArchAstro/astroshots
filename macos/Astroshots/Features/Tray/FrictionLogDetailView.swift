@@ -60,6 +60,7 @@ struct FrictionLogDetailView: View {
                 }
                 if let run = appState.selectedFrictionRun {
                     runPicker(log: log, selected: run)
+                    narrationCard(log: log, run: run)
                     improveRollup(run: run)
                     stepsTable(run: run)
                 } else {
@@ -192,6 +193,162 @@ struct FrictionLogDetailView: View {
 
     /// Run history control. Matches `StreamFilterChip`: 28pt pills, radius 6,
     /// purpleSoft selection — no nested card (chips sit on paper like stream filters).
+    @ViewBuilder
+    private func narrationCard(log: FrictionLog, run: FrictionLogRun) -> some View {
+        let readiness = appState.narration.readiness
+        let job = appState.narrationQueue.job(forRunDirectory: run.directoryPath)
+
+        // Only surface once the user has opted in (or a job already exists).
+        if readiness == .disabled, job == nil {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.purple)
+                    Text("Narrated video")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Spacer(minLength: 4)
+                    if let job, job.phase == .complete, job.outputPath != nil {
+                        Text("Ready")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.green)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.greenSoft, in: Capsule())
+                    }
+                }
+
+                if readiness.isReady {
+                    Text(
+                        "Builds an MP4 that walks each step’s screenshot with the spoken transcript."
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    if let job, job.phase == .queued || job.phase == .synthesizing
+                        || job.phase == .encoding
+                    {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(job.message)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(Theme.ink2)
+                            ProgressView(value: job.progress)
+                                .progressViewStyle(.linear)
+                                .tint(Theme.purple)
+                            HStack {
+                                Spacer()
+                                Button("Cancel") {
+                                    appState.narrationQueue.cancel(job.id)
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.muted)
+                            }
+                        }
+                    } else if let job, job.phase == .complete, let path = job.outputPath {
+                        HStack(spacing: 8) {
+                            Button("Show in Finder") {
+                                appState.narrationQueue.revealOutput(for: job.id)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 7))
+                            .foregroundStyle(Theme.purple)
+
+                            Button("Render again") {
+                                _ = appState.enqueueNarration(for: log, run: run)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+
+                            Spacer(minLength: 0)
+                        }
+                        Text((path as NSString).lastPathComponent)
+                            .font(.system(size: 9.5, design: .monospaced))
+                            .foregroundStyle(Theme.muted2)
+                            .lineLimit(1)
+                    } else if let job, job.phase == .failed {
+                        Text(job.message)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(Theme.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Retry narration") {
+                            _ = appState.enqueueNarration(for: log, run: run)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+                    } else {
+                        Button {
+                            _ = appState.enqueueNarration(for: log, run: run)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Make narrated video")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundStyle(Theme.purple)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 7)
+                            .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("friction.narration.make")
+                    }
+                } else if readiness == .disabled {
+                    Text("Turn on Narration in Settings to generate step voiceovers with Qwen3-TTS.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.muted)
+                } else if readiness.isBusy {
+                    Text(readiness.statusLine)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Theme.ink2)
+                    if let fraction = readiness.progressFraction {
+                        ProgressView(value: fraction)
+                            .progressViewStyle(.linear)
+                            .tint(Theme.purple)
+                    }
+                } else {
+                    Text(readiness.statusLine)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.muted)
+                    Button("Open Settings") {
+                        appState.openSettings()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
+                }
+            }
+            .padding(11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color.white.opacity(0.72),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Theme.line, lineWidth: 1)
+            )
+            .accessibilityIdentifier("friction.narration.card")
+        }
+    }
+
+    /// Run history: single-line menu selector (scales to many runs; no h-scroll pills).
     private func runPicker(log: FrictionLog, selected: FrictionLogRun) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -216,7 +373,6 @@ struct FrictionLogDetailView: View {
             }
 
             if log.runCount == 1 {
-                // One attempt: identity line only (no one-item “picker”).
                 HStack(spacing: 8) {
                     Text(selected.displayTitle)
                         .font(.system(size: 12, weight: .semibold))
@@ -240,52 +396,70 @@ struct FrictionLogDetailView: View {
                         .stroke(Theme.line, lineWidth: 1)
                 )
             } else {
-                // Segmented history: one compact pill per attempt (newest first).
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(log.runs.enumerated()), id: \.element.id) { index, run in
-                            let isSelected = run.id == selected.id
-                            let isLatest = index == 0
-                            Button {
-                                // Color swap only — same frequency band as stream filters.
-                                appState.selectFrictionRun(run)
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Text(run.displayTitle)
-                                        .font(.system(size: 10.5, weight: .semibold))
-                                        .lineLimit(1)
-                                    if isLatest {
-                                        Text("Latest")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .opacity(isSelected ? 0.9 : 0.72)
-                                    }
-                                }
-                                .padding(.horizontal, 9)
-                                .frame(height: 28)
-                                .foregroundStyle(isSelected ? Theme.purple : Theme.ink2)
-                                .background(
-                                    isSelected ? Theme.purpleSoft : Theme.surface,
-                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                )
-                                .contentShape(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                )
+                // Full-width menu selector — closed label stays compact; menu lists all runs.
+                Menu {
+                    ForEach(Array(log.runs.enumerated()), id: \.element.id) { index, run in
+                        let isLatest = index == 0
+                        Button {
+                            appState.selectFrictionRun(run)
+                        } label: {
+                            if run.id == selected.id {
+                                Label(runMenuLabel(run: run, isLatest: isLatest), systemImage: "checkmark")
+                            } else {
+                                Text(runMenuLabel(run: run, isLatest: isLatest))
                             }
-                            .buttonStyle(.plain)
-                            .help(run.runID)
-                            .accessibilityIdentifier("friction.run.\(run.runID)")
-                            .accessibilityLabel(
-                                "\(isLatest ? "Latest run" : "Run") \(run.displayTitle), \(run.stepCountLabel)"
-                            )
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
+                        .accessibilityIdentifier("friction.run.\(run.runID)")
                     }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(selected.displayTitle)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        if selected.runID == log.latestRun?.runID {
+                            Text("Latest")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.purple)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Theme.purpleSoft, in: Capsule())
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .menuStyle(.borderlessButton)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Color.white.opacity(0.72),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Theme.line, lineWidth: 1)
+                )
+                .help(selected.runID)
                 .accessibilityIdentifier("friction.runs.picker")
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Run history, \(log.runCount) runs")
+                .accessibilityLabel(
+                    "Run \(selected.displayTitle), \(log.runCount) runs available"
+                )
             }
         }
+    }
+
+    private func runMenuLabel(run: FrictionLogRun, isLatest: Bool) -> String {
+        var parts = [run.displayTitle]
+        if isLatest { parts.append("Latest") }
+        parts.append(run.stepCountLabel)
+        // Full id in the open menu for disambiguation.
+        return "\(parts.joined(separator: " · "))  ·  \(run.runID)"
     }
 
     private func stepsTable(run: FrictionLogRun) -> some View {

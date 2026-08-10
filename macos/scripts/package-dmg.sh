@@ -112,6 +112,11 @@ else
   )
 fi
 
+# mlx-audio-swift / mlx-swift: Metal toolchain + skip CUDA plugin fingerprint.
+# shellcheck source=xcode-env.sh
+source "$(cd "$(dirname "$0")" && pwd)/xcode-env.sh"
+ensure_mlx_build_prereqs
+
 echo "==> Building $CONFIGURATION (identity=$IDENTITY team=${TEAM:-none})"
 xcodebuild \
   -project Astroshots.xcodeproj \
@@ -119,6 +124,7 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED" \
+  "${ASTROSHOTS_XCODEBUILD_FLAGS[@]}" \
   "${SIGN_ARGS[@]}" \
   ONLY_ACTIVE_ARCH=NO \
   build

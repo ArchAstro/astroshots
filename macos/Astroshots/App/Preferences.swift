@@ -17,6 +17,10 @@ final class Preferences {
         static let overlayEnabled = "overlayEnabled"
         static let autoDismiss = "autoDismiss"
         static let autoDismissSeconds = "autoDismissSeconds"
+        /// Opt-in friction-log narrated videos (MLX Audio + Qwen3-TTS).
+        static let narrationEnabled = "narrationEnabled"
+        /// Cached flag that the Qwen3 model finished downloading at least once.
+        static let narrationModelReady = "narrationModelReady"
     }
 
     /// Migration schema for first-run detection. Increment when adoption rules
@@ -106,6 +110,18 @@ final class Preferences {
             return value > 0 ? value : 5.5
         }
         set { defaults.set(newValue, forKey: Key.autoDismissSeconds) }
+    }
+
+    /// When true, Settings enables the MLX narration pipeline (download + render).
+    var narrationEnabled: Bool {
+        get { defaults.bool(forKey: Key.narrationEnabled) }
+        set { defaults.set(newValue, forKey: Key.narrationEnabled) }
+    }
+
+    /// True after a successful model download (used to restore Ready quickly).
+    var narrationModelReady: Bool {
+        get { defaults.bool(forKey: Key.narrationModelReady) }
+        set { defaults.set(newValue, forKey: Key.narrationModelReady) }
     }
 
     /// Call when the user successfully chooses initial watch folders.

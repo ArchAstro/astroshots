@@ -375,4 +375,15 @@ account, and land in an empty workspace ready for first project.
 Friction logs are **agent-authored UX narrative**, not harness pass/fail.
 `manifest.json` / `review.json` remain the one-off shot contract.
 
+## Narrated videos (opt-in, Astroshots app)
+
+When the human enables **Settings → Narration**, Astroshots can render an MP4
+from a run: each step’s screenshot held for the spoken `transcript` via
+**mlx-audio-swift** (MLX Swift + Qwen3-TTS on Apple Silicon). The app downloads
+the model in the background and serializes render jobs in a queue.
+
+Agents should still write high-quality `transcript` fields; they do **not**
+invoke TTS themselves. Point humans at the run detail **Make narrated video**
+control once narration status is Ready.
+
 Full JSONL and directory notes: [references/contract.md](references/contract.md).
