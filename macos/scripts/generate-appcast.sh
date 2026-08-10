@@ -82,7 +82,8 @@ find_sparkle_bin() {
   local archive="$tools_dir/Sparkle-for-Swift-Package-Manager.zip"
   mkdir -p "$tools_dir"
   if [[ ! -x "$tools_dir/bin/generate_appcast" ]]; then
-    echo "==> Downloading Sparkle tools (2.9.5)"
+    # stdout is reserved for find_sparkle_bin's returned path.
+    echo "==> Downloading Sparkle tools (2.9.5)" >&2
     curl -fsSL \
       -o "$archive" \
       "https://github.com/sparkle-project/Sparkle/releases/download/2.9.5/Sparkle-for-Swift-Package-Manager.zip"
