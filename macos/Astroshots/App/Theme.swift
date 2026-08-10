@@ -23,7 +23,7 @@ enum Theme {
     static let blue = Color(hex: 0x376E9C)
     static let blueSoft = Color(hex: 0xE7F0F8)
 
-    static let trayWidth: CGFloat = 400
+    static let trayWidth: CGFloat = 430
     static let trayHeight: CGFloat = 640
 }
 
@@ -35,6 +35,27 @@ extension Color {
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255
         )
+    }
+}
+
+/// Flat hover feedback for tray chrome controls, shared with Agent Rooms.
+private struct HoverHighlight: ViewModifier {
+    let cornerRadius: CGFloat
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                isHovered ? Color(hex: 0x21201C).opacity(0.06) : .clear,
+                in: RoundedRectangle(cornerRadius: cornerRadius)
+            )
+            .onHover { isHovered = $0 }
+    }
+}
+
+extension View {
+    func hoverHighlight(cornerRadius: CGFloat = 7) -> some View {
+        modifier(HoverHighlight(cornerRadius: cornerRadius))
     }
 }
 

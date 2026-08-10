@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Menu-bar tray: stream home, detail drill-in, settings via gear.
@@ -10,9 +11,6 @@ struct TrayView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if showsTabBar {
-                tabBar
-            }
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -29,11 +27,11 @@ struct TrayView: View {
     }
 
     private var statusLabel: String {
-        if appState.needsWatchRootSetup { return "setup" }
-        if appState.isScanning { return "scanning" }
-        if appState.isFixtureSession { return "seeded" }
-        if isCatalogEmpty { return "idle" }
-        return "live"
+        if appState.needsWatchRootSetup { return "Choose watch folders" }
+        if appState.isScanning { return "Scanning for captures" }
+        if appState.isFixtureSession { return "Preview data" }
+        if isCatalogEmpty { return "Waiting for captures" }
+        return "Live review stream"
     }
 
     private var statusColor: Color {
@@ -41,13 +39,6 @@ struct TrayView: View {
         if appState.isFixtureSession { return Theme.blue }
         if isCatalogEmpty { return Theme.muted }
         return Theme.green
-    }
-
-    private var statusDotColor: Color {
-        if appState.needsWatchRootSetup || appState.isScanning { return Theme.amber }
-        if appState.isFixtureSession { return Theme.blue }
-        if isCatalogEmpty { return Color(hex: 0xB0AAA2) }
-        return Color(hex: 0x20A37F)
     }
 
     private var showsTabBar: Bool {
@@ -66,13 +57,14 @@ struct TrayView: View {
                 } label: {
                     Text(tab.label)
                         .font(.system(size: 10, weight: .semibold))
-                        .frame(maxWidth: .infinity)
+                        .frame(width: 99)
                         .padding(.vertical, 6)
                         .foregroundStyle(appState.activeTab == tab ? Theme.ink : Theme.muted)
                         .background(
                             appState.activeTab == tab ? Color.white : Color.clear,
                             in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                         )
+                        .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -89,96 +81,84 @@ struct TrayView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: 0) {
+            HStack(spacing: 9) {
                 Image("AstroshotsMark")
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(.white)
                     .padding(5)
-                    .frame(width: 24, height: 24)
-                    .background(
-                        LinearGradient(
-                            colors: [Theme.green, Theme.purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 7)
-                    )
-                Text("Astroshots")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                    .tracking(-0.15)
-            }
+                    .frame(width: 27, height: 27)
+                    .background(Theme.green, in: RoundedRectangle(cornerRadius: 8))
 
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(statusDotColor)
-                    .frame(width: 5, height: 5)
-                    .shadow(
-                        color: statusLabel == "live"
-                            ? Color(hex: 0x20A37F).opacity(0.35)
-                            : .clear,
-                        radius: 3
-                    )
-                Text(statusLabel)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(statusColor)
-                    .accessibilityIdentifier("tray.status")
-            }
-
-            Spacer(minLength: 4)
-
-            iconButton(
-                systemImage: "gearshape",
-                title: "Settings",
-                active: appState.pane == .settings
-            ) {
-                appState.openSettings()
-            }
-
-            // Labeled pin control (friction log: icon-only was easy to miss).
-            Button {
-                if isPinned {
-                    trayChrome.close()
-                } else {
-                    trayChrome.openPinned()
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Astroshots")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text(statusLabel)
+                        .font(.system(size: 9))
+                        .foregroundStyle(statusColor)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("tray.status")
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: isPinned ? "pin.slash" : "pin")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(isPinned ? "Unpin" : "Pin")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .foregroundStyle(isPinned ? Theme.purple : Theme.ink2)
-                .padding(.horizontal, 8)
-                .frame(height: 28)
-                .background(
-                    isPinned ? Theme.purpleSoft : Theme.surface,
-                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(isPinned ? "Back to menu bar" : "Keep tray visible as a window")
-            .accessibilityLabel(isPinned ? "Unpin tray" : "Pin tray keep visible")
-            .accessibilityIdentifier("tray.pin")
 
-            if !isPinned {
-                iconButton(systemImage: "xmark", title: "Close") {
-                    trayChrome.close()
+                Spacer()
+
+                iconButton(
+                    systemImage: "arrow.up.right.square",
+                    title: "Show current capture in Finder"
+                ) {
+                    showCurrentCaptureInFinder()
+                }
+
+                iconButton(
+                    systemImage: "gearshape.fill",
+                    title: "Settings",
+                    active: appState.pane == .settings
+                ) {
+                    appState.openSettings()
+                }
+
+                Button {
+                    if isPinned {
+                        trayChrome.close()
+                    } else {
+                        trayChrome.openPinned()
+                    }
+                } label: {
+                    Image(systemName: "pin")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isPinned ? Theme.green : Theme.muted)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            isPinned ? Theme.greenSoft : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .hoverHighlight()
+                .help(isPinned ? "Back to menu bar" : "Keep tray visible as a window")
+                .accessibilityLabel(isPinned ? "Unpin tray" : "Pin tray keep visible")
+                .accessibilityIdentifier("tray.pin")
+
+                if !isPinned {
+                    iconButton(systemImage: "xmark", title: "Close") {
+                        trayChrome.close()
+                    }
                 }
             }
-        }
-        .frame(height: 36)
-        .padding(.horizontal, 12)
-        .padding(.top, isPinned ? 8 : 4)
-        .padding(.bottom, 10)
-        .overlay(alignment: .bottom) {
+            .frame(height: 43)
+            .padding(.horizontal, 14)
+
+            if showsTabBar {
+                tabBar
+            }
+
             Rectangle().fill(Theme.line).frame(height: 1)
         }
+        .padding(.top, isPinned ? 8 : 4)
     }
 
     @ViewBuilder
@@ -233,16 +213,32 @@ struct TrayView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(active ? Theme.purple : Color(hex: 0x595650))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(active ? Theme.green : Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(
-                    active ? Theme.purpleSoft : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 7)
+                    active ? Theme.greenSoft : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                 )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .hoverHighlight()
         .help(title)
+    }
+
+    private func showCurrentCaptureInFinder() {
+        let currentPath = appState.selectedFrictionStep?.primaryScreenshotPath
+            ?? appState.selectedShot?.path
+            ?? appState.watchRootPaths.first
+
+        guard let currentPath else {
+            appState.openSettings()
+            return
+        }
+
+        NSWorkspace.shared.activateFileViewerSelecting([
+            URL(fileURLWithPath: currentPath),
+        ])
     }
 }
