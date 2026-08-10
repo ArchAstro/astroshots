@@ -159,9 +159,11 @@ sign_app() {
     ent_args=(--entitlements "$entitlements")
   fi
 
-  # Sign nested code first (Sparkle.framework, XPC services, dylibs), then the
-  # outer bundle. --deep is discouraged for modern notarization. Use -depth so
-  # nested frameworks/XPC bundles are signed before their parents.
+  # Sign nested code first, then the outer bundle. Sparkle contains two XPC
+  # services plus Updater.app and the standalone Autoupdate executable; Apple
+  # notarization rejects the DMG if any of those retain Sparkle's vendor
+  # signature. --deep is discouraged for signing, so use -depth to sign every
+  # nested code object before its parent while preserving helper entitlements.
   local nested
   while IFS= read -r nested; do
     [[ -n "$nested" ]] || continue
@@ -169,13 +171,16 @@ sign_app() {
       --force \
       --options runtime \
       --timestamp \
+      --preserve-metadata=entitlements \
       --sign "$IDENTITY" \
       "$nested"
   done < <(
-    find "$app/Contents" -depth \( \
+    find "$app/Contents" -depth ! -type l \( \
       -name "*.dylib" -o \
       -name "*.so" -o \
       -name "*.xpc" -o \
+      -name "*.app" -o \
+      -name "Autoupdate" -o \
       -name "*.framework" \
     \) 2>/dev/null
   )
@@ -188,7 +193,7 @@ sign_app() {
     "${ent_args[@]}" \
     "$app"
 
-  codesign --verify --verbose=2 "$app"
+  codesign --verify --deep --strict --verbose=2 "$app"
   spctl --assess --type execute --verbose=4 "$app" 2>&1 || {
     # Pre-notarization assess often fails; verify signature only.
     echo "note: spctl assess before notarization may fail; signature verify passed"
@@ -356,6 +361,7 @@ notarize_dmg() {
   local dmg="$1"
   local team_id="${APPLE_TEAM_ID:-$TEAM}"
   local key_path="${APPLE_API_KEY_PATH:-}"
+  local credentials=()
 
   if [[ -z "$key_path" && -n "${APPLE_API_KEY_BASE64:-}" ]]; then
     key_path="${RUNNER_TEMP:-/tmp}/AuthKey_${APPLE_API_KEY_ID:-ci}.p8"
@@ -365,18 +371,18 @@ notarize_dmg() {
 
   if [[ -n "$key_path" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER_ID:-}" ]]; then
     echo "==> Notarizing with App Store Connect API key"
-    xcrun notarytool submit "$dmg" \
+    credentials=(
       --key "$key_path" \
       --key-id "$APPLE_API_KEY_ID" \
-      --issuer "$APPLE_API_ISSUER_ID" \
-      --wait
+      --issuer "$APPLE_API_ISSUER_ID"
+    )
   elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "$team_id" ]]; then
     echo "==> Notarizing with Apple ID"
-    xcrun notarytool submit "$dmg" \
+    credentials=(
       --apple-id "$APPLE_ID" \
       --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-      --team-id "$team_id" \
-      --wait
+      --team-id "$team_id"
+    )
   else
     cat >&2 <<'EOF'
 error: notarization credentials missing.
@@ -388,6 +394,26 @@ or:
 
 Or pass --skip-notarize (signed but not Gatekeeper-clean until you notarize).
 EOF
+    return 1
+  fi
+
+  local result_file
+  result_file="$(mktemp "${RUNNER_TEMP:-/tmp}/astroshots-notary-result.XXXXXX.json")"
+  if ! xcrun notarytool submit "$dmg" \
+    "${credentials[@]}" \
+    --wait \
+    --output-format json | tee "$result_file"; then
+    rm -f "$result_file"
+    return 1
+  fi
+
+  local submission_id status
+  submission_id="$(/usr/bin/plutil -extract id raw -o - "$result_file")"
+  status="$(/usr/bin/plutil -extract status raw -o - "$result_file")"
+  rm -f "$result_file"
+  if [[ "$status" != "Accepted" ]]; then
+    echo "error: notarization $submission_id finished with status: $status" >&2
+    xcrun notarytool log "$submission_id" "${credentials[@]}" || true
     return 1
   fi
 
