@@ -1,26 +1,25 @@
 ---
 name: astroshot
 description: >
-  Capture deterministic PNG screenshots with the unified
-  @archastro/astroshot CLI. Use React mode for isolated browser components,
-  Ink mode for fixed terminal component states, and PTY mode for real
-  interactive terminal executables such as Ratatui, Bubble Tea, Textual, or
-  curses. Use when fixed inputs or scripted terminal actions can reproduce the
-  target state without a live web application. Use agent-browser for routing,
-  authentication, live backend data, or a full browser shell; use
-  astroshots-review to stream an existing image for human review; use
-  screenshot to orchestrate a documentation image set.
+  Capture deterministic PNG screenshots and journey movies with the unified
+  @archastro/astroshot CLI. Use React for isolated browser components, Ink for
+  fixed terminal component states, PTY for real interactive terminal
+  executables, and movie for browser, truecolor PTY, native macOS window, or
+  custom-frame recordings. Use agent-browser for one-off live browser actions;
+  use astroshots-review to stream captures and read feedback; use screenshot
+  to orchestrate a documentation image set.
 ---
 
 # Astroshot capture
 
-Use one CLI with three capture boundaries:
+Use one CLI with four capture boundaries:
 
 | Target state | Mode | Read |
 |---|---|---|
 | Isolated browser React component | `react` | [React mode](references/react.md) |
 | Fixed Ink component tree | `ink` | [Terminal modes](references/terminal.md) |
 | Real terminal executable and keyboard flow | `pty` | [Terminal modes](references/terminal.md) |
+| Multi-step journey recording | `movie` | Run `astroshot movie which-source "<intent>"` first |
 
 Choose the smallest boundary that proves the intended state. Do not rebuild a
 full application shell in a fixture merely to avoid running the application.
@@ -41,9 +40,9 @@ package is not yet available from npm:
 node packages/astroshot/bin/astroshot.mjs --help
 ```
 
-Do not silently substitute the old `react-shot` or `tui-shot` executables.
-They are rendering-engine packages; the supported command surface is
-`astroshot react|ink|pty`.
+Do not silently substitute the old `react-shot`, `tui-shot`, or
+`astroshot-movie` executables. They are engine packages; the supported command
+surface is `astroshot react|ink|pty|movie`.
 
 Install Chromium once:
 
@@ -55,7 +54,7 @@ npx --@archastro:registry=https://registry.npmjs.org \
 On Linux CI images that need browser system libraries, add `--with-deps`.
 Pin an exact Astroshot version in CI.
 
-## Workflow
+## Still-image workflow
 
 1. Decide whether fixed props, a fixed Ink tree, or a real PTY process owns the
    state.
@@ -75,13 +74,55 @@ astroshot react batch ./shots.yaml
 astroshot ink batch ./terminal-shots.yaml
 ```
 
+## Movie workflow
+
+Movies are for journeys, not replacements for stable component stills. Choose
+the source from intent before recording:
+
+```bash
+astroshot movie which-source "record a native SwiftUI onboarding window"
+astroshot movie --help
+```
+
+| Intent | `--source` | Never substitute |
+|--------|------------|------------------|
+| Web / SPA / Playwright | `browser` | Desktop-grab Chrome |
+| TUI / CLI / truecolor | `pty` | `desktop.window` on Terminal/iTerm/Ghostty |
+| Native macOS app window | `desktop.window` | Browser or terminal capture |
+| Caller-owned PNG/JPEG sequence | `frames` | A custom output layout |
+
+1. Run `which-source`; follow its recommendation.
+2. Use one stable `--run-id` for movies in the same journey.
+3. Supply `--feature`, `--slug`, a human title, and what the movie proves.
+4. For native windows, run `list-windows` and check Screen Recording access.
+   `desktop.window` refuses off-screen or nearly blank frames by default;
+   `--allow-blank` is an explicit escape hatch.
+5. Confirm poster, video, duration, source, and chapters under
+   `.astroshot/<feature>/`, then finalize execution as `pass` or `fail`.
+
+```bash
+astroshot movie run --source browser --feature checkout --slug purchase \
+  --url https://example.com/checkout --run-id checkout-20260811
+
+astroshot movie list-windows
+astroshot movie run --source desktop.window --feature desktop-onboarding \
+  --slug first-run --bundle-id com.example.App --duration-ms 4000
+```
+
+Every source writes a poster PNG plus WebM/MP4 video into the normal manifest.
+Astroshots shows duration in the Shots stream and provides tray/full-screen
+playback. `desktop.window` is macOS-only; browser, PTY, and frames are
+cross-platform.
+
 ## Review and documentation
 
-`astroshot` creates an image. It does not imply that a human reviewed it.
+`astroshot` creates an image or movie artifact. It does not imply human review.
 
-- To stream the PNG into `.astroshot/<feature>/`, read the
+- To stream a standalone PNG into `.astroshot/<feature>/`, read the
   **astroshots-review**
   skill and pass the file to `astroshot-capture --source`.
+- Movies already write poster+video+manifest into `.astroshot/<feature>/`; do
+  not pass their poster through `astroshot-capture` again.
 - To plan, embed, inventory, and render-check a documentation image set, read
   the **screenshot** skill.
 

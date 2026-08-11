@@ -23,6 +23,18 @@ final class NarrationModelManager {
 
     init(preferences: Preferences = .shared) {
         self.preferences = preferences
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["ASTROSHOTS_UI_TEST_NARRATION_READY"] == "1" {
+            readiness = .ready
+            capability = NarrationCapability(
+                isAppleSilicon: true,
+                memoryGB: Self.physicalMemoryGB(),
+                readyForTTS: true,
+                unsupportedReason: nil
+            )
+            return
+        }
+        #endif
         if preferences.narrationEnabled {
             if NarrationPaths.isModelOnDisk() {
                 readiness = .ready

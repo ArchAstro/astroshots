@@ -3,8 +3,8 @@ name: browser-ui-harness
 description: >
   Design and implement reusable browser UI smoke/e2e harnesses, especially
   Bash plus agent-browser: runner/case separation, named sessions, bounded
-  waits, product assertions, evidence, cleanup, and optional .astroshot review
-  streams. Use when building or revising run.sh plus cases/, or defining a
+  waits, product assertions, still/movie evidence, cleanup, and optional
+  .astroshot review streams. Use when building or revising run.sh plus cases/, or defining a
   repeatable real-browser testing contract. For a one-off browser journey use
   agent-browser; for isolated component captures use astroshot;
   for documentation image-set planning use screenshot.
@@ -244,6 +244,7 @@ Keep `run.sh` under a few hundred lines by pushing product detail into cases.
 | `@archastro/astroshot react` from npmjs | Isolated React docs PNGs without a full stack |
 | `@archastro/astroshot ink` from npmjs | Isolated Ink terminal PNGs without a PTY |
 | `@archastro/astroshot pty` from npmjs | Real Ratatui or arbitrary terminal-process PNGs |
+| `@archastro/astroshot movie --source browser` | Continuous browser journey with poster+video manifest |
 | **Astroshots** | Live human review of harness frames |
 
 Use a Bash agent-browser harness when you want a **readable journey + evidence**
@@ -270,5 +271,5 @@ strict CI parallelism.
 - **screenshot** skill — documentation asset planning and visual review
 - **agent-browser** skill — CLI loop, snapshot, screenshots  
 - **astroshots-review** skill — `.astroshot/` layout + `astroshot-capture`
-- **astroshot** skill — deterministic React, Ink, and arbitrary PTY fixtures
+- **astroshot** skill — deterministic React, Ink, and PTY stills plus journey movies
 - CLI deep dive: `agent-browser skills get core --full`

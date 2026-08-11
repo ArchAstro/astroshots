@@ -1,14 +1,13 @@
 ---
 name: astroshots-review
 description: >
-  Stream existing UI captures into live human review through Astroshots, the
-  macOS menu-bar app that watches .astroshot/ across worktrees, and read its
-  hash- and run-scoped review feedback. Use when wiring a browser or test
-  harness to the .astroshot write contract, operating or debugging the
-  Astroshots app, or when the user mentions Astroshots, screenshot streams,
-  overlays, or live screenshot review. This is the review transport and
-  feedback layer, not the React, terminal, browser, or documentation capture
-  workflow itself.
+  Stream stills and journey movies into live human review through Astroshots,
+  the macOS menu-bar app that watches .astroshot/ across worktrees, and read
+  its hash- and run-scoped feedback. Use when wiring a harness to the
+  .astroshot contract, choosing a movie source, operating movie playback,
+  separating one-off Shots from the reserved friction-log tree, or debugging
+  overlays and review state. This is review transport, not the underlying
+  React, terminal, browser, friction-log, or documentation capture workflow.
 ---
 
 # Astroshots live review
@@ -46,7 +45,10 @@ astroshot movie --help
 `desktop.window` is macOS-only and uses OS `screencapture` (already installed)
 plus the package’s Swift window list — no extra binary download. Needs Screen
 Recording TCC. Movies write **poster PNG + video** under `.astroshot/`; the
-tray streams the poster today.
+tray shows duration and a play overlay, filters Movies, and plays the video in
+tray or full-screen review with scrubbing, volume, and full-screen controls.
+Manifest metadata can also surface source and chapters. Review remains keyed
+to the poster filename/hash; replacing the poster makes Seen stale.
 
 This skill starts after a capture source exists.
 
@@ -60,6 +62,8 @@ Write from the worktree root:
   review.json
   0001-signed-in.png
   0002-configure.png
+  0003-journey.png       # movie poster
+  0003-journey.webm      # movie payload
 ```
 
 - Feature names are kebab-case.
