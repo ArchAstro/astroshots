@@ -21,6 +21,7 @@ Own the documentation outcome, not merely PNG generation.
 | Fixed Ink state | **astroshot** `ink` |
 | Real terminal executable or keyboard flow | **astroshot** `pty` |
 | Authenticated page, routing, live data, or full browser shell | **agent-browser** |
+| Native app state with a deterministic screenshot hook | Project-owned native UI harness |
 | Optional live human review of any result | **astroshots-review** |
 
 Use a fixture when fixed inputs can express the state. Use a real browser when
@@ -58,8 +59,15 @@ when one image can establish the state.
 ## Produce and inspect
 
 Read the selected **astroshot** or **agent-browser** skill and follow its
-current command contract. Keep fixture sources and batch manifests in version
-control. Capture directly to the documentation asset directory when practical.
+current command contract. For a native harness, use its documented automation
+entry point and wait for an explicit completion marker. Keep fixture sources
+and batch manifests in version control. Capture directly to the documentation
+asset directory when practical.
+
+When documenting movie support, capture the viewer state that teaches the
+reader something—movie badge/filter, playback actions, controls, chapters—not
+only a poster frame. When documenting friction logs, prove the scenario list,
+run history/rollup, and transcript-backed step evidence as distinct states.
 
 Open every generated image with the available image inspection tool. Check:
 

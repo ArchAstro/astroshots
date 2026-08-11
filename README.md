@@ -1,11 +1,16 @@
 # Astroshots
 
-**Watch your test screenshots as they land.**
+**Watch screenshots, journey movies, and UX friction as they land.**
 
-Astroshots is a macOS menu-bar app for anyone who captures UI during browser tests, harness runs, or manual QA. Point your tools at a simple folder layout — frames stream in live, flash over your desktop, and stay in one history across every project you work in.
+Astroshots is a local macOS review tray for browser tests, harness runs, and
+agentic UX walkthroughs. Point your tools at a simple folder layout: stills and
+movies stream into **Shots**, structured user journeys collect under **Friction
+Logs**, and everything stays on disk across every project you watch.
 
 <p align="center">
-  <img src="docs/images/hero-overlay.jpg" alt="Astroshots desktop overlays flashing new screenshots above the menu bar" width="900" />
+  <img src="docs/images/shots-movie-stream.png" alt="Astroshots Shots tab with a movie row, duration badge, Movies filter, and review state" width="360" />
+  &nbsp;
+  <img src="docs/images/movie-detail.png" alt="Movie detail with Play in tray, Open movie, chapters, feedback, and Seen controls" width="360" />
 </p>
 
 ---
@@ -14,37 +19,80 @@ Astroshots is a macOS menu-bar app for anyone who captures UI during browser tes
 
 | Problem | What Astroshots does |
 |---------|----------------------|
-| Screenshots buried in `/tmp` or CI artifacts | Live stream as soon as a PNG is written |
+| Screenshots and recordings buried in `/tmp` or CI artifacts | Live stream as soon as a still or movie lands |
 | Jumping between projects to find shots | One tray, every project under your watched folders |
 | “Did that step look right?” mid-run | Desktop overlay above all windows |
 | Manual folder digging after a suite | Newest-first history with titles from a small manifest |
+| UX findings scattered across chat and screenshots | Friction Logs pair every step with evidence, transcript, and good/improve notes |
+| Repeating a walkthrough loses the earlier result | Per-scenario run history keeps every non-empty attempt switchable |
 
-No project picker. No account. No cloud. Just files on disk and a camera icon in the menu bar.
+No project picker. No account. No cloud. Just files on disk and an Astroshots
+icon in the menu bar.
 
 <p align="center">
-  <img src="docs/images/overlay-cards.png" alt="Stacked overlay cards from different projects" width="420" />
+  <img src="docs/images/overlay-card.png" alt="Desktop overlay for a newly captured onboarding movie with a direct Open in Astroshots action" width="420" />
 </p>
 
 ---
 
 ## Install
 
-### From a release (recommended)
+### Quickstart: app + skills
+
+Prerequisites: **macOS 14+** and **Node.js 22.14+**.
+
+1. Download the latest **Astroshots-x.y.z.dmg** from
+   [Releases](https://github.com/ArchAstro/astroshots/releases), drag
+   **Astroshots** into **Applications**, and launch it.
+2. Choose the folder that contains your coding projects when first-launch setup
+   asks what to watch. Add more later from the menu-bar icon → gear →
+   **Add folders…**.
+3. Install all six agent skills globally so they are available in every
+   project:
+
+   ```bash
+   npx skills add ArchAstro/astroshots --skill '*' -g -y
+   npx skills list -g
+   ```
+
+4. If you will capture browser-backed screenshots or movies, install the
+   managed Chromium runtime once:
+
+   ```bash
+   npx --@archastro:registry=https://registry.npmjs.org \
+     @archastro/astroshot install-browser
+   ```
+
+5. Verify the watch path from any project inside the folder selected in step 2:
+
+   ```bash
+   cd /path/to/your/project
+   mkdir -p .astroshot/quickstart
+   cp /path/to/any-screenshot.png .astroshot/quickstart/0001-ready.png
+   ```
+
+   Open the Astroshots menu-bar icon → **Shots**. A **quickstart** entry with
+   `0001-ready.png` confirms the app and on-disk contract are connected.
+
+The sections below cover project-local or individual skill installs, capture
+modes, movies, friction logs, and the complete file contract.
+
+### App from a release (recommended)
 
 1. Download the latest versioned **Astroshots-x.y.z.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
 2. Open the DMG and drag **Astroshots** into **Applications**.
 3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). There is **no default watch folder**: first launch **asks which folders to watch** (the open panel starts in `~/Projects` when that folder exists).
 4. After setup it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
-5. Click the camera icon → gear → **Add folders…** to watch more locations later.
-6. **Right-click** the camera icon → **Quit Astroshots** to exit (left-click opens the tray).
+5. Click the Astroshots icon → gear → **Add folders…** to watch more locations later.
+6. **Right-click** the Astroshots icon → **Quit Astroshots** to exit (left-click opens the tray).
 
 Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
 Installed copies can **Check for Updates…** (Sparkle) against the latest GitHub
 Release appcast.
 
-### From source
+### App from source
 
-macOS 14+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+macOS 14+, Xcode 26+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ```bash
 git clone https://github.com/ArchAstro/astroshots.git
@@ -60,30 +108,47 @@ Details: [`macos/README.md`](macos/README.md).
 ## How it works
 
 1. **Watch** — On first launch you choose one or more folders; Astroshots recursively watches them for `.astroshot/` trees.
-2. **Write** — Your harness, agent, or script drops PNGs (and an optional
-   execution `manifest.json`) under that layout.
-3. **See** — New frames flash on the desktop; open the tray for the full
-   stream. Click a row for detail. The tray has two tabs: **Shots** (one-off
-   harness frames) and **Friction Logs** (agentic UX walkthroughs under
-   `.astroshot/friction-logs/`).
-4. **Review** — Click a screenshot for a chromeless, screen-sized review
-   takeover. A human can send feedback or mark the current image Seen;
-   Astroshots writes that state to `review.json` for agents and harnesses.
-   Friction log steps open in-tab with good/improve notes, spoken
-   `transcript` narration, and screenshots (author/run with the
-   **friction-log** skill).
+2. **Write** — A harness, agent, or script writes stills, movie poster+video
+   pairs, and optional execution metadata under `.astroshot/`.
+3. **See** — New review frames flash as desktop overlays. **Shots** combines
+   stills and movies across worktrees; the Movies filter isolates recordings.
+4. **Play** — Movie detail and full-screen review play WebM, MP4, and MOV with
+   scrubbing, volume, full-screen controls, duration/source metadata, and chapters.
+5. **Review** — Send feedback or mark the current poster/image Seen.
+   Astroshots writes hash- and run-scoped human state to `review.json`.
+6. **Walk the product** — **Friction Logs** lists agentic scenarios under the
+   reserved `.astroshot/friction-logs/` tree. Each run keeps ordered steps,
+   screenshots, a spoken transcript, Looks good / Can improve notes, and an
+   improvement rollup. Run history stays switchable.
+7. **Narrate (optional)** — On Apple Silicon, enable Settings → Narration to
+   generate an on-device MP4 from step screenshots and transcripts with
+   Qwen3-TTS. Models download only after opt-in.
 
-### The tray
+### Movies in Shots
 
 <p align="center">
-  <img src="docs/images/tray-stream.png" alt="Astroshots menu-bar tray showing a live multi-project screenshot stream" width="360" />
+  <img src="docs/images/shots-movie-stream.png" alt="Shots stream with the Movies filter and a one-second onboarding movie ready for review" width="360" />
   &nbsp;
-  <img src="docs/images/tray-detail.png" alt="Astroshots detail view for a single screenshot frame" width="360" />
+  <img src="docs/images/movie-detail.png" alt="Movie detail showing playback actions, chapter metadata, feedback, and Seen acknowledgement" width="360" />
 </p>
 
+### Friction Logs
+
 <p align="center">
-  <img src="docs/images/hero-stream.jpg" alt="Astroshots tray open on the desktop stream view" width="900" />
+  <img src="docs/images/friction-logs.png" alt="Friction Logs tab listing a completed checkout scenario with two retained runs and two improvement notes" width="280" />
+  &nbsp;
+  <img src="docs/images/friction-run.png" alt="Friction-log run detail with run history, Make narrated video, improvement rollup, and two steps" width="280" />
+  &nbsp;
+  <img src="docs/images/friction-step.png" alt="Friction-log step detail pairing visual evidence with transcript, Looks good, and Can improve notes" width="280" />
 </p>
+
+Every README image above comes from the current native Debug app and a
+synthetic local fixture. Inventory: [`docs/screenshots.json`](docs/screenshots.json).
+Regenerate the complete set with:
+
+```bash
+bash scripts/capture-readme-screenshots.sh
+```
 
 ### Write layout
 
@@ -93,6 +158,8 @@ Details: [`macos/README.md`](macos/README.md).
   review.json            # optional human feedback, written by Astroshots
   0001-signed-in.png
   0002-configure.png
+  0003-onboarding.png     # movie poster shown in the stream/overlay
+  0003-onboarding.webm    # movie played by Astroshots
 ```
 
 Example `manifest.json`:
@@ -117,6 +184,23 @@ Example `manifest.json`:
 ```
 
 Project name is inferred from the folder that contains `.astroshot`. Feature is the directory name under it.
+
+Movie entries extend the same manifest shot shape; `file` remains the poster
+used by the stream and review state:
+
+```json
+{
+  "kind": "movie",
+  "file": "0003-onboarding.png",
+  "video": "0003-onboarding.webm",
+  "duration_ms": 4200,
+  "source": "browser",
+  "chapters": [
+    { "slug": "signed-in", "t_ms": 900 },
+    { "slug": "configured", "t_ms": 2800 }
+  ]
+}
+```
 
 `manifest.json.status` reports only whether the capture journey is running,
 passed, or failed. It is never a human acknowledgement. Seen state and feedback
@@ -157,25 +241,71 @@ acknowledgement and comments do not carry forward, even when the bytes match.
 
 ---
 
-## Screenshot tools
+## Friction-log layout
+
+`friction-logs` is a reserved namespace, not a Shots feature. Scenario prompts
+and every non-empty attempt stay together:
+
+```text
+<project>/.astroshot/friction-logs/checkout-as-new-user/
+  prompt.md
+  meta.json
+  runs/20260811T153000Z/
+    log.jsonl
+    0001-choose-plan.png
+    0002-confirm-checkout.png
+  runs/20260810T180000Z/
+    log.jsonl
+    0001-choose-plan.png
+```
+
+Each `log.jsonl` line is one user-visible step:
+
+```json
+{
+  "step": 1,
+  "id": "choose-plan",
+  "title": "Choose a plan",
+  "description": "Compared plans from a clean session.",
+  "transcript": "I arrive at pricing and compare the plans. The differences are easy to scan, but annual savings need a clearer explanation. I choose the team plan and continue to checkout.",
+  "screenshots": ["0001-choose-plan.png"],
+  "good": ["Plan differences are easy to scan"],
+  "improve": ["Annual savings need a clearer explanation"],
+  "url": "/pricing"
+}
+```
+
+New runs require a short spoken `transcript` per step. Read all transcripts in
+order and they should form one continuous narration: action taken, what worked,
+what did not, and a transition into the next step. The tray loads every
+non-empty run newest-first, hides empty stubs, rolls up improvements, and lets
+the reviewer switch runs and step through evidence with ← →.
+
+Install/use the **friction-log** skill to author, list, or execute this contract.
+Astroshots can derive a narrated MP4 after the run; agents still write the
+screenshots and transcripts, not TTS output.
+
+---
+
+## Capture tools
 
 Astroshots publishes one fixture-driven CLI,
-[`@archastro/astroshot`](packages/astroshot), with React, Ink, and PTY modes.
-It creates deterministic documentation and review images without requiring a
-running application:
+[`@archastro/astroshot`](packages/astroshot), for deterministic React, Ink,
+and PTY stills plus source-aware journey movies:
 
 | Mode | Use it for | Command |
 |------|------------|---------|
 | `react` | React components, dialogs, forms, and other isolated UI states | `astroshot react <fixture> -o <image>` |
 | `ink` | Ink terminal components rendered through a real terminal model | `astroshot ink <fixture> -o <image>` |
 | `pty` | Arbitrary terminal executables such as Ratatui, Bubble Tea, or curses | `astroshot pty <fixture> -o <image>` |
+| `movie` | Browser, truecolor PTY, native macOS window, or custom-frame journeys | `astroshot movie run --source <source> …` |
 
 Generate a typed or declarative starting fixture with `astroshot init react`,
 `astroshot init ink`, or `astroshot init pty`. Existing files are preserved
 unless `--force` is explicit. The former `tui` command remains an alias for
 `ink`.
 
-Install Chromium once for all modes:
+Install Chromium once for the browser-backed modes:
 
 ```bash
 npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
@@ -213,8 +343,41 @@ React and Ink modes also accept `batch <manifest.yaml|json>`. Their fixture
 APIs, PTY action contract, configuration, and manifest formats are documented
 in the package READMEs.
 Use a component tool when fixed props can express the state. Use a browser
-journey when the screenshot must prove routing, authentication, live data, or
+journey when the capture must prove routing, authentication, live data, or
 the complete application shell.
+
+### Record a journey movie
+
+Ask the CLI to choose the correct pixel source before recording:
+
+```bash
+astroshot movie which-source "record a Ratatui dashboard with truecolor"
+astroshot movie --help
+```
+
+| Journey | `--source` | Why |
+|---------|------------|-----|
+| Web / SPA / Playwright | `browser` | Records the browser directly; no desktop Chrome grab |
+| TUI / CLI / truecolor | `pty` | Preserves terminal color without recording Terminal.app |
+| Native macOS app | `desktop.window` | Targets AppKit/SwiftUI chrome through the shipped macOS window tooling |
+| Custom PNG sequence | `frames` | Encodes caller-owned pixels into the shared sink |
+
+```bash
+# Browser
+astroshot movie run --source browser --feature checkout --slug purchase \
+  --url https://example.com/checkout
+
+# Native macOS window (requires Screen Recording permission)
+astroshot movie list-windows
+astroshot movie run --source desktop.window --feature desktop-onboarding \
+  --slug first-run --bundle-id com.example.App --duration-ms 4000
+```
+
+Every source writes a poster PNG, WebM/MP4 video, duration, source, and optional
+chapters into the normal `.astroshot/<feature>/` manifest. Astroshots shows the
+poster in the stream and overlay, then plays the video in tray or full-screen
+review. `desktop.window` is macOS-only and rejects off-screen or nearly blank
+captures unless `--allow-blank` is explicit.
 
 Fixtures and configuration are executable code with the current user's
 permissions. Only capture trusted repositories and review downloaded fixtures
@@ -236,9 +399,10 @@ npx --@archastro:registry=https://registry.npmjs.org \
   --source /tmp/account-dialog.png
 ```
 
-The npm CLI runs independently of the macOS viewer; CI verifies all modes on
-Linux with the minimum supported Node.js release and Node.js 24 LTS. The live
-viewer remains a macOS application.
+The npm CLI runs independently of the macOS viewer. CI verifies the still modes
+and cross-platform movie sources on Linux with the minimum supported Node.js
+release and Node.js 24 LTS; `desktop.window` and the live viewer remain macOS
+features.
 
 ---
 
@@ -274,15 +438,16 @@ The helper lives at [`bin/astroshot-capture`](bin/astroshot-capture) →
 
 ### Agent skills
 
-This repo ships **five** skills. Install them with the [skills](https://github.com/vercel-labs/skills) CLI.
+This repo ships **six** skills. Install them with the [skills](https://github.com/vercel-labs/skills) CLI.
 
 | Skill | What it teaches |
 |-------|-----------------|
-| **astroshots-review** | Stream captures under `.astroshot/` and read human feedback |
+| **astroshots-review** | Stream stills/movies under `.astroshot/` and read human feedback |
 | **screenshot** | Plan, generate, review, and maintain documentation image sets |
-| **astroshot** | Capture deterministic React, Ink, and PTY fixtures with the unified CLI |
+| **astroshot** | Capture deterministic React, Ink, and PTY stills plus journey movies |
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
+| **friction-log** | Author, list, and run user-perspective UX scenarios with transcripts and evidence |
 
 #### Install all skills (recommended)
 
@@ -300,8 +465,8 @@ npx skills add ArchAstro/astroshots --skill '*' -y
 ```
 
 `--skill '*'` installs **every** skill in this repo (`astroshot`,
-`astroshots-review`, `screenshot`, `agent-browser`, and
-`browser-ui-harness`). Using a single name (for example,
+`astroshots-review`, `screenshot`, `agent-browser`, `browser-ui-harness`, and
+`friction-log`). Using a single name (for example,
 `--skill astroshots-review`) installs just that one.
 
 #### Install one skill
@@ -313,6 +478,7 @@ npx skills add ArchAstro/astroshots --skill screenshot -g -y
 npx skills add ArchAstro/astroshots --skill astroshot -g -y
 npx skills add ArchAstro/astroshots --skill agent-browser -g -y
 npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
+npx skills add ArchAstro/astroshots --skill friction-log -g -y
 
 # This project only (from project root)
 npx skills add ArchAstro/astroshots --skill agent-browser -y
@@ -346,11 +512,11 @@ Skill sources: [`skills/`](skills/).
 | Surface | Job |
 |---------|-----|
 | **Desktop overlay** | New frame above all windows; Open / dismiss |
-| **Stream** | Newest-first list across all projects under every watched folder |
-| **Detail** | Full frame + path, feature, URL, time |
-| **Settings** | Watched folders, overlay toggles |
-
-Interactive mock (open in a browser): [`docs/mocks/astroshots-menubar.html`](docs/mocks/astroshots-menubar.html).
+| **Shots stream** | Newest-first stills and movies, worktree grouping, Unseen/History, Movies filter |
+| **Movie detail** | Playback, chapters, duration/source metadata, feedback, Seen state |
+| **Friction Logs** | Scenario prompts, run history, improvement rollup, step screenshots/transcripts/notes |
+| **Narrated video** | Optional on-device transcript-to-MP4 generation on Apple Silicon |
+| **Settings** | Watched folders, overlay behavior, narration, and software updates |
 
 ---
 
@@ -363,7 +529,7 @@ macOS app and npm package versions are independent tracks
 | Maintainer action | What it does |
 |-------------------|--------------|
 | **Actions → Cut release** | Bump macOS marketing version + build, roll changelog, tag `vX.Y.Z`, **dispatch Release DMG**, PR to main |
-| **Actions → Cut npm release** | Bump all three `@archastro/*` packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
+| **Actions → Cut npm release** | Bump all four `@archastro/*` packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
 | [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed DMG (macOS) and npm release notes |
 
 Both cut workflows follow the same shape as `archastro-js` / `archastro-python`
@@ -401,8 +567,8 @@ as the package built from the tagged commit.
 Tag `astroshot-vX.Y.Z` (or **Cut npm release**) starts
 `.github/workflows/publish-npm.yml`. The
 workflow rejects a tag unless every package has the same version, reruns
-verification, publishes both rendering engines, and publishes the unified CLI
-last through npm trusted publishing.
+verification, publishes both still-image engines and the movie harness, then
+publishes the unified CLI last through npm trusted publishing.
 
 The workflow explicitly targets `https://registry.npmjs.org`. Trusted
 publishing automatically attaches provenance after this repository and the
@@ -415,18 +581,22 @@ repository.
 
 - macOS 14 or later  
 - One or more folders of projects to watch (configure in-app)
-- Tools that can write PNG files (any language, any harness)
+- Tools that can write stills or use `astroshot movie` (any language/harness may write the on-disk contract)
 
 The npm screenshot tools require Node.js 22.14 or later and a locally installed
 Chromium managed by Playwright.
 
+Native-window movie capture needs macOS Screen Recording permission. Optional
+narrated friction-log videos need Apple Silicon; enabling Narration downloads
+the Qwen3-TTS model locally.
+
 The canonical documentation and skill proof is
 [`scripts/verify-skills.sh`](scripts/verify-skills.sh). CI runs its integration
-mode, which captures one image with each npm package, streams both through
+mode, which captures React, Ink, and PTY images, streams them through
 `astroshot-capture`, and asserts the resulting manifest. The separate
-[`scripts/verify-packages.mjs`](scripts/verify-packages.mjs) proof packs both
-workspaces, installs the tarballs into a clean temporary npm project, and
-executes the exposed `npx` commands.
+[`scripts/verify-packages.mjs`](scripts/verify-packages.mjs) proof packs all
+four npm workspaces, installs the tarballs into a clean temporary npm project,
+and executes the public still and movie `npx` commands.
 
 ---
 

@@ -37,6 +37,7 @@ agent-browser install
 | Reusable multi-case browser smoke harness | **browser-ui-harness** |
 | Documentation image set and rendered-page verification | **screenshot** |
 | Live review of an existing capture | **astroshots-review** |
+| Recorded browser journey with poster+video manifest | `astroshot movie --source browser` |
 
 ## Journey loop
 
@@ -110,6 +111,10 @@ intended state:
 
 Astroshots is optional review transport; it does not replace product
 assertions and does not make a capture human-approved.
+
+For a continuous journey movie, use `astroshot movie --source browser` instead
+of desktop-recording Chrome. Keep `agent-browser` for semantic actions and
+assertions; the movie is evidence, not the assertion.
 
 ## Local applications and cleanup
 

@@ -1,0 +1,45 @@
+{
+  "owner": "README.md",
+  "regenerate": "bash scripts/capture-readme-screenshots.sh",
+  "source": "native Astroshots Debug app automation",
+  "fixture": "temporary local movie manifest plus two-run friction log; no user data",
+  "readiness": "the app writes CAPTURE_OK after every requested tray state is rendered",
+  "shots": [
+    {
+      "asset": "images/overlay-card.png",
+      "dimensions": "800x640",
+      "alt": "Desktop overlay for a newly captured onboarding movie with a direct Open in Astroshots action",
+      "proves": "new review frames surface as a desktop overlay"
+    },
+    {
+      "asset": "images/shots-movie-stream.png",
+      "dimensions": "860x1344",
+      "alt": "Shots stream with the Movies filter and a one-second onboarding movie ready for review",
+      "proves": "movies appear in the Shots stream with movie filtering and duration"
+    },
+    {
+      "asset": "images/movie-detail.png",
+      "dimensions": "860x1344",
+      "alt": "Movie detail showing playback actions, chapter metadata, feedback, and Seen acknowledgement",
+      "proves": "movie detail exposes playback actions and movie metadata"
+    },
+    {
+      "asset": "images/friction-logs.png",
+      "dimensions": "860x1344",
+      "alt": "Friction Logs tab listing a completed checkout scenario with two retained runs and two improvement notes",
+      "proves": "friction-log scenarios are separate from one-off Shots"
+    },
+    {
+      "asset": "images/friction-run.png",
+      "dimensions": "860x1344",
+      "alt": "Friction-log run detail with run history, Make narrated video, improvement rollup, and two steps",
+      "proves": "a scenario exposes run history, improvement rollup, and steps"
+    },
+    {
+      "asset": "images/friction-step.png",
+      "dimensions": "860x1344",
+      "alt": "Friction-log step detail pairing visual evidence with transcript, Looks good, and Can improve notes",
+      "proves": "step detail pairs evidence with transcript and good/improve notes"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import SwiftUI
 struct FrictionLogDetailView: View {
     @Environment(AppState.self) private var appState
     @State private var showPrompt = false
+    @State private var showRunPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -191,8 +192,7 @@ struct FrictionLogDetailView: View {
         }
     }
 
-    /// Run history control. Matches `StreamFilterChip`: 28pt pills, radius 6,
-    /// purpleSoft selection — no nested card (chips sit on paper like stream filters).
+    /// Optional transcript-to-MP4 action and current narration job state.
     @ViewBuilder
     private func narrationCard(log: FrictionLog, run: FrictionLogRun) -> some View {
         let readiness = appState.narration.readiness
@@ -396,70 +396,178 @@ struct FrictionLogDetailView: View {
                         .stroke(Theme.line, lineWidth: 1)
                 )
             } else {
-                // Full-width menu selector — closed label stays compact; menu lists all runs.
-                Menu {
-                    ForEach(Array(log.runs.enumerated()), id: \.element.id) { index, run in
-                        let isLatest = index == 0
-                        Button {
-                            appState.selectFrictionRun(run)
-                        } label: {
-                            if run.id == selected.id {
-                                Label(runMenuLabel(run: run, isLatest: isLatest), systemImage: "checkmark")
-                            } else {
-                                Text(runMenuLabel(run: run, isLatest: isLatest))
-                            }
-                        }
-                        .accessibilityIdentifier("friction.run.\(run.runID)")
-                    }
+                Button {
+                    showRunPicker.toggle()
                 } label: {
-                    HStack(spacing: 8) {
-                        Text(selected.displayTitle)
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(1)
-                        if selected.runID == log.latestRun?.runID {
-                            Text("Latest")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Theme.purple)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Theme.purpleSoft, in: Capsule())
+                            .foregroundStyle(Theme.purple)
+                            .frame(width: 28, height: 28)
+                            .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 7))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(selected.displayTitle)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.ink)
+                                    .lineLimit(1)
+                                if selected.runID == log.latestRun?.runID {
+                                    Text("Latest")
+                                        .font(.system(size: 8.5, weight: .bold))
+                                        .foregroundStyle(Theme.purple)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Theme.purpleSoft, in: Capsule())
+                                }
+                            }
+                            Text("\(selected.stepCountLabel) · \(selected.runID)")
+                                .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Theme.muted2)
+                                .lineLimit(1)
                         }
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.muted2)
+
+                        Spacer(minLength: 6)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(showRunPicker ? Theme.purple : Theme.muted2)
+                            .rotationEffect(.degrees(showRunPicker ? 180 : 0))
+                            .frame(width: 24, height: 24)
+                            .background(
+                                showRunPicker ? Theme.purpleSoft : Theme.surface,
+                                in: RoundedRectangle(cornerRadius: 6)
+                            )
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
+                    .background(
+                        Color.white.opacity(0.76),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(
+                                showRunPicker ? Theme.purple.opacity(0.34) : Theme.line,
+                                lineWidth: 1
+                            )
+                    )
                 }
-                .menuStyle(.borderlessButton)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Color.white.opacity(0.72),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Theme.line, lineWidth: 1)
-                )
+                .buttonStyle(.plain)
+                .hoverHighlight(cornerRadius: 11)
                 .help(selected.runID)
                 .accessibilityIdentifier("friction.runs.picker")
                 .accessibilityLabel(
                     "Run \(selected.displayTitle), \(log.runCount) runs available"
                 )
+                .popover(isPresented: $showRunPicker, arrowEdge: .bottom) {
+                    runPickerPopover(log: log, selected: selected)
+                }
             }
         }
     }
 
-    private func runMenuLabel(run: FrictionLogRun, isLatest: Bool) -> String {
-        var parts = [run.displayTitle]
-        if isLatest { parts.append("Latest") }
-        parts.append(run.stepCountLabel)
-        // Full id in the open menu for disambiguation.
-        return "\(parts.joined(separator: " · "))  ·  \(run.runID)"
+    private func runPickerPopover(log: FrictionLog, selected: FrictionLogRun) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Choose a run")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Newest first · \(log.runCount) total")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(Theme.muted2)
+                }
+                Spacer()
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.purple)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 7))
+            }
+
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(Array(log.runs.enumerated()), id: \.element.id) { index, run in
+                        runPickerRow(
+                            run: run,
+                            isLatest: index == 0,
+                            isSelected: run.id == selected.id
+                        )
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .frame(maxHeight: min(CGFloat(log.runCount) * 54, 280))
+        }
+        .padding(10)
+        .frame(width: 340)
+        .background(Theme.paper)
+        .accessibilityIdentifier("friction.runs.popover")
+    }
+
+    private func runPickerRow(
+        run: FrictionLogRun,
+        isLatest: Bool,
+        isSelected: Bool
+    ) -> some View {
+        Button {
+            appState.selectFrictionRun(run)
+            showRunPicker = false
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "clock")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.purple : Theme.muted2)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        isSelected ? Theme.purpleSoft : Theme.surface,
+                        in: RoundedRectangle(cornerRadius: 6)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
+                        Text(run.displayTitle)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        if isLatest {
+                            Text("Latest")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Theme.purple)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Theme.purpleSoft, in: Capsule())
+                        }
+                    }
+                    Text(run.runID)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Theme.muted2)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                Text(run.stepCountLabel)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.purple : Theme.muted2)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                isSelected ? Theme.purpleSoft.opacity(0.72) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+        }
+        .buttonStyle(.plain)
+        .hoverHighlight(cornerRadius: 8)
+        .accessibilityIdentifier("friction.run.\(run.runID)")
+        .accessibilityLabel(
+            "\(run.displayTitle), \(run.stepCountLabel)\(isLatest ? ", latest" : "")"
+        )
     }
 
     private func stepsTable(run: FrictionLogRun) -> some View {

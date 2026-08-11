@@ -30,6 +30,24 @@ execution and image metadata. Human feedback is a separate sibling file:
 | `url` | string | no | Route or UI context |
 | `viewport` | string | no | e.g. `1280x1100` |
 
+### Movie fields
+
+A movie is a normal shot entry whose `file` is the poster used in the stream,
+overlay, and review state:
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `kind` | string | recommended | `movie`; inferred when `video` is present |
+| `video` | string | yes | Sibling WebM, MP4, or MOV basename |
+| `duration_ms` | number | recommended | Duration shown in stream/detail |
+| `source` | string | recommended | `browser`, `pty`, `desktop.window`, or `frames` |
+| `chapters` | array | no | `{ "slug": "configured", "t_ms": 2800 }` entries |
+
+Astroshots shows movie badges and duration in the Shots stream, supports a
+Movies filter, and provides tray/full-screen playback. `file` intentionally
+remains the poster filename so overlays, thumbnails, and `review.json` share
+the still-image contract.
+
 ## Matching
 
 The app matches a PNG to a manifest entry by, in order:

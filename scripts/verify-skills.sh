@@ -37,6 +37,16 @@ require_reference "skills/friction-log/SKILL.md" "transcript"
 require_reference "skills/friction-log/SKILL.md" "Transitions"
 require_reference "skills/friction-log/references/contract.md" "screenshots"
 require_reference "skills/friction-log/references/contract.md" "transcript"
+require_reference "skills/astroshot/SKILL.md" "astroshot movie which-source"
+require_reference "skills/astroshot/SKILL.md" "desktop.window"
+require_reference "skills/astroshots-review/SKILL.md" "full-screen controls"
+require_reference "skills/astroshots-review/references/manifest.md" "duration_ms"
+require_reference "skills/screenshot/SKILL.md" "movie badge/filter"
+require_reference "skills/screenshot/SKILL.md" "transcript-backed step evidence"
+require_reference "skills/browser-ui-harness/SKILL.md" "astroshot movie --source browser"
+require_reference "README.md" "This repo ships **six** skills"
+require_reference "README.md" "Make narrated video"
+require_reference "README.md" "bash scripts/capture-readme-screenshots.sh"
 
 # Guard the two easy-to-miss safety properties in the browser guidance:
 # inspection examples must not use agent-browser's default-clicking `find`
@@ -62,7 +72,7 @@ done
 
 # Exercise the same single CLI entry point that npx exposes. Build the internal
 # engines only when a fresh checkout has no generated CLI.
-for tool in react-shot tui-shot; do
+for tool in react-shot tui-shot movie-harness; do
   if [[ ! -f "packages/$tool/dist/cli.js" ]]; then
     npm run build --workspace "@archastro/$tool"
   fi
@@ -79,6 +89,10 @@ grep -Fq "install-browser" <<<"$help_output" ||
 node packages/astroshot/bin/astroshot.mjs react --help >/dev/null
 node packages/astroshot/bin/astroshot.mjs ink --help >/dev/null
 node packages/astroshot/bin/astroshot.mjs pty --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs movie --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs movie which-source \
+  "native SwiftUI onboarding window" | grep -Fq "desktop.window" ||
+  fail "astroshot movie which-source did not select desktop.window"
 
 if [[ "${ASTROSHOTS_VERIFY_INTEGRATION:-0}" != "1" ]]; then
   echo "verify-skills: command help and skill references pass"
