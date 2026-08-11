@@ -11,6 +11,15 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Changed
+
+- **Friction Logs run history:** replaced the native menu chrome with an
+  Astroshots-themed, scrollable run picker that clearly identifies the latest
+  run and shows each run's timestamp, step count, and stable ID.
+- **Product and agent guidance:** refreshed the README, bundled skills, and
+  reproducible screenshot set for Movies, Friction Logs, narrated videos, and
+  app + skills onboarding.
+
 ## [0.2.2] (macos) - 2026-08-10
 
 ### Added
