@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.3] (macos) - 2026-08-11
+
 ### Changed
 
 - **Friction Logs run history:** replaced the native menu chrome with an
