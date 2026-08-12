@@ -14,7 +14,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-CURL=(curl --fail --silent --show-error --location --retry 3 --retry-all-errors)
+CURL=(
+  curl --fail --silent --show-error --location
+  --retry 12 --retry-all-errors --retry-delay 5 --retry-max-time 120
+)
 refresh_separator="?"
 if [[ "$FEED_URL" == *\?* ]]; then
   refresh_separator="&"
