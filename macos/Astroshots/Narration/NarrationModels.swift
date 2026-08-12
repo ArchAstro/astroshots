@@ -6,6 +6,8 @@ enum NarrationDefaults {
     /// CustomVoice English preset (see Qwen3-TTS README).
     static let voice = "Ryan"
     static let language = "English"
+    /// Keep independently synthesized friction-log steps sounding like one narrator.
+    static let temperature: Float = 0.3
     /// Minimum step display duration when audio is shorter.
     static let minimumStepSeconds: Double = 1.6
     static let framesPerSecond: Int32 = 12

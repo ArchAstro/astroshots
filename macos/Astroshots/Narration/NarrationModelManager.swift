@@ -305,12 +305,15 @@ final class NarrationSpeechBox: @unchecked Sendable {
 
     func speak(_ text: String, voice: String = NarrationDefaults.voice) async throws -> [Float] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var generationParameters = model.defaultGenerationParameters
+        generationParameters.temperature = NarrationDefaults.temperature
         let audio: MLXArray = try await model.generate(
             text: trimmed,
             voice: NarrationVoice.normalized(voice),
             refAudio: nil,
             refText: nil,
-            language: NarrationDefaults.language
+            language: NarrationDefaults.language,
+            generationParameters: generationParameters
         )
         return audio.asArray(Float.self)
     }
