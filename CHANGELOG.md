@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.5] (macos) - 2026-08-12
+
 ### Fixed
 
 - **Software Update refresh:** every update check now bypasses stale appcast
