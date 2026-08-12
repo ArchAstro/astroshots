@@ -53,7 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             updaterController = sparkle
             updateDelegate.logStartup(updater: sparkle.updater)
-            state.updaterSettings = UpdaterSettingsModel(updater: sparkle.updater)
+            let updaterSettings = UpdaterSettingsModel(updater: sparkle.updater)
+            state.updaterSettings = updaterSettings
+            updateDelegate.onUpdateCycleChanged = { [weak updaterSettings] active in
+                updaterSettings?.setUpdateCycleActive(active)
+            }
             controller.attachUpdaterController(sparkle)
 
             #if DEBUG

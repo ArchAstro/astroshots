@@ -90,4 +90,17 @@ struct BrandAssetsTests {
         let publicKey = try #require(info["SUPublicEDKey"] as? String)
         #expect(publicKey == "kddwW0gHUJ6CvdcYukaQd+cfNxEEHwQZHjzUYsjtVgc=")
     }
+
+    @Test
+    func updateChecksUseFreshCacheBustingParameters() throws {
+        let first = SoftwareUpdateFeedRequest.makeRefreshToken()
+        let second = SoftwareUpdateFeedRequest.makeRefreshToken()
+        #expect(first != second)
+
+        let parameters = SoftwareUpdateFeedRequest.parameters(refreshToken: first)
+        let parameter = try #require(parameters.first)
+        #expect(parameter["key"] == "refresh")
+        #expect(parameter["value"] == first)
+        #expect(parameter["displayKey"] == "Feed refresh")
+    }
 }

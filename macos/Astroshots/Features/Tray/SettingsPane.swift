@@ -335,8 +335,16 @@ private struct SoftwareUpdateSettingsCard: View {
             }
             .padding(.top, 4)
 
-            Button("Check for Updates…") {
+            Button {
                 settings.checkForUpdates()
+            } label: {
+                HStack(spacing: 6) {
+                    if settings.isCheckingForUpdates {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(settings.isCheckingForUpdates ? "Checking…" : "Check for Updates…")
+                }
             }
             .buttonStyle(.plain)
             .font(.system(size: 11, weight: .semibold))

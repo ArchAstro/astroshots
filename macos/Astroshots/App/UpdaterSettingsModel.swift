@@ -14,6 +14,7 @@ import Sparkle
 @Observable
 final class UpdaterSettingsModel {
     private let updater: SPUUpdater
+    private(set) var isCheckingForUpdates = false
 
     var automaticallyChecksForUpdates: Bool {
         didSet {
@@ -46,7 +47,11 @@ final class UpdaterSettingsModel {
     }
 
     var canCheckForUpdates: Bool {
-        updater.canCheckForUpdates
+        !isCheckingForUpdates && updater.canCheckForUpdates
+    }
+
+    func setUpdateCycleActive(_ active: Bool) {
+        isCheckingForUpdates = active
     }
 
     func checkForUpdates() {

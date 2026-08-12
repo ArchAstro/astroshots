@@ -7,6 +7,8 @@ import Sparkle
 /// lifetime of `SPUStandardUpdaterController` (the controller holds it weakly).
 final class SoftwareUpdateDelegate: NSObject, SPUUpdaterDelegate {
     private let log = SoftwareUpdateLog.logger
+    private var feedRefreshToken = SoftwareUpdateFeedRequest.makeRefreshToken()
+    var onUpdateCycleChanged: ((Bool) -> Void)?
 
     /// One-shot boot summary so a release test has a clear start line.
     func logStartup(updater: SPUUpdater) {
@@ -27,10 +29,24 @@ final class SoftwareUpdateDelegate: NSObject, SPUUpdaterDelegate {
         mayPerform updateCheck: SPUUpdateCheck,
         error: NSErrorPointer
     ) -> Bool {
+        feedRefreshToken = SoftwareUpdateFeedRequest.makeRefreshToken()
         let type = SoftwareUpdateLog.describe(updateCheck)
         let installed = SoftwareUpdateLog.installedVersionSummary()
-        log.info("mayPerformCheck type=\(type, privacy: .public) installed=\(installed, privacy: .public)")
+        log.info(
+            "mayPerformCheck type=\(type, privacy: .public) installed=\(installed, privacy: .public) refresh=\(self.feedRefreshToken, privacy: .public)"
+        )
+        onUpdateCycleChanged?(true)
         return true
+    }
+
+    /// Sparkle's supported hook for appending feed query parameters. A unique
+    /// value per cycle forces user-initiated checks through GitHub's stable
+    /// release URL instead of reusing a stale cached appcast response.
+    func feedParameters(
+        for updater: SPUUpdater,
+        sendingSystemProfile: Bool
+    ) -> [[String: String]] {
+        SoftwareUpdateFeedRequest.parameters(refreshToken: feedRefreshToken)
     }
 
     func updater(
@@ -163,6 +179,7 @@ final class SoftwareUpdateDelegate: NSObject, SPUUpdaterDelegate {
         didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
         error: (any Error)?
     ) {
+        onUpdateCycleChanged?(false)
         let type = SoftwareUpdateLog.describe(updateCheck)
         if let error {
             let detail = SoftwareUpdateLog.describe(error)
@@ -170,5 +187,20 @@ final class SoftwareUpdateDelegate: NSObject, SPUUpdaterDelegate {
         } else {
             log.info("cycleFinished type=\(type, privacy: .public) ok")
         }
+    }
+}
+
+enum SoftwareUpdateFeedRequest {
+    static func makeRefreshToken() -> String {
+        UUID().uuidString.lowercased()
+    }
+
+    static func parameters(refreshToken: String) -> [[String: String]] {
+        [[
+            "key": "refresh",
+            "value": refreshToken,
+            "displayKey": "Feed refresh",
+            "displayValue": refreshToken,
+        ]]
     }
 }

@@ -185,6 +185,7 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
+            dist/*.md
             dist/appcast.xml
           if-no-files-found: error
           retention-days: 90
@@ -203,6 +204,7 @@ jobs:
           ASSETS=(
             "dist/Astroshots-${VERSION}.dmg"
             "dist/Astroshots-${VERSION}.zip"
+            "dist/Astroshots-${VERSION}.md"
             "dist/appcast.xml"
           )
           for asset in "${ASSETS[@]}"; do
@@ -227,7 +229,24 @@ jobs:
               --title "Astroshots Sparkle appcast" \
               --notes "Cumulative Sparkle appcast for the macOS app. Not an app version; updated by Release DMG." \
               --latest=false \
-              dist/appcast.xml
+              dist/appcast.xml \
+              "dist/Astroshots-${VERSION}.md"
           else
-            gh release upload appcast dist/appcast.xml --clobber
+            gh release upload appcast \
+              dist/appcast.xml \
+              "dist/Astroshots-${VERSION}.md" \
+              --clobber
           fi
+
+      - name: Verify published Sparkle update end to end
+        working-directory: macos
+        env:
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          chmod +x scripts/test-update-feed.sh
+          ./scripts/test-update-feed.sh \
+            https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml \
+            "$VERSION"

@@ -194,6 +194,9 @@ fi
 
 mkdir -p "$(dirname "$OUT")"
 cp "$WORK/appcast.xml" "$OUT"
+if [[ -f "$WORK/Astroshots-${VERSION}.md" ]]; then
+  cp "$WORK/Astroshots-${VERSION}.md" "$(dirname "$OUT")/"
+fi
 echo "==> Wrote $OUT"
 # Show the new item enclosure line for CI logs (no private key material).
 grep -E 'sparkle:(version|shortVersionString)|enclosure |title>' "$OUT" | head -40 || true
