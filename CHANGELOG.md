@@ -11,6 +11,22 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **Narration voices:** Settings now offers persistent Qwen3 voice selection
+  with sample playback, and every narration job consistently uses the chosen
+  voice.
+- **Share-ready narrated videos:** generated MP4s include burned-in captions,
+  the friction-log title in the filename, and branded opening and closing cards
+  built from the Astroshots icon and DMG artwork.
+
+### Changed
+
+- **Feedback-first walkthroughs:** each image begins beside its rendered review
+  feedback, then the feedback fades away after about 30 seconds while the image
+  expands edge-to-edge. Short narration steps still receive a fade and
+  full-screen hold before advancing.
+
 ## [0.2.5] (macos) - 2026-08-12
 
 ### Fixed
