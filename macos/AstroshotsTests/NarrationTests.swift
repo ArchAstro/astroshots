@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Testing
 @testable import Astroshots
@@ -70,6 +71,65 @@ struct NarrationTests {
                 || dir.path.contains("Qwen3_TTS")
                 || dir.lastPathComponent.contains("Qwen3")
         )
+    }
+
+    /// Regression for a circular AVAssetWriter wait: video was fed to
+    /// completion before audio started, but long clips backpressure video until
+    /// audio advances. This is synthetic and always runs in CI; no TTS model is
+    /// loaded or downloaded.
+    @Test(.timeLimit(.minutes(1)))
+    func longNarrationFeedsAudioAndVideoConcurrently() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("astroshots-narration-regression-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let wav = root.appendingPathComponent("long-silence.wav")
+        let png = root.appendingPathComponent("frame.png")
+        let mp4 = root.appendingPathComponent("narration.mp4")
+        let duration = 30.0
+        try writeSilentWAV(to: wav, duration: duration)
+        try writeSolidPNG(to: png, width: 1280, height: 720)
+
+        try await NarrationVideoComposer.compose(
+            steps: [
+                .init(imagePath: png.path, audioPath: wav.path, duration: duration),
+            ],
+            outputURL: mp4
+        )
+
+        let bytes = try FileManager.default.attributesOfItem(atPath: mp4.path)[.size]
+            as? NSNumber
+        #expect((bytes?.intValue ?? 0) > 5_000)
+        let asset = AVURLAsset(url: mp4)
+        let assetDuration = try await asset.load(.duration).seconds
+        #expect(assetDuration >= duration - 0.6)
+
+        let videoTrack = try #require(
+            try await asset.loadTracks(withMediaType: .video).first
+        )
+        let audioTrack = try #require(
+            try await asset.loadTracks(withMediaType: .audio).first
+        )
+        let videoSample = try decodeFirstSample(
+            from: asset,
+            track: videoTrack,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+            ]
+        )
+        #expect(CMSampleBufferGetImageBuffer(videoSample) != nil)
+
+        let audioSample = try decodeFirstSample(
+            from: asset,
+            track: audioTrack,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+            ]
+        )
+        #expect(CMSampleBufferGetTotalSampleSize(audioSample) > 0)
     }
 
     /// Opt-in smoke: download Qwen3-TTS, synthesize one phrase, write a WAV.
@@ -148,5 +208,41 @@ struct NarrationTests {
             throw NarrationError.processFailed("Could not write smoke PNG")
         }
         try data.write(to: url)
+    }
+
+    private func writeSilentWAV(to url: URL, duration: Double) throws {
+        let sampleRate = 44_100.0
+        let frameCount = AVAudioFrameCount(duration * sampleRate)
+        let format = try #require(
+            AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)
+        )
+        let buffer = try #require(
+            AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)
+        )
+        buffer.frameLength = frameCount
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+    }
+
+    private func decodeFirstSample(
+        from asset: AVAsset,
+        track: AVAssetTrack,
+        outputSettings: [String: Any]
+    ) throws -> CMSampleBuffer {
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings)
+        try #require(reader.canAdd(output))
+        reader.add(output)
+        guard reader.startReading() else {
+            throw NarrationError.processFailed(
+                reader.error?.localizedDescription ?? "Decode failed"
+            )
+        }
+        guard let sample = output.copyNextSampleBuffer() else {
+            throw NarrationError.processFailed(
+                reader.error?.localizedDescription ?? "Track produced no decoded samples"
+            )
+        }
+        return sample
     }
 }

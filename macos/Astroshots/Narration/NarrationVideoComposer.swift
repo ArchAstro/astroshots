@@ -14,6 +14,31 @@ enum NarrationVideoComposer {
         var duration: Double
     }
 
+    /// AVAssetWriter is designed for independently fed inputs but its Objective-C
+    /// types do not declare Sendable conformance. Access is split by track; only
+    /// status/cancellation is shared across the two child tasks.
+    private final class SegmentWriterContext: @unchecked Sendable {
+        let writer: AVAssetWriter
+        let videoInput: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let audioInput: AVAssetWriterInput
+        let image: NSImage
+
+        init(
+            writer: AVAssetWriter,
+            videoInput: AVAssetWriterInput,
+            adaptor: AVAssetWriterInputPixelBufferAdaptor,
+            audioInput: AVAssetWriterInput,
+            image: NSImage
+        ) {
+            self.writer = writer
+            self.videoInput = videoInput
+            self.adaptor = adaptor
+            self.audioInput = audioInput
+            self.image = image
+        }
+    }
+
     static func compose(
         steps: [StepMedia],
         outputURL: URL,
@@ -105,25 +130,53 @@ enum NarrationVideoComposer {
         let fps: Int32 = 2
         let frameCount = max(2, Int(ceil(duration * Double(fps))))
         let frameDuration = CMTime(value: 1, timescale: fps)
-
-        try await appendVideoFrames(
+        let context = SegmentWriterContext(
+            writer: writer,
+            videoInput: videoInput,
             adaptor: adaptor,
-            input: videoInput,
-            image: image,
-            size: size,
-            frameCount: frameCount,
-            frameDuration: frameDuration
+            audioInput: audioInput,
+            image: image
         )
-        videoInput.markAsFinished()
 
-        try await appendAudioFile(
-            path: step.audioPath,
-            to: audioInput,
-            maxDuration: CMTime(seconds: duration, preferredTimescale: 600)
-        )
-        audioInput.markAsFinished()
+        do {
+            // AVAssetWriter interleaves its inputs and may backpressure one
+            // until the other advances. Feed both tracks concurrently; awaiting
+            // all video before starting audio deadlocks on longer narration.
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try await appendVideoFrames(
+                        adaptor: context.adaptor,
+                        input: context.videoInput,
+                        writer: context.writer,
+                        image: context.image,
+                        size: size,
+                        frameCount: frameCount,
+                        frameDuration: frameDuration
+                    )
+                    context.videoInput.markAsFinished()
+                }
+                group.addTask {
+                    try await appendAudioFile(
+                        path: step.audioPath,
+                        to: context.audioInput,
+                        writer: context.writer,
+                        maxDuration: CMTime(seconds: duration, preferredTimescale: 600)
+                    )
+                    context.audioInput.markAsFinished()
+                }
+                try await group.waitForAll()
+            }
 
-        await writer.finishWriting()
+            try Task.checkCancellation()
+            await withTaskCancellationHandler {
+                await writer.finishWriting()
+            } onCancel: {
+                context.writer.cancelWriting()
+            }
+        } catch {
+            writer.cancelWriting()
+            throw error
+        }
         guard writer.status == .completed else {
             throw NarrationError.processFailed(
                 writer.error?.localizedDescription ?? "Segment encode failed."
@@ -134,48 +187,38 @@ enum NarrationVideoComposer {
     private static func appendVideoFrames(
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         input: AVAssetWriterInput,
+        writer: AVAssetWriter,
         image: NSImage,
         size: CGSize,
         frameCount: Int,
         frameDuration: CMTime
     ) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            let queue = DispatchQueue(label: "ai.archastro.astroshots.narration.video")
-            var index = 0
-            var finished = false
-
-            input.requestMediaDataWhenReady(on: queue) {
-                if finished { return }
-                while input.isReadyForMoreMediaData {
-                    if index >= frameCount {
-                        finished = true
-                        cont.resume()
-                        return
-                    }
-                    guard let buffer = makePixelBuffer(from: image, size: size) else {
-                        finished = true
-                        cont.resume(
-                            throwing: NarrationError.processFailed("Could not create video frame.")
-                        )
-                        return
-                    }
-                    let time = CMTimeMultiply(frameDuration, multiplier: Int32(index))
-                    if !adaptor.append(buffer, withPresentationTime: time) {
-                        finished = true
-                        cont.resume(
-                            throwing: NarrationError.processFailed("Failed appending video frame.")
-                        )
-                        return
-                    }
-                    index += 1
-                }
+        var index = 0
+        while index < frameCount {
+            try Task.checkCancellation()
+            try checkWriter(writer)
+            guard input.isReadyForMoreMediaData else {
+                try await Task.sleep(for: .milliseconds(2))
+                continue
             }
+
+            guard let buffer = makePixelBuffer(from: image, size: size) else {
+                throw NarrationError.processFailed("Could not create video frame.")
+            }
+            let time = CMTimeMultiply(frameDuration, multiplier: Int32(index))
+            guard adaptor.append(buffer, withPresentationTime: time) else {
+                throw NarrationError.processFailed(
+                    writer.error?.localizedDescription ?? "Failed appending video frame."
+                )
+            }
+            index += 1
         }
     }
 
     private static func appendAudioFile(
         path: String,
         to input: AVAssetWriterInput,
+        writer: AVAssetWriter,
         maxDuration: CMTime
     ) async throws {
         let url = URL(fileURLWithPath: path)
@@ -205,36 +248,47 @@ enum NarrationVideoComposer {
                 reader.error?.localizedDescription ?? "Audio reader failed to start."
             )
         }
+        defer { reader.cancelReading() }
 
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            let queue = DispatchQueue(label: "ai.archastro.astroshots.narration.audio")
-            var finished = false
+        while true {
+            try Task.checkCancellation()
+            try checkWriter(writer)
+            guard input.isReadyForMoreMediaData else {
+                try await Task.sleep(for: .milliseconds(2))
+                continue
+            }
 
-            input.requestMediaDataWhenReady(on: queue) {
-                if finished { return }
-                while input.isReadyForMoreMediaData {
-                    guard let sample = output.copyNextSampleBuffer() else {
-                        finished = true
-                        cont.resume()
-                        return
-                    }
-                    let pts = CMSampleBufferGetPresentationTimeStamp(sample)
-                    if CMTimeCompare(pts, maxDuration) > 0 {
-                        finished = true
-                        cont.resume()
-                        return
-                    }
-                    if !input.append(sample) {
-                        finished = true
-                        cont.resume(
-                            throwing: NarrationError.processFailed("Failed appending audio sample.")
-                        )
-                        return
-                    }
+            guard let sample = output.copyNextSampleBuffer() else {
+                if reader.status == .failed {
+                    throw NarrationError.processFailed(
+                        reader.error?.localizedDescription ?? "Audio reader failed."
+                    )
                 }
+                break
+            }
+            let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+            if CMTimeCompare(pts, maxDuration) > 0 {
+                break
+            }
+            guard input.append(sample) else {
+                throw NarrationError.processFailed(
+                    writer.error?.localizedDescription ?? "Failed appending audio sample."
+                )
             }
         }
-        reader.cancelReading()
+    }
+
+    private static func checkWriter(_ writer: AVAssetWriter) throws {
+        switch writer.status {
+        case .failed:
+            throw NarrationError.processFailed(
+                writer.error?.localizedDescription ?? "Segment encode failed."
+            )
+        case .cancelled:
+            throw CancellationError()
+        default:
+            return
+        }
     }
 
     private static func concatenate(segments: [URL], outputURL: URL) async throws {
