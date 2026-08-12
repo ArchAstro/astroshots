@@ -11,6 +11,11 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Narrated video generation:** feed audio and video to the encoder concurrently
+  so longer friction-log narrations complete instead of hanging during MP4 encoding.
+
 ## [0.2.3] (macos) - 2026-08-11
 
 ### Changed
