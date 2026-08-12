@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.6] (macos) - 2026-08-12
+
 ### Added
 
 - **Narration voices:** Settings now offers persistent Qwen3 voice selection
