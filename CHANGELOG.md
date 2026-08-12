@@ -11,6 +11,13 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Software Update refresh:** every update check now bypasses stale appcast
+  caches, shows active checking state in Settings, and ships reachable release
+  notes. Release CI verifies the public feed, archive, and EdDSA signature end
+  to end before completing.
+
 ## [0.2.4] (macos) - 2026-08-12
 
 ### Fixed
