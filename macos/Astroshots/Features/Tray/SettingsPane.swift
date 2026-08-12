@@ -192,6 +192,58 @@ struct SettingsPane: View {
                 appState.setNarrationEnabled(enabled)
             }
 
+            if appState.narrationEnabled {
+                HStack(spacing: 8) {
+                    Text("Voice")
+                        .font(.system(size: 11, weight: .semibold))
+                    Spacer(minLength: 8)
+                    Picker(
+                        "Voice",
+                        selection: Binding(
+                            get: { appState.narrationVoice },
+                            set: { voice in
+                                appState.narration.stopPreview()
+                                appState.setNarrationVoice(voice)
+                            }
+                        )
+                    ) {
+                        ForEach(NarrationVoice.available) { voice in
+                            Text("\(voice.displayName) · \(voice.language)")
+                                .tag(voice.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                    .accessibilityIdentifier("settings.narration.voice")
+
+                    Button {
+                        appState.narration.previewVoice(appState.narrationVoice)
+                    } label: {
+                        Image(
+                            systemName: appState.narration.previewingVoice == appState.narrationVoice
+                                ? "stop.fill"
+                                : "play.fill"
+                        )
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 7))
+                    .disabled(!readiness.isReady)
+                    .help(readiness.isReady ? "Hear this voice" : "Narration is not ready yet")
+                    .accessibilityLabel(
+                        appState.narration.previewingVoice == appState.narrationVoice
+                            ? "Stop voice sample"
+                            : "Play voice sample"
+                    )
+                    .accessibilityIdentifier("settings.narration.voice-preview")
+                }
+                .padding(.top, 4)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Theme.line).frame(height: 1)
+                }
+            }
+
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     statusDot(for: readiness)
@@ -219,6 +271,13 @@ struct SettingsPane: View {
                     .padding(.vertical, 6)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 7))
                     .accessibilityIdentifier("settings.narration.retry")
+                }
+
+                if let error = appState.narration.lastError, readiness.isReady {
+                    Text(error)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(Theme.red)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text("Requires Apple Silicon. Qwen3-TTS downloads via Hugging Face into the MLX Hub cache; generation runs in-process.")

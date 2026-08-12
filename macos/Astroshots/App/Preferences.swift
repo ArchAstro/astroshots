@@ -21,6 +21,8 @@ final class Preferences {
         static let narrationEnabled = "narrationEnabled"
         /// Cached flag that the Qwen3 model finished downloading at least once.
         static let narrationModelReady = "narrationModelReady"
+        /// Named Qwen3 CustomVoice speaker used for previews and every render.
+        static let narrationVoice = "narrationVoice"
     }
 
     /// Migration schema for first-run detection. Increment when adoption rules
@@ -122,6 +124,11 @@ final class Preferences {
     var narrationModelReady: Bool {
         get { defaults.bool(forKey: Key.narrationModelReady) }
         set { defaults.set(newValue, forKey: Key.narrationModelReady) }
+    }
+
+    var narrationVoice: String {
+        get { NarrationVoice.normalized(defaults.string(forKey: Key.narrationVoice)) }
+        set { defaults.set(NarrationVoice.normalized(newValue), forKey: Key.narrationVoice) }
     }
 
     /// Call when the user successfully chooses initial watch folders.

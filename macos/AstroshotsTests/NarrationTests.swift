@@ -47,6 +47,7 @@ struct NarrationTests {
         let job = NarrationJob.make(log: log, run: run)
         #expect(job.stepTranscripts.count == 1)
         #expect(job.stepTranscripts[0].transcript.contains("open the app"))
+        #expect(job.voice == NarrationDefaults.voice)
         #expect(job.phase == .queued)
     }
 
@@ -61,6 +62,7 @@ struct NarrationTests {
     @Test func defaultModelIsQwen3TTS() {
         #expect(NarrationDefaults.modelID.contains("Qwen3-TTS"))
         #expect(NarrationDefaults.voice == "Ryan")
+        #expect(NarrationVoice.available.map(\.id).contains("Aiden"))
     }
 
     @Test func modelDirectoryUsesMlxAudioCacheLayout() {
@@ -87,15 +89,24 @@ struct NarrationTests {
         let wav = root.appendingPathComponent("long-silence.wav")
         let png = root.appendingPathComponent("frame.png")
         let mp4 = root.appendingPathComponent("narration.mp4")
-        let duration = 30.0
+        let duration = 33.0
         try writeSilentWAV(to: wav, duration: duration)
         try writeSolidPNG(to: png, width: 1280, height: 720)
 
         try await NarrationVideoComposer.compose(
             steps: [
-                .init(imagePath: png.path, audioPath: wav.path, duration: duration),
+                .init(
+                    imagePath: png.path,
+                    audioPath: wav.path,
+                    duration: duration,
+                    title: "Checkout",
+                    transcript: "The checkout is clear and the primary action is easy to find.",
+                    good: ["Clear primary action"],
+                    improve: ["Move trust details closer"]
+                ),
             ],
-            outputURL: mp4
+            outputURL: mp4,
+            logTitle: "Checkout review"
         )
 
         let bytes = try FileManager.default.attributesOfItem(atPath: mp4.path)[.size]
@@ -130,6 +141,35 @@ struct NarrationTests {
             ]
         )
         #expect(CMSampleBufferGetTotalSampleSize(audioSample) > 0)
+
+        let keepPreview = ProcessInfo.processInfo.environment["ASTROSHOTS_KEEP_NARRATION_PREVIEW"] == "1"
+            || FileManager.default.fileExists(atPath: "/tmp/ASTROSHOTS_KEEP_NARRATION_PREVIEW")
+        if keepPreview {
+            let preview = FileManager.default.temporaryDirectory
+                .appendingPathComponent("astroshots-narration-preview.mp4")
+            try? FileManager.default.removeItem(at: preview)
+            try FileManager.default.copyItem(at: mp4, to: preview)
+            try await writePreviewFrames(from: asset)
+            print("narration preview: \(preview.path)")
+        }
+    }
+
+    @Test func captionsAdvanceAndFeedbackFadesAfterThirtySeconds() {
+        let transcript = "one two three four five six seven eight nine ten eleven twelve thirteen"
+        #expect(NarrationVideoComposer.captionText(transcript, elapsed: 0, duration: 40).contains("one"))
+        #expect(NarrationVideoComposer.captionText(transcript, elapsed: 39, duration: 40).contains("thirteen"))
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 29, duration: 40, hasFeedback: true) == 1)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 30.5, duration: 40, hasFeedback: true) == 0.5)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 32, duration: 40, hasFeedback: true) == 0)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 5, duration: 8, hasFeedback: true) == 1)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 6, duration: 8, hasFeedback: true) == 0.5)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 7, duration: 8, hasFeedback: true) == 0)
+        #expect(NarrationVideoComposer.feedbackOpacity(elapsed: 5, duration: 40, hasFeedback: false) == 0)
+    }
+
+    @Test func narratedFilenameIncludesSanitizedLogTitle() {
+        #expect(NarrationJobQueue.safeFilenameComponent("Checkout / mobile ✨") == "Checkout-mobile")
+        #expect(NarrationJobQueue.safeFilenameComponent("✨") == "Friction-Log")
     }
 
     /// Opt-in smoke: download Qwen3-TTS, synthesize one phrase, write a WAV.
@@ -222,6 +262,32 @@ struct NarrationTests {
         buffer.frameLength = frameCount
         let file = try AVAudioFile(forWriting: url, settings: format.settings)
         try file.write(from: buffer)
+    }
+
+    private func writePreviewFrames(from asset: AVAsset) async throws {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+
+        for (name, seconds) in [
+            ("intro", 1.0),
+            ("feedback", 4.0),
+            ("fullscreen", 34.5),
+            ("outro", 37.0),
+        ] {
+            let (image, _) = try await generator.image(
+                at: CMTime(seconds: seconds, preferredTimescale: 600)
+            )
+            let representation = NSBitmapImageRep(cgImage: image)
+            let data = try #require(
+                representation.representation(using: .png, properties: [:])
+            )
+            let output = FileManager.default.temporaryDirectory
+                .appendingPathComponent("astroshots-narration-\(name).png")
+            try data.write(to: output, options: .atomic)
+            print("narration frame: \(output.path)")
+        }
     }
 
     private func decodeFirstSample(

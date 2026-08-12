@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import HuggingFace
 import MLX
@@ -14,12 +15,17 @@ final class NarrationModelManager {
     private(set) var readiness: NarrationReadiness = .disabled
     private(set) var capability: NarrationCapability = .unknown
     private(set) var lastError: String?
+    private(set) var previewingVoice: String?
 
     /// Warm model kept after successful setup so render jobs skip reload cost.
     private(set) var loadedModel: (any SpeechGenerationModel)?
 
     private let preferences: Preferences
     private var bootstrapTask: Task<Void, Never>?
+    private var previewTask: Task<Void, Never>?
+    private var previewPlayer: AVAudioPlayer?
+    private var synthesisBusy = false
+    private var synthesisWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(preferences: Preferences = .shared) {
         self.preferences = preferences
@@ -53,6 +59,7 @@ final class NarrationModelManager {
             bootstrapTask?.cancel()
             bootstrapTask = nil
             loadedModel = nil
+            stopPreview()
             readiness = .disabled
             lastError = nil
             return
@@ -141,10 +148,14 @@ final class NarrationModelManager {
     }
 
     /// One-shot TTS for smoke tests / debugging (writes a mono WAV).
-    func synthesizePhrase(_ text: String, to output: URL) async throws -> Double {
+    func synthesizePhrase(
+        _ text: String,
+        voice: String = NarrationDefaults.voice,
+        to output: URL
+    ) async throws -> Double {
         let model = try await modelForSynthesis()
-        let box = NarrationSpeechBox(model)
-        let samples = try await box.speak(text)
+        let audio = try await synthesizeAudio(text, voice: voice, using: model)
+        let samples = audio.samples
         guard !samples.isEmpty else {
             throw NarrationError.processFailed("TTS produced empty audio.")
         }
@@ -154,10 +165,87 @@ final class NarrationModelManager {
         )
         try AudioUtils.writeWavFile(
             samples: samples,
-            sampleRate: Double(box.sampleRate),
+            sampleRate: Double(audio.sampleRate),
             fileURL: output
         )
-        return Double(samples.count) / Double(max(box.sampleRate, 1))
+        return Double(samples.count) / Double(max(audio.sampleRate, 1))
+    }
+
+    func synthesizeAudio(
+        _ text: String,
+        voice: String,
+        using model: any SpeechGenerationModel
+    ) async throws -> (samples: [Float], sampleRate: Int) {
+        await acquireSynthesisSlot()
+        defer { releaseSynthesisSlot() }
+        try Task.checkCancellation()
+
+        let box = NarrationSpeechBox(model)
+        let samples = try await box.speak(text, voice: NarrationVoice.normalized(voice))
+        return (samples, box.sampleRate)
+    }
+
+    private func acquireSynthesisSlot() async {
+        if !synthesisBusy {
+            synthesisBusy = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            synthesisWaiters.append(continuation)
+        }
+    }
+
+    private func releaseSynthesisSlot() {
+        if synthesisWaiters.isEmpty {
+            synthesisBusy = false
+        } else {
+            synthesisWaiters.removeFirst().resume()
+        }
+    }
+
+    func previewVoice(_ voice: String) {
+        let voice = NarrationVoice.normalized(voice)
+        if previewingVoice == voice {
+            stopPreview()
+            return
+        }
+        stopPreview()
+        previewingVoice = voice
+        lastError = nil
+        previewTask = Task { [weak self] in
+            guard let self else { return }
+            let output = FileManager.default.temporaryDirectory
+                .appendingPathComponent("astroshots-voice-preview-\(voice).wav")
+            do {
+                try? FileManager.default.removeItem(at: output)
+                _ = try await synthesizePhrase(
+                    NarrationDefaults.voicePreviewText,
+                    voice: voice,
+                    to: output
+                )
+                try Task.checkCancellation()
+                let player = try AVAudioPlayer(contentsOf: output)
+                player.prepareToPlay()
+                previewPlayer = player
+                player.play()
+                let nanoseconds = UInt64((player.duration + 0.15) * 1_000_000_000)
+                try await Task.sleep(nanoseconds: nanoseconds)
+                if previewingVoice == voice { previewingVoice = nil }
+            } catch is CancellationError {
+                // A second tap or a new voice selection stops the current sample.
+            } catch {
+                lastError = error.localizedDescription
+                previewingVoice = nil
+            }
+        }
+    }
+
+    func stopPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewPlayer?.stop()
+        previewPlayer = nil
+        previewingVoice = nil
     }
 
     private func downloadModel(force: Bool) async throws {
@@ -215,26 +303,15 @@ final class NarrationSpeechBox: @unchecked Sendable {
 
     var sampleRate: Int { model.sampleRate }
 
-    func speak(_ text: String, voice: String? = NarrationDefaults.voice) async throws -> [Float] {
+    func speak(_ text: String, voice: String = NarrationDefaults.voice) async throws -> [Float] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let audio: MLXArray
-        do {
-            audio = try await model.generate(
-                text: trimmed,
-                voice: voice,
-                refAudio: nil,
-                refText: nil,
-                language: NarrationDefaults.language
-            )
-        } catch {
-            audio = try await model.generate(
-                text: trimmed,
-                voice: nil,
-                refAudio: nil,
-                refText: nil,
-                language: NarrationDefaults.language
-            )
-        }
+        let audio: MLXArray = try await model.generate(
+            text: trimmed,
+            voice: NarrationVoice.normalized(voice),
+            refAudio: nil,
+            refText: nil,
+            language: NarrationDefaults.language
+        )
         return audio.asArray(Float.self)
     }
 }
