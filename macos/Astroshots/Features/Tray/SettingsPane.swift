@@ -208,7 +208,7 @@ struct SettingsPane: View {
                         )
                     ) {
                         ForEach(NarrationVoice.available) { voice in
-                            Text("\(voice.displayName) · \(voice.language)")
+                            Text(voice.displayName)
                                 .tag(voice.id)
                         }
                     }

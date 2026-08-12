@@ -19,18 +19,17 @@ enum NarrationDefaults {
 
 struct NarrationVoice: Identifiable, Equatable, Sendable {
     let id: String
-    let language: String
 
     var displayName: String { id.replacingOccurrences(of: "_", with: " ") }
 
     static let available: [NarrationVoice] = [
-        .init(id: "Ryan", language: "English"),
-        .init(id: "Aiden", language: "English"),
-        .init(id: "Vivian", language: "Chinese"),
-        .init(id: "Serena", language: "Chinese"),
-        .init(id: "Uncle_Fu", language: "Chinese"),
-        .init(id: "Dylan", language: "Chinese"),
-        .init(id: "Eric", language: "Chinese"),
+        .init(id: "Ryan"),
+        .init(id: "Aiden"),
+        .init(id: "Vivian"),
+        .init(id: "Serena"),
+        .init(id: "Uncle_Fu"),
+        .init(id: "Dylan"),
+        .init(id: "Eric"),
     ]
 
     static func normalized(_ value: String?) -> String {
