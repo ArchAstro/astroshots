@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.4] (macos) - 2026-08-12
+
 ### Fixed
 
 - **Narrated video generation:** feed audio and video to the encoder concurrently
