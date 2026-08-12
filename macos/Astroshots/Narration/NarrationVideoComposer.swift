@@ -143,9 +143,7 @@ enum NarrationVideoComposer {
         }
         writer.startSession(atSourceTime: .zero)
 
-        let image = step.isBrandCard
-            ? (brandBackground() ?? placeholderImage(size: size))
-            : (loadImage(path: step.imagePath) ?? placeholderImage(size: size))
+        let image = loadImage(path: step.imagePath) ?? placeholderImage(size: size)
         // Still-image segments stay inexpensive while fades remain visibly smooth.
         let fps = NarrationDefaults.framesPerSecond
         let frameCount = max(2, Int(ceil(duration * Double(fps))))
@@ -434,11 +432,13 @@ enum NarrationVideoComposer {
                 | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
-        context.setFillColor(NSColor(calibratedWhite: 0.035, alpha: 1).cgColor)
+        let backgroundColor = step.isBrandCard
+            ? NSColor.black
+            : NSColor(calibratedWhite: 0.035, alpha: 1)
+        context.setFillColor(backgroundColor.cgColor)
         context.fill(CGRect(origin: .zero, size: size))
 
         if step.isBrandCard {
-            drawAspectFill(image, in: CGRect(origin: .zero, size: size), context: context)
             drawBrandOverlay(title: step.title, size: size, context: context)
             return buffer
         }
@@ -512,14 +512,6 @@ enum NarrationVideoComposer {
         return chunks[min(Int(progress * Double(chunks.count)), chunks.count - 1)]
     }
 
-    private static func brandBackground() -> NSImage? {
-        guard let url = Bundle.main.url(
-            forResource: "astroshots-dmg-background",
-            withExtension: "png"
-        ) else { return nil }
-        return NSImage(contentsOf: url)
-    }
-
     private static func brandIcon() -> NSImage? {
         guard let url = Bundle.main.url(
             forResource: "astroshots-app-icon-master",
@@ -547,32 +539,6 @@ enum NarrationVideoComposer {
         )
         context.interpolationQuality = .high
         context.draw(cgImage, in: rect)
-    }
-
-    private static func drawAspectFill(
-        _ image: NSImage,
-        in frame: CGRect,
-        context: CGContext
-    ) {
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return
-        }
-        let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-        let scale = max(frame.width / imageSize.width, frame.height / imageSize.height)
-        let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        context.saveGState()
-        context.clip(to: frame)
-        context.interpolationQuality = .high
-        context.draw(
-            cgImage,
-            in: CGRect(
-                x: frame.midX - drawSize.width / 2,
-                y: frame.midY - drawSize.height / 2,
-                width: drawSize.width,
-                height: drawSize.height
-            )
-        )
-        context.restoreGState()
     }
 
     private static func withFlippedAppKitContext(

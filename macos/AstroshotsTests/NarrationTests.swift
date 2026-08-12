@@ -62,6 +62,7 @@ struct NarrationTests {
     @Test func defaultModelIsQwen3TTS() {
         #expect(NarrationDefaults.modelID.contains("Qwen3-TTS"))
         #expect(NarrationDefaults.voice == "Ryan")
+        #expect(NarrationDefaults.temperature == 0.3)
         #expect(NarrationVoice.available.map(\.id).contains("Aiden"))
     }
 
@@ -129,7 +130,11 @@ struct NarrationTests {
                 kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
             ]
         )
-        #expect(CMSampleBufferGetImageBuffer(videoSample) != nil)
+        let titleFrame = try #require(CMSampleBufferGetImageBuffer(videoSample))
+        let titleCorner = try pixelRGB(in: titleFrame, x: 8, y: 8)
+        #expect(titleCorner.red < 16)
+        #expect(titleCorner.green < 16)
+        #expect(titleCorner.blue < 16)
 
         let audioSample = try decodeFirstSample(
             from: asset,
@@ -310,5 +315,18 @@ struct NarrationTests {
             )
         }
         return sample
+    }
+
+    private func pixelRGB(
+        in buffer: CVPixelBuffer,
+        x: Int,
+        y: Int
+    ) throws -> (red: UInt8, green: UInt8, blue: UInt8) {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        let base = try #require(CVPixelBufferGetBaseAddress(buffer))
+        let offset = y * CVPixelBufferGetBytesPerRow(buffer) + x * 4
+        let pixel = base.advanced(by: offset).assumingMemoryBound(to: UInt8.self)
+        return (red: pixel[2], green: pixel[1], blue: pixel[0])
     }
 }
