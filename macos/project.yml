@@ -35,6 +35,10 @@ targets:
       - path: Astroshots
         excludes:
           - "**/Resources/narration_harness.py"
+      - path: Design/Generated/astroshots-dmg-background.png
+        buildPhase: resources
+      - path: Design/Generated/astroshots-app-icon-master.png
+        buildPhase: resources
     dependencies:
       - package: mlx-audio-swift
         product: MLXAudioCore

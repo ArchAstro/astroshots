@@ -4,6 +4,20 @@ import Testing
 
 struct PreferencesTests {
     @Test @MainActor
+    func narrationVoicePersistsAndRejectsUnknownValues() {
+        let suiteName = "astroshots-preferences-voice-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+
+        #expect(preferences.narrationVoice == "Ryan")
+        preferences.narrationVoice = "Aiden"
+        #expect(Preferences(defaults: defaults).narrationVoice == "Aiden")
+        preferences.narrationVoice = "Not a voice"
+        #expect(preferences.narrationVoice == "Ryan")
+    }
+
+    @Test @MainActor
     func freshInstallNeedsFirstRunStartup() {
         let suiteName = "astroshots-preferences-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

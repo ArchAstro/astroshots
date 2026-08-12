@@ -10,8 +10,13 @@ import Foundation
 enum NarrationVideoComposer {
     struct StepMedia: Sendable {
         var imagePath: String?
-        var audioPath: String
+        var audioPath: String?
         var duration: Double
+        var title: String = ""
+        var transcript: String = ""
+        var good: [String] = []
+        var improve: [String] = []
+        var isBrandCard = false
     }
 
     /// AVAssetWriter is designed for independently fed inputs but its Objective-C
@@ -23,25 +28,29 @@ enum NarrationVideoComposer {
         let adaptor: AVAssetWriterInputPixelBufferAdaptor
         let audioInput: AVAssetWriterInput
         let image: NSImage
+        let step: StepMedia
 
         init(
             writer: AVAssetWriter,
             videoInput: AVAssetWriterInput,
             adaptor: AVAssetWriterInputPixelBufferAdaptor,
             audioInput: AVAssetWriterInput,
-            image: NSImage
+            image: NSImage,
+            step: StepMedia
         ) {
             self.writer = writer
             self.videoInput = videoInput
             self.adaptor = adaptor
             self.audioInput = audioInput
             self.image = image
+            self.step = step
         }
     }
 
     static func compose(
         steps: [StepMedia],
         outputURL: URL,
+        logTitle: String = "Astroshots",
         size: CGSize = CGSize(width: 1280, height: 720)
     ) async throws {
         guard !steps.isEmpty else {
@@ -60,8 +69,17 @@ enum NarrationVideoComposer {
         try FileManager.default.createDirectory(at: workRoot, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workRoot) }
 
+        let brandCard = StepMedia(
+            imagePath: nil,
+            audioPath: nil,
+            duration: NarrationDefaults.titleCardSeconds,
+            title: logTitle,
+            isBrandCard: true
+        )
+        let timeline = [brandCard] + steps + [brandCard]
+
         var segmentURLs: [URL] = []
-        for (index, step) in steps.enumerated() {
+        for (index, step) in timeline.enumerated() {
             let segment = workRoot.appendingPathComponent(String(format: "seg-%02d.mp4", index))
             try await writeSegment(step: step, outputURL: segment, size: size)
             segmentURLs.append(segment)
@@ -125,9 +143,11 @@ enum NarrationVideoComposer {
         }
         writer.startSession(atSourceTime: .zero)
 
-        let image = loadImage(path: step.imagePath) ?? placeholderImage(size: size)
-        // Sparse still frames — 2 fps is enough for a held screenshot.
-        let fps: Int32 = 2
+        let image = step.isBrandCard
+            ? (brandBackground() ?? placeholderImage(size: size))
+            : (loadImage(path: step.imagePath) ?? placeholderImage(size: size))
+        // Still-image segments stay inexpensive while fades remain visibly smooth.
+        let fps = NarrationDefaults.framesPerSecond
         let frameCount = max(2, Int(ceil(duration * Double(fps))))
         let frameDuration = CMTime(value: 1, timescale: fps)
         let context = SegmentWriterContext(
@@ -135,7 +155,8 @@ enum NarrationVideoComposer {
             videoInput: videoInput,
             adaptor: adaptor,
             audioInput: audioInput,
-            image: image
+            image: image,
+            step: step
         )
 
         do {
@@ -149,6 +170,7 @@ enum NarrationVideoComposer {
                         input: context.videoInput,
                         writer: context.writer,
                         image: context.image,
+                        step: context.step,
                         size: size,
                         frameCount: frameCount,
                         frameDuration: frameDuration
@@ -189,6 +211,7 @@ enum NarrationVideoComposer {
         input: AVAssetWriterInput,
         writer: AVAssetWriter,
         image: NSImage,
+        step: StepMedia,
         size: CGSize,
         frameCount: Int,
         frameDuration: CMTime
@@ -202,7 +225,14 @@ enum NarrationVideoComposer {
                 continue
             }
 
-            guard let buffer = makePixelBuffer(from: image, size: size) else {
+            let elapsed = Double(index) / Double(frameDuration.timescale)
+            guard let buffer = makePixelBuffer(
+                from: image,
+                step: step,
+                elapsed: elapsed,
+                duration: Double(frameCount) / Double(frameDuration.timescale),
+                size: size
+            ) else {
                 throw NarrationError.processFailed("Could not create video frame.")
             }
             let time = CMTimeMultiply(frameDuration, multiplier: Int32(index))
@@ -216,11 +246,12 @@ enum NarrationVideoComposer {
     }
 
     private static func appendAudioFile(
-        path: String,
+        path: String?,
         to input: AVAssetWriterInput,
         writer: AVAssetWriter,
         maxDuration: CMTime
     ) async throws {
+        guard let path else { return }
         let url = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else { return }
         let asset = AVURLAsset(url: url)
@@ -367,7 +398,13 @@ enum NarrationVideoComposer {
         return image
     }
 
-    private static func makePixelBuffer(from image: NSImage, size: CGSize) -> CVPixelBuffer? {
+    private static func makePixelBuffer(
+        from image: NSImage,
+        step: StepMedia,
+        elapsed: Double,
+        duration: Double,
+        size: CGSize
+    ) -> CVPixelBuffer? {
         var buffer: CVPixelBuffer?
         let attrs: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: true,
@@ -397,21 +434,317 @@ enum NarrationVideoComposer {
                 | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
-        context.setFillColor(NSColor.black.cgColor)
+        context.setFillColor(NSColor(calibratedWhite: 0.035, alpha: 1).cgColor)
         context.fill(CGRect(origin: .zero, size: size))
 
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        if step.isBrandCard {
+            drawAspectFill(image, in: CGRect(origin: .zero, size: size), context: context)
+            drawBrandOverlay(title: step.title, size: size, context: context)
             return buffer
         }
+
+        let feedbackAlpha = feedbackOpacity(
+            elapsed: elapsed,
+            duration: duration,
+            hasFeedback: !step.good.isEmpty || !step.improve.isEmpty
+        )
+        let inset: CGFloat = 28 * feedbackAlpha
+        let railWidth = size.width * 0.31
+        let imageRight = size.width - inset - railWidth * feedbackAlpha
+        let imageFrame = CGRect(
+            x: inset,
+            y: inset,
+            width: max(1, imageRight - inset),
+            height: size.height - inset * 2
+        )
+        drawAspectFit(image, in: imageFrame, context: context)
+
+        if feedbackAlpha > 0.001 {
+            drawFeedbackRail(
+                step: step,
+                alpha: feedbackAlpha,
+                frame: CGRect(
+                    x: size.width - railWidth + 10,
+                    y: 34,
+                    width: railWidth - 34,
+                    height: size.height - 68
+                ),
+                context: context
+            )
+        }
+        drawCaptions(
+            captionText(step.transcript, elapsed: elapsed, duration: duration),
+            feedbackAlpha: feedbackAlpha,
+            size: size,
+            context: context
+        )
+        return buffer
+    }
+
+    static func feedbackOpacity(
+        elapsed: Double,
+        duration: Double,
+        hasFeedback: Bool
+    ) -> CGFloat {
+        guard hasFeedback else { return 0 }
+        let fadeStart = min(
+            NarrationDefaults.feedbackVisibleSeconds,
+            max(
+                0,
+                duration
+                    - NarrationDefaults.feedbackFadeSeconds
+                    - NarrationDefaults.fullScreenHoldSeconds
+            )
+        )
+        guard elapsed > fadeStart else { return 1 }
+        let progress = (elapsed - fadeStart) / NarrationDefaults.feedbackFadeSeconds
+        return CGFloat(max(0, 1 - min(progress, 1)))
+    }
+
+    static func captionText(_ transcript: String, elapsed: Double, duration: Double) -> String {
+        let words = transcript.split(whereSeparator: { $0.isWhitespace })
+        guard !words.isEmpty else { return "" }
+        let wordsPerCaption = 11
+        let chunks = stride(from: 0, to: words.count, by: wordsPerCaption).map {
+            words[$0 ..< min($0 + wordsPerCaption, words.count)].joined(separator: " ")
+        }
+        let progress = duration > 0 ? max(0, min(elapsed / duration, 0.999_999)) : 0
+        return chunks[min(Int(progress * Double(chunks.count)), chunks.count - 1)]
+    }
+
+    private static func brandBackground() -> NSImage? {
+        guard let url = Bundle.main.url(
+            forResource: "astroshots-dmg-background",
+            withExtension: "png"
+        ) else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
+    private static func brandIcon() -> NSImage? {
+        guard let url = Bundle.main.url(
+            forResource: "astroshots-app-icon-master",
+            withExtension: "png"
+        ) else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
+    private static func drawAspectFit(
+        _ image: NSImage,
+        in frame: CGRect,
+        context: CGContext
+    ) {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return
+        }
         let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-        let scale = min(size.width / imageSize.width, size.height / imageSize.height)
+        let scale = min(frame.width / imageSize.width, frame.height / imageSize.height)
         let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        let origin = CGPoint(
-            x: (size.width - drawSize.width) / 2,
-            y: (size.height - drawSize.height) / 2
+        let rect = CGRect(
+            x: frame.midX - drawSize.width / 2,
+            y: frame.midY - drawSize.height / 2,
+            width: drawSize.width,
+            height: drawSize.height
         )
         context.interpolationQuality = .high
-        context.draw(cgImage, in: CGRect(origin: origin, size: drawSize))
-        return buffer
+        context.draw(cgImage, in: rect)
+    }
+
+    private static func drawAspectFill(
+        _ image: NSImage,
+        in frame: CGRect,
+        context: CGContext
+    ) {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return
+        }
+        let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
+        let scale = max(frame.width / imageSize.width, frame.height / imageSize.height)
+        let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        context.saveGState()
+        context.clip(to: frame)
+        context.interpolationQuality = .high
+        context.draw(
+            cgImage,
+            in: CGRect(
+                x: frame.midX - drawSize.width / 2,
+                y: frame.midY - drawSize.height / 2,
+                width: drawSize.width,
+                height: drawSize.height
+            )
+        )
+        context.restoreGState()
+    }
+
+    private static func withFlippedAppKitContext(
+        _ context: CGContext,
+        draw: () -> Void
+    ) {
+        context.saveGState()
+        context.translateBy(x: 0, y: CGFloat(context.height))
+        context.scaleBy(x: 1, y: -1)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+        draw()
+        NSGraphicsContext.restoreGraphicsState()
+        context.restoreGState()
+    }
+
+    private static func drawBrandOverlay(title: String, size: CGSize, context: CGContext) {
+        withFlippedAppKitContext(context) {
+            NSColor.black.withAlphaComponent(0.42).setFill()
+            NSBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
+
+            let card = NSBezierPath(
+                roundedRect: CGRect(
+                    x: size.width / 2 - 310,
+                    y: 112,
+                    width: 620,
+                    height: 430
+                ),
+                xRadius: 30,
+                yRadius: 30
+            )
+            NSColor.black.withAlphaComponent(0.92).setFill()
+            card.fill()
+            NSColor.white.withAlphaComponent(0.14).setStroke()
+            card.lineWidth = 1
+            card.stroke()
+
+            if let icon = brandIcon() {
+                icon.draw(
+                    in: CGRect(x: size.width / 2 - 58, y: 150, width: 116, height: 116),
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: 1
+                )
+            }
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            paragraph.lineBreakMode = .byWordWrapping
+            (title as NSString).draw(
+                in: CGRect(x: 150, y: 292, width: size.width - 300, height: 150),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 50, weight: .bold),
+                    .foregroundColor: NSColor.white,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+            ("Astroshots by ArchAstro" as NSString).draw(
+                in: CGRect(x: 150, y: 458, width: size.width - 300, height: 54),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 24, weight: .medium),
+                    .foregroundColor: NSColor.white.withAlphaComponent(0.82),
+                    .paragraphStyle: paragraph,
+                ]
+            )
+        }
+    }
+
+    private static func drawFeedbackRail(
+        step: StepMedia,
+        alpha: CGFloat,
+        frame: CGRect,
+        context: CGContext
+    ) {
+        withFlippedAppKitContext(context) {
+            let rail = NSBezierPath(roundedRect: frame, xRadius: 24, yRadius: 24)
+            NSColor(calibratedWhite: 0.075, alpha: 0.96 * alpha).setFill()
+            rail.fill()
+            NSColor.white.withAlphaComponent(0.12 * alpha).setStroke()
+            rail.lineWidth = 1
+            rail.stroke()
+
+            var y = frame.minY + 28
+            (step.title as NSString).draw(
+                in: CGRect(x: frame.minX + 24, y: y, width: frame.width - 48, height: 70),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 25, weight: .bold),
+                    .foregroundColor: NSColor.white.withAlphaComponent(alpha),
+                ]
+            )
+            y += 82
+            y = drawFeedbackSection(
+                label: "WHAT WORKED",
+                bullets: step.good,
+                color: NSColor(calibratedRed: 0.25, green: 0.88, blue: 0.65, alpha: alpha),
+                x: frame.minX + 24,
+                y: y,
+                width: frame.width - 48
+            )
+            if !step.good.isEmpty, !step.improve.isEmpty { y += 22 }
+            _ = drawFeedbackSection(
+                label: "IMPROVE",
+                bullets: step.improve,
+                color: NSColor(calibratedRed: 1.0, green: 0.68, blue: 0.28, alpha: alpha),
+                x: frame.minX + 24,
+                y: y,
+                width: frame.width - 48
+            )
+        }
+    }
+
+    private static func drawFeedbackSection(
+        label: String,
+        bullets: [String],
+        color: NSColor,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat
+    ) -> CGFloat {
+        guard !bullets.isEmpty else { return y }
+        (label as NSString).draw(
+            in: CGRect(x: x, y: y, width: width, height: 26),
+            withAttributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                .foregroundColor: color,
+            ]
+        )
+        var cursor = y + 31
+        for bullet in bullets.prefix(4) {
+            let text = "•  \(bullet)"
+            (text as NSString).draw(
+                in: CGRect(x: x, y: cursor, width: width, height: 68),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 18, weight: .medium),
+                    .foregroundColor: NSColor.white.withAlphaComponent(color.alphaComponent),
+                ]
+            )
+            cursor += 62
+        }
+        return cursor
+    }
+
+    private static func drawCaptions(
+        _ text: String,
+        feedbackAlpha: CGFloat,
+        size: CGSize,
+        context: CGContext
+    ) {
+        guard !text.isEmpty else { return }
+        withFlippedAppKitContext(context) {
+            let railWidth = feedbackAlpha > 0.001 ? size.width * 0.31 : 0
+            let horizontalInset: CGFloat = 90
+            let frame = CGRect(
+                x: horizontalInset,
+                y: size.height - 112,
+                width: size.width - horizontalInset * 2 - railWidth,
+                height: 76
+            )
+            NSColor.black.withAlphaComponent(0.78).setFill()
+            NSBezierPath(roundedRect: frame.insetBy(dx: -18, dy: -10), xRadius: 14, yRadius: 14)
+                .fill()
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            paragraph.lineBreakMode = .byWordWrapping
+            (text as NSString).draw(
+                in: frame,
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 23, weight: .semibold),
+                    .foregroundColor: NSColor.white,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+        }
     }
 }

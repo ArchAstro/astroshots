@@ -2,14 +2,43 @@ import Foundation
 
 /// Default Qwen3-TTS MLX checkpoint used by mlx-audio-swift.
 enum NarrationDefaults {
-    static let modelID = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
-    /// Base/CustomVoice English preset (see Qwen3-TTS README).
+    static let modelID = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
+    /// CustomVoice English preset (see Qwen3-TTS README).
     static let voice = "Ryan"
     static let language = "English"
     /// Minimum step display duration when audio is shorter.
     static let minimumStepSeconds: Double = 1.6
-    static let framesPerSecond: Int32 = 30
+    static let framesPerSecond: Int32 = 12
     static let minMemoryGB: Double = 8.0
+    static let titleCardSeconds: Double = 3.0
+    static let feedbackVisibleSeconds: Double = 30.0
+    static let feedbackFadeSeconds: Double = 1.0
+    static let fullScreenHoldSeconds: Double = 1.5
+    static let voicePreviewText = "This is what your Astroshots narration will sound like."
+}
+
+struct NarrationVoice: Identifiable, Equatable, Sendable {
+    let id: String
+    let language: String
+
+    var displayName: String { id.replacingOccurrences(of: "_", with: " ") }
+
+    static let available: [NarrationVoice] = [
+        .init(id: "Ryan", language: "English"),
+        .init(id: "Aiden", language: "English"),
+        .init(id: "Vivian", language: "Chinese"),
+        .init(id: "Serena", language: "Chinese"),
+        .init(id: "Uncle_Fu", language: "Chinese"),
+        .init(id: "Dylan", language: "Chinese"),
+        .init(id: "Eric", language: "Chinese"),
+    ]
+
+    static func normalized(_ value: String?) -> String {
+        guard let value, available.contains(where: { $0.id == value }) else {
+            return NarrationDefaults.voice
+        }
+        return value
+    }
 }
 
 enum NarrationReadiness: Equatable, Sendable {
@@ -94,6 +123,8 @@ struct NarrationStepInput: Equatable, Sendable {
     var title: String
     var transcript: String
     var imagePath: String?
+    var good: [String]
+    var improve: [String]
 }
 
 struct NarrationJob: Identifiable, Equatable, Sendable {
@@ -102,6 +133,7 @@ struct NarrationJob: Identifiable, Equatable, Sendable {
     let logSlug: String
     let runID: String
     let runDirectoryPath: String
+    let voice: String
     let stepTranscripts: [NarrationStepInput]
     var phase: NarrationJobPhase
     var progress: Double
@@ -117,7 +149,8 @@ struct NarrationJob: Identifiable, Equatable, Sendable {
 extension NarrationJob {
     static func make(
         log: FrictionLog,
-        run: FrictionLogRun
+        run: FrictionLogRun,
+        voice: String = NarrationDefaults.voice
     ) -> NarrationJob {
         let steps = run.steps.map { step in
             NarrationStepInput(
@@ -126,7 +159,9 @@ extension NarrationJob {
                 transcript: step.hasTranscript
                     ? step.transcript
                     : (step.description.isEmpty ? step.title : step.description),
-                imagePath: step.primaryScreenshotPath
+                imagePath: step.primaryScreenshotPath,
+                good: step.good,
+                improve: step.improve
             )
         }
         return NarrationJob(
@@ -135,6 +170,7 @@ extension NarrationJob {
             logSlug: log.slug,
             runID: run.runID,
             runDirectoryPath: run.directoryPath,
+            voice: NarrationVoice.normalized(voice),
             stepTranscripts: steps,
             phase: .queued,
             progress: 0,

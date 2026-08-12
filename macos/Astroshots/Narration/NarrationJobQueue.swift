@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import MLX
 import MLXAudioCore
 import MLXAudioTTS
 import Observation
@@ -34,7 +33,11 @@ final class NarrationJobQueue {
     }
 
     @discardableResult
-    func enqueue(log: FrictionLog, run: FrictionLogRun) throws -> NarrationJob {
+    func enqueue(
+        log: FrictionLog,
+        run: FrictionLogRun,
+        voice: String = NarrationDefaults.voice
+    ) throws -> NarrationJob {
         guard modelManager.readiness.isReady else {
             throw NarrationError.notReady
         }
@@ -48,7 +51,7 @@ final class NarrationJobQueue {
             return existing
         }
 
-        let job = NarrationJob.make(log: log, run: run)
+        let job = NarrationJob.make(log: log, run: run, voice: voice)
         jobs.insert(job, at: 0)
         if jobs.count > 40 {
             jobs = Array(jobs.prefix(40))
@@ -156,6 +159,7 @@ final class NarrationJobQueue {
             let duration = try await synthesize(
                 model: model,
                 text: step.transcript,
+                voice: job.voice,
                 output: wav
             )
             update(id: job.id) {
@@ -167,7 +171,11 @@ final class NarrationJobQueue {
                 NarrationVideoComposer.StepMedia(
                     imagePath: step.imagePath,
                     audioPath: wav.path,
-                    duration: duration
+                    duration: duration,
+                    title: step.title,
+                    transcript: step.transcript,
+                    good: step.good,
+                    improve: step.improve
                 )
             )
         }
@@ -179,9 +187,14 @@ final class NarrationJobQueue {
             $0.message = "Encoding MP4…"
         }
 
+        let fileTitle = Self.safeFilenameComponent(job.logTitle)
         let output = URL(fileURLWithPath: job.runDirectoryPath)
-            .appendingPathComponent("narration-\(job.runID).mp4")
-        try await NarrationVideoComposer.compose(steps: media, outputURL: output)
+            .appendingPathComponent("Astroshots-\(fileTitle)-\(job.runID).mp4")
+        try await NarrationVideoComposer.compose(
+            steps: media,
+            outputURL: output,
+            logTitle: job.logTitle
+        )
 
         update(id: job.id) {
             $0.progress = 0.98
@@ -193,6 +206,7 @@ final class NarrationJobQueue {
     private func synthesize(
         model: any SpeechGenerationModel,
         text: String,
+        voice: String,
         output: URL
     ) async throws -> Double {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -200,8 +214,12 @@ final class NarrationJobQueue {
             throw NarrationError.processFailed("Empty transcript for a step.")
         }
 
-        let box = NarrationSpeechBox(model)
-        let samples = try await box.speak(trimmed)
+        let audio = try await modelManager.synthesizeAudio(
+            trimmed,
+            voice: voice,
+            using: model
+        )
+        let samples = audio.samples
         guard !samples.isEmpty else {
             throw NarrationError.processFailed("TTS produced empty audio.")
         }
@@ -212,11 +230,20 @@ final class NarrationJobQueue {
         )
         try AudioUtils.writeWavFile(
             samples: samples,
-            sampleRate: Double(box.sampleRate),
+            sampleRate: Double(audio.sampleRate),
             fileURL: output
         )
 
-        let duration = Double(samples.count) / Double(max(box.sampleRate, 1))
+        let duration = Double(samples.count) / Double(max(audio.sampleRate, 1))
         return max(duration, NarrationDefaults.minimumStepSeconds)
+    }
+
+    nonisolated static func safeFilenameComponent(_ title: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let words = title
+            .components(separatedBy: allowed.inverted)
+            .filter { !$0.isEmpty }
+        let value = words.joined(separator: "-")
+        return value.isEmpty ? "Friction-Log" : String(value.prefix(80))
     }
 }
