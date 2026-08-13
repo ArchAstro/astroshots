@@ -18,6 +18,71 @@ struct PreferencesTests {
     }
 
     @Test @MainActor
+    func hiddenFrictionLogIDsAreDeduplicatedAndPersisted() {
+        let suiteName = "astroshots-hidden-friction-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+
+        preferences.hiddenFrictionLogIDs = ["/tmp/b::two", "", "/tmp/a::one", "/tmp/b::two"]
+
+        #expect(preferences.hiddenFrictionLogIDs == ["/tmp/a::one", "/tmp/b::two"])
+        #expect(Preferences(defaults: defaults).hiddenFrictionLogIDs == [
+            "/tmp/a::one", "/tmp/b::two",
+        ])
+    }
+
+    @Test @MainActor
+    func hidingFiltersTheUXPersistsAndLeavesFilesOnDisk() throws {
+        let suiteName = "astroshots-hidden-friction-state-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("astroshots-hidden-friction-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let alphaPrompt = root.appendingPathComponent("alpha-prompt.md")
+        try Data("Keep me".utf8).write(to: alphaPrompt)
+        let alpha = makeFrictionLog(root: root, slug: "alpha", promptPath: alphaPrompt.path)
+        let beta = makeFrictionLog(root: root, slug: "beta")
+        let preferences = Preferences(defaults: defaults)
+        let watcher = makeWatcher(root: root)
+        defer { watcher.stop() }
+        let state = AppState(
+            preferences: preferences,
+            watcher: watcher,
+            automaticallyStartsWatching: false
+        )
+        state.replaceFrictionLogs([alpha, beta])
+        state.selectFrictionLog(alpha)
+
+        state.hideFrictionLog(alpha)
+
+        #expect(state.discoveredFrictionLogs == [alpha, beta])
+        #expect(state.frictionLogs == [beta])
+        #expect(state.hiddenFrictionLogs == [alpha])
+        #expect(state.selectedFrictionLogID == beta.id)
+        #expect(state.pane == .stream)
+        #expect(FileManager.default.fileExists(atPath: alphaPrompt.path))
+        #expect(preferences.hiddenFrictionLogIDs == [alpha.id])
+
+        let relaunchedWatcher = makeWatcher(root: root)
+        defer { relaunchedWatcher.stop() }
+        let relaunched = AppState(
+            preferences: Preferences(defaults: defaults),
+            watcher: relaunchedWatcher,
+            automaticallyStartsWatching: false
+        )
+        relaunched.replaceFrictionLogs([alpha, beta])
+        #expect(relaunched.frictionLogs == [beta])
+
+        relaunched.restoreFrictionLog(id: alpha.id)
+        #expect(relaunched.frictionLogs == [alpha, beta])
+        #expect(relaunched.hiddenFrictionLogIDs.isEmpty)
+    }
+
+    @Test @MainActor
     func freshInstallNeedsFirstRunStartup() {
         let suiteName = "astroshots-preferences-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -182,5 +247,33 @@ struct PreferencesTests {
         let again = Preferences(defaults: defaults)
         #expect(again.shouldPresentFirstRunStartup)
         #expect(again.watchRootPaths.isEmpty)
+    }
+
+    private func makeWatcher(root: URL) -> AstroshotWatcher {
+        AstroshotWatcher(
+            configuration: .init(
+                roots: [],
+                cacheFileURL: root.appendingPathComponent("shot-index-\(UUID().uuidString).json")
+            )
+        )
+    }
+
+    private func makeFrictionLog(
+        root: URL,
+        slug: String,
+        promptPath: String? = nil
+    ) -> FrictionLog {
+        FrictionLog(
+            worktree: "demo",
+            worktreePath: root.path,
+            slug: slug,
+            title: slug.capitalized,
+            description: "",
+            promptPath: promptPath,
+            promptMarkdown: nil,
+            status: .ready,
+            runs: [],
+            updatedAt: Date()
+        )
     }
 }

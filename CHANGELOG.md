@@ -11,6 +11,12 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **Non-destructive friction-log hiding:** hide individual friction logs from
+  the tray while keeping their files on disk, then restore them individually or
+  all at once from Settings.
+
 ### Fixed
 
 - **macOS dark mode:** tray, Settings, detail views, friction logs, overlays,

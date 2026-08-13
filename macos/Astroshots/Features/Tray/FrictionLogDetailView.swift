@@ -43,6 +43,21 @@ struct FrictionLogDetailView: View {
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.muted2)
             }
+
+            if let log = appState.selectedFrictionLog {
+                Button {
+                    appState.hideFrictionLog(log)
+                } label: {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 24, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("Hide friction log")
+                .accessibilityLabel("Hide \(log.title)")
+                .accessibilityIdentifier("friction.detail.hide")
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

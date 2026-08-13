@@ -154,6 +154,42 @@ struct SettingsPane: View {
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 9))
                     }
 
+                    card {
+                        HStack(spacing: 8) {
+                            Text("Hidden friction logs")
+                                .font(.system(size: 12, weight: .semibold))
+                            Spacer(minLength: 4)
+                            if !appState.hiddenFrictionLogIDs.isEmpty {
+                                Button("Restore all") {
+                                    appState.restoreAllFrictionLogs()
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.purple)
+                                .accessibilityIdentifier("settings.hidden-friction.restore-all")
+                            }
+                        }
+                        Text("Hidden logs stay on disk. Astroshots saves their stable IDs locally and removes them from the normal UX.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.muted)
+                            .padding(.bottom, 4)
+
+                        if appState.hiddenFrictionLogIDs.isEmpty {
+                            Text("No hidden friction logs")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.muted)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            ForEach(appState.hiddenFrictionLogIDs, id: \.self) { id in
+                                hiddenFrictionLogRow(id: id)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings.hidden-friction-logs")
+
                     updatesCard
 
                     narrationCard
@@ -302,6 +338,36 @@ struct SettingsPane: View {
         return Circle()
             .fill(color)
             .frame(width: 7, height: 7)
+    }
+
+    private func hiddenFrictionLogRow(id: String) -> some View {
+        let log = appState.discoveredFrictionLog(id: id)
+        return HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(log?.title ?? id)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(2)
+                Text(log.map { "\($0.worktreeShort) · \($0.slug)" } ?? "Not currently discovered")
+                    .font(.system(size: 9.5, design: .monospaced))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Button("Restore") {
+                appState.restoreFrictionLog(id: id)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Theme.purple)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 7))
+            .accessibilityIdentifier("settings.hidden-friction.restore")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
     }
 
     @ViewBuilder

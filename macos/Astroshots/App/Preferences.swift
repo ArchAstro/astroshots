@@ -17,6 +17,8 @@ final class Preferences {
         static let overlayEnabled = "overlayEnabled"
         static let autoDismiss = "autoDismiss"
         static let autoDismissSeconds = "autoDismissSeconds"
+        /// Stable `worktreePath::slug` identities hidden from the friction-log UX.
+        static let hiddenFrictionLogIDs = "hiddenFrictionLogIDs"
         /// Opt-in friction-log narrated videos (MLX Audio + Qwen3-TTS).
         static let narrationEnabled = "narrationEnabled"
         /// Cached flag that the Qwen3 model finished downloading at least once.
@@ -114,6 +116,21 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.autoDismissSeconds) }
     }
 
+    /// Friction logs hidden from the app without removing their files on disk.
+    var hiddenFrictionLogIDs: [String] {
+        get {
+            Self.normalizeFrictionLogIDs(
+                defaults.stringArray(forKey: Key.hiddenFrictionLogIDs) ?? []
+            )
+        }
+        set {
+            defaults.set(
+                Self.normalizeFrictionLogIDs(newValue),
+                forKey: Key.hiddenFrictionLogIDs
+            )
+        }
+    }
+
     /// When true, Settings enables the MLX narration pipeline (download + render).
     var narrationEnabled: Bool {
         get { defaults.bool(forKey: Key.narrationEnabled) }
@@ -182,6 +199,10 @@ final class Preferences {
         return roots.contains {
             contains(root: $0, path: normalizedPath)
         }
+    }
+
+    static func normalizeFrictionLogIDs(_ ids: [String]) -> [String] {
+        Array(Set(ids.filter { !$0.isEmpty })).sorted()
     }
 
     // MARK: - First-run detection
