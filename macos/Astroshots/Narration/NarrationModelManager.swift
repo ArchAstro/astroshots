@@ -174,15 +174,31 @@ final class NarrationModelManager {
     func synthesizeAudio(
         _ text: String,
         voice: String,
-        using model: any SpeechGenerationModel
+        using model: any SpeechGenerationModel,
+        anchor: NarrationVoiceAnchor? = nil
     ) async throws -> (samples: [Float], sampleRate: Int) {
         await acquireSynthesisSlot()
         defer { releaseSynthesisSlot() }
         try Task.checkCancellation()
 
         let box = NarrationSpeechBox(model)
-        let samples = try await box.speak(text, voice: NarrationVoice.normalized(voice))
+        let samples = try await box.speak(
+            text,
+            voice: NarrationVoice.normalized(voice),
+            anchor: anchor
+        )
         return (samples, box.sampleRate)
+    }
+
+    /// One CustomVoice clip for the job; later chunks clone it so timbre does not wander.
+    func makeVoiceAnchor(
+        voice: String,
+        using model: any SpeechGenerationModel
+    ) async throws -> NarrationVoiceAnchor {
+        await acquireSynthesisSlot()
+        defer { releaseSynthesisSlot() }
+        try Task.checkCancellation()
+        return try await NarrationSpeechBox(model).makeAnchor(voice: voice)
     }
 
     private func acquireSynthesisSlot() async {
@@ -293,6 +309,20 @@ final class NarrationModelManager {
     }
 }
 
+/// One job-scoped reference clip. Reuse the same `audio` instance so Qwen's
+/// ICL cache keys on object identity instead of re-encoding every chunk.
+final class NarrationVoiceAnchor: @unchecked Sendable {
+    let text: String
+    let audio: MLXArray
+    let canClone: Bool
+
+    init(text: String, audio: MLXArray, canClone: Bool) {
+        self.text = text
+        self.audio = audio
+        self.canClone = canClone
+    }
+}
+
 /// Serial TTS access for non-Sendable `SpeechGenerationModel` instances.
 final class NarrationSpeechBox: @unchecked Sendable {
     private let model: any SpeechGenerationModel
@@ -303,18 +333,93 @@ final class NarrationSpeechBox: @unchecked Sendable {
 
     var sampleRate: Int { model.sampleRate }
 
-    func speak(_ text: String, voice: String = NarrationDefaults.voice) async throws -> [Float] {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    func makeAnchor(voice: String) async throws -> NarrationVoiceAnchor {
         var generationParameters = model.defaultGenerationParameters
-        generationParameters.temperature = NarrationDefaults.temperature
-        let audio: MLXArray = try await model.generate(
-            text: trimmed,
-            voice: NarrationVoice.normalized(voice),
+        generationParameters.temperature = 0.3
+        let speaker = NarrationVoice.normalized(voice)
+        let raw = try await model.generate(
+            text: NarrationSpeech.referenceText,
+            voice: speaker,
             refAudio: nil,
             refText: nil,
             language: NarrationDefaults.language,
             generationParameters: generationParameters
         )
-        return audio.asArray(Float.self)
+        let samples = NarrationSpeech.trimSilence(
+            raw.asArray(Float.self),
+            sampleRate: sampleRate
+        )
+        guard !samples.isEmpty else {
+            throw NarrationError.processFailed("Voice reference clip was empty.")
+        }
+        let audio = MLXArray(samples)
+        var canClone = false
+        if let qwen = model as? Qwen3TTSModel {
+            do {
+                _ = try qwen.prepareReferenceConditioning(
+                    refAudio: audio,
+                    refText: NarrationSpeech.referenceText,
+                    language: NarrationDefaults.language
+                )
+                canClone = true
+            } catch {
+                canClone = false
+            }
+        }
+        return NarrationVoiceAnchor(
+            text: NarrationSpeech.referenceText,
+            audio: audio,
+            canClone: canClone
+        )
+    }
+
+    func speak(
+        _ text: String,
+        voice: String = NarrationDefaults.voice,
+        anchor: NarrationVoiceAnchor? = nil
+    ) async throws -> [Float] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var generationParameters = model.defaultGenerationParameters
+        generationParameters.temperature = NarrationDefaults.temperature
+        let speaker = NarrationVoice.normalized(voice)
+        let pieces = NarrationSpeech.chunks(for: trimmed)
+        let clone = anchor?.canClone == true
+        var combined: [Float] = []
+
+        for (index, piece) in pieces.enumerated() {
+            try Task.checkCancellation()
+            let audio: MLXArray
+            if clone, let anchor {
+                audio = try await model.generate(
+                    text: piece,
+                    voice: nil,
+                    refAudio: anchor.audio,
+                    refText: anchor.text,
+                    language: NarrationDefaults.language,
+                    generationParameters: generationParameters
+                )
+            } else {
+                audio = try await model.generate(
+                    text: piece,
+                    voice: speaker,
+                    refAudio: nil,
+                    refText: nil,
+                    language: NarrationDefaults.language,
+                    generationParameters: generationParameters
+                )
+            }
+            let spoken = NarrationSpeech.trimSilence(
+                audio.asArray(Float.self),
+                sampleRate: sampleRate
+            )
+            guard !spoken.isEmpty else { continue }
+            if index > 0 {
+                combined.append(contentsOf: NarrationSpeech.interChunkSilence(sampleRate: sampleRate))
+            }
+            combined.append(contentsOf: spoken)
+        }
+        return combined
     }
 }

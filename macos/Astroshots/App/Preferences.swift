@@ -25,6 +25,9 @@ final class Preferences {
         static let narrationModelReady = "narrationModelReady"
         /// Named Qwen3 CustomVoice speaker used for previews and every render.
         static let narrationVoice = "narrationVoice"
+        /// Burned-in captions on narrated MP4s. Default off: the word clock
+        /// cannot stay locked to Qwen's actual pacing.
+        static let narrationCaptionsEnabled = "narrationCaptionsEnabled"
     }
 
     /// Migration schema for first-run detection. Increment when adoption rules
@@ -146,6 +149,12 @@ final class Preferences {
     var narrationVoice: String {
         get { NarrationVoice.normalized(defaults.string(forKey: Key.narrationVoice)) }
         set { defaults.set(NarrationVoice.normalized(newValue), forKey: Key.narrationVoice) }
+    }
+
+    /// Missing key is off (`UserDefaults.bool` default).
+    var narrationCaptionsEnabled: Bool {
+        get { defaults.bool(forKey: Key.narrationCaptionsEnabled) }
+        set { defaults.set(newValue, forKey: Key.narrationCaptionsEnabled) }
     }
 
     /// Call when the user successfully chooses initial watch folders.

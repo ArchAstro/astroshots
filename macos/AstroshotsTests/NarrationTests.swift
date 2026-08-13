@@ -48,7 +48,11 @@ struct NarrationTests {
         #expect(job.stepTranscripts.count == 1)
         #expect(job.stepTranscripts[0].transcript.contains("open the app"))
         #expect(job.voice == NarrationDefaults.voice)
+        #expect(job.showCaptions == false)
+        #expect(job.brief == nil)
         #expect(job.phase == .queued)
+        let captioned = NarrationJob.make(log: log, run: run, showCaptions: true)
+        #expect(captioned.showCaptions)
     }
 
     @Test func readinessStatusLinesAreStable() {
@@ -62,7 +66,7 @@ struct NarrationTests {
     @Test func defaultModelIsQwen3TTS() {
         #expect(NarrationDefaults.modelID.contains("Qwen3-TTS"))
         #expect(NarrationDefaults.voice == "Ryan")
-        #expect(NarrationDefaults.temperature == 0.3)
+        #expect(NarrationDefaults.temperature == 0.5)
         #expect(NarrationVoice.available.map(\.id).contains("Aiden"))
     }
 
@@ -177,6 +181,93 @@ struct NarrationTests {
         #expect(NarrationJobQueue.safeFilenameComponent("✨") == "Friction-Log")
     }
 
+    @Test func speechChunksPackSentencesUnderTheTokenBudget() {
+        let text = """
+        I land on the portal as a new hire, hunting a backend for a flavor chat. \
+        The hero is sharp and names every store as its own tenant. \
+        The visual of Northstar and Harbor already feels like shops. \
+        The hitch is the loudest button is Talk to us, with Sign in in the header. \
+        I scroll for a path that sounds like embed a chat agent.
+        """
+        let chunks = NarrationSpeech.chunks(for: text)
+        #expect(chunks.count >= 2)
+        #expect(chunks.count <= 4)
+        #expect(chunks.joined(separator: " ").contains("flavor chat"))
+        #expect(chunks.last?.contains("scroll") == true)
+        for chunk in chunks {
+            #expect(NarrationSpeech.wordCount(chunk) <= NarrationSpeech.maxChunkWords)
+        }
+        #expect(NarrationSpeech.chunks(for: "   ").isEmpty)
+        #expect(NarrationSpeech.chunks(for: "One short line.").count == 1)
+    }
+
+    @Test func speechVoicePromptKeepsTheSpeakerAndAsksForPace() {
+        let prompt = NarrationSpeech.voicePrompt(speaker: "Ryan")
+        #expect(prompt.hasPrefix("Ryan,"))
+        #expect(prompt.contains("conversational pace"))
+        #expect(NarrationSpeech.voicePrompt(speaker: "not-a-voice").hasPrefix("Ryan,"))
+    }
+
+    @Test func briefReadsGoalAndPersonaFromThePrompt() {
+        let markdown = """
+        # Ice cream
+
+        ## Goal
+        Decide whether ArchAstro can back a flavor-chat storefront.
+
+        ## Persona
+        Day-one contractor on the ice cream account.
+
+        ## Environment
+        - Base URL: $PORTAL_URL (local)
+        - Fresh browser session
+        """
+        let brief = NarrationBrief.make(
+            title: "Ice cream chain evaluates developer portal",
+            description: "meta fallback",
+            promptMarkdown: markdown
+        )
+        #expect(brief.hasContent)
+        #expect(brief.goal.contains("flavor-chat"))
+        #expect(brief.persona.contains("Day-one contractor"))
+        #expect(!brief.transcript.contains("$PORTAL_URL"))
+        #expect(brief.transcript.contains("We follow them through it."))
+        #expect(NarrationBrief.section("environment", in: markdown).contains("Fresh browser"))
+        #expect(!NarrationBrief.section("environment", in: markdown).contains("$PORTAL_URL"))
+
+        let fallback = NarrationBrief.make(
+            title: "Checkout",
+            description: "Fresh account, empty cart.",
+            promptMarkdown: nil
+        )
+        #expect(fallback.goal.contains("empty cart"))
+        #expect(fallback.persona.isEmpty)
+        #expect(NarrationBrief.make(title: "X", description: "", promptMarkdown: nil).hasContent == false)
+    }
+
+    @Test func voiceReferenceLineIsShortEnoughToClone() {
+        let words = NarrationSpeech.wordCount(NarrationSpeech.referenceText)
+        #expect(words >= 6)
+        #expect(words <= 16)
+        #expect(NarrationSpeech.referenceText.hasSuffix("."))
+        #expect(NarrationSpeech.chunks(for: NarrationSpeech.referenceText).count == 1)
+    }
+
+    @Test func silenceTrimDropsTheTokenCapTail() {
+        let rate = 24_000
+        var samples = [Float](repeating: 0, count: rate * 8)
+        for index in (rate / 2) ..< (rate * 3) {
+            samples[index] = 0.2
+        }
+        let trimmed = NarrationSpeech.trimSilence(samples, sampleRate: rate)
+        let duration = Double(trimmed.count) / Double(rate)
+        #expect(duration > 2.4)
+        #expect(duration < 3.4)
+
+        let silent = [Float](repeating: 0, count: rate)
+        #expect(NarrationSpeech.trimSilence(silent, sampleRate: rate).count == rate)
+    }
+
     /// Opt-in smoke: download Qwen3-TTS, synthesize one phrase, write a WAV.
     ///
     /// xcodebuild does not always forward shell env into the test host, so we
@@ -238,6 +329,52 @@ struct NarrationTests {
         let mp4Size = try FileManager.default.attributesOfItem(atPath: mp4.path)[.size] as? NSNumber
         #expect((mp4Size?.intValue ?? 0) > 5_000)
         print("narration smoke mp4: \(mp4.path) bytes=\(mp4Size?.intValue ?? 0)")
+    }
+
+    /// Opt-in: re-render a real friction-log run with the local TTS pipeline.
+    ///
+    /// ```bash
+    /// export ASTROSHOTS_NARRATE_RUN=/path/to/runs/<id>
+    /// # or: touch /tmp/ASTROSHOTS_NARRATE_RUN and put the path in that file
+    /// ```
+    @MainActor
+    @Test(.timeLimit(.minutes(30)))
+    func renderRequestedFrictionRun() async throws {
+        let envPath = ProcessInfo.processInfo.environment["ASTROSHOTS_NARRATE_RUN"]
+        let fileURL = URL(fileURLWithPath: "/tmp/ASTROSHOTS_NARRATE_RUN")
+        let filePath = (try? String(contentsOf: fileURL, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = [envPath, filePath]
+            .compactMap { $0 }
+            .first { !$0.isEmpty && $0 != "1" }
+        guard let raw else { return }
+
+        let runDir = URL(fileURLWithPath: raw, isDirectory: true)
+        let loaded = try #require(
+            FrictionLogLoader.loadRun(directory: runDir),
+            "Could not load friction-log run at \(runDir.path)"
+        )
+        #expect(!loaded.1.steps.isEmpty)
+
+        NarrationPaths.ensureDirectories()
+        let suite = "astroshots.narration.render.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(true, forKey: "narrationEnabled")
+        let manager = NarrationModelManager(preferences: Preferences(defaults: defaults))
+        await manager.refreshAndBootstrapIfNeeded()
+        #expect(manager.readiness.isReady, "bootstrap failed: \(manager.readiness.statusLine)")
+
+        let queue = NarrationJobQueue(modelManager: manager)
+        let output = try await queue.renderImmediately(
+            log: loaded.0,
+            run: loaded.1,
+            voice: NarrationDefaults.voice
+        )
+        #expect(FileManager.default.fileExists(atPath: output.path))
+        let size = try FileManager.default.attributesOfItem(atPath: output.path)[.size] as? NSNumber
+        #expect((size?.intValue ?? 0) > 20_000)
+        print("narration render mp4: \(output.path) bytes=\(size?.intValue ?? 0)")
     }
 
     private func writeSolidPNG(to url: URL, width: Int, height: Int) throws {

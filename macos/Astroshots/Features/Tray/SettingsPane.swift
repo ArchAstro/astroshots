@@ -278,6 +278,13 @@ struct SettingsPane: View {
                 .overlay(alignment: .top) {
                     Rectangle().fill(Theme.line).frame(height: 1)
                 }
+
+                toggleRow(
+                    "Burn in captions",
+                    isOn: appState.narrationCaptionsEnabled
+                ) { enabled in
+                    appState.setNarrationCaptionsEnabled(enabled)
+                }
             }
 
             VStack(alignment: .leading, spacing: 6) {

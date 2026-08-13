@@ -6,8 +6,8 @@ enum NarrationDefaults {
     /// CustomVoice English preset (see Qwen3-TTS README).
     static let voice = "Ryan"
     static let language = "English"
-    /// Keep independently synthesized friction-log steps sounding like one narrator.
-    static let temperature: Float = 0.3
+    /// Low enough to keep one speaker across steps, high enough to sound human.
+    static let temperature: Float = 0.5
     /// Minimum step display duration when audio is shorter.
     static let minimumStepSeconds: Double = 1.6
     static let framesPerSecond: Int32 = 12
@@ -135,6 +135,8 @@ struct NarrationJob: Identifiable, Equatable, Sendable {
     let runID: String
     let runDirectoryPath: String
     let voice: String
+    let showCaptions: Bool
+    let brief: NarrationBrief?
     let stepTranscripts: [NarrationStepInput]
     var phase: NarrationJobPhase
     var progress: Double
@@ -151,7 +153,8 @@ extension NarrationJob {
     static func make(
         log: FrictionLog,
         run: FrictionLogRun,
-        voice: String = NarrationDefaults.voice
+        voice: String = NarrationDefaults.voice,
+        showCaptions: Bool = false
     ) -> NarrationJob {
         let steps = run.steps.map { step in
             NarrationStepInput(
@@ -172,6 +175,11 @@ extension NarrationJob {
             runID: run.runID,
             runDirectoryPath: run.directoryPath,
             voice: NarrationVoice.normalized(voice),
+            showCaptions: showCaptions,
+            brief: {
+                let brief = NarrationBrief.make(log: log)
+                return brief.hasContent ? brief : nil
+            }(),
             stepTranscripts: steps,
             phase: .queued,
             progress: 0,

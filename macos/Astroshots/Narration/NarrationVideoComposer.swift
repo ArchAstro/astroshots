@@ -17,6 +17,9 @@ enum NarrationVideoComposer {
         var good: [String] = []
         var improve: [String] = []
         var isBrandCard = false
+        var isContextCard = false
+        var contextPersona: String = ""
+        var contextGoal: String = ""
     }
 
     /// AVAssetWriter is designed for independently fed inputs but its Objective-C
@@ -51,7 +54,8 @@ enum NarrationVideoComposer {
         steps: [StepMedia],
         outputURL: URL,
         logTitle: String = "Astroshots",
-        size: CGSize = CGSize(width: 1280, height: 720)
+        size: CGSize = CGSize(width: 1280, height: 720),
+        showCaptions: Bool = false
     ) async throws {
         guard !steps.isEmpty else {
             throw NarrationError.processFailed("No steps to encode.")
@@ -81,7 +85,12 @@ enum NarrationVideoComposer {
         var segmentURLs: [URL] = []
         for (index, step) in timeline.enumerated() {
             let segment = workRoot.appendingPathComponent(String(format: "seg-%02d.mp4", index))
-            try await writeSegment(step: step, outputURL: segment, size: size)
+            try await writeSegment(
+                step: step,
+                outputURL: segment,
+                size: size,
+                showCaptions: showCaptions && !step.isBrandCard && !step.isContextCard
+            )
             segmentURLs.append(segment)
         }
 
@@ -97,7 +106,8 @@ enum NarrationVideoComposer {
     private static func writeSegment(
         step: StepMedia,
         outputURL: URL,
-        size: CGSize
+        size: CGSize,
+        showCaptions: Bool
     ) async throws {
         let duration = max(step.duration, NarrationDefaults.minimumStepSeconds)
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
@@ -171,7 +181,8 @@ enum NarrationVideoComposer {
                         step: context.step,
                         size: size,
                         frameCount: frameCount,
-                        frameDuration: frameDuration
+                        frameDuration: frameDuration,
+                        showCaptions: showCaptions
                     )
                     context.videoInput.markAsFinished()
                 }
@@ -212,7 +223,8 @@ enum NarrationVideoComposer {
         step: StepMedia,
         size: CGSize,
         frameCount: Int,
-        frameDuration: CMTime
+        frameDuration: CMTime,
+        showCaptions: Bool
     ) async throws {
         var index = 0
         while index < frameCount {
@@ -229,7 +241,8 @@ enum NarrationVideoComposer {
                 step: step,
                 elapsed: elapsed,
                 duration: Double(frameCount) / Double(frameDuration.timescale),
-                size: size
+                size: size,
+                showCaptions: showCaptions
             ) else {
                 throw NarrationError.processFailed("Could not create video frame.")
             }
@@ -401,7 +414,8 @@ enum NarrationVideoComposer {
         step: StepMedia,
         elapsed: Double,
         duration: Double,
-        size: CGSize
+        size: CGSize,
+        showCaptions: Bool
     ) -> CVPixelBuffer? {
         var buffer: CVPixelBuffer?
         let attrs: [CFString: Any] = [
@@ -432,7 +446,7 @@ enum NarrationVideoComposer {
                 | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
-        let backgroundColor = step.isBrandCard
+        let backgroundColor = step.isBrandCard || step.isContextCard
             ? NSColor.black
             : NSColor(calibratedWhite: 0.035, alpha: 1)
         context.setFillColor(backgroundColor.cgColor)
@@ -440,6 +454,10 @@ enum NarrationVideoComposer {
 
         if step.isBrandCard {
             drawBrandOverlay(title: step.title, size: size, context: context)
+            return buffer
+        }
+        if step.isContextCard {
+            drawContextOverlay(step: step, size: size, context: context)
             return buffer
         }
 
@@ -472,12 +490,14 @@ enum NarrationVideoComposer {
                 context: context
             )
         }
-        drawCaptions(
-            captionText(step.transcript, elapsed: elapsed, duration: duration),
-            feedbackAlpha: feedbackAlpha,
-            size: size,
-            context: context
-        )
+        if showCaptions {
+            drawCaptions(
+                captionText(step.transcript, elapsed: elapsed, duration: duration),
+                feedbackAlpha: feedbackAlpha,
+                size: size,
+                context: context
+            )
+        }
         return buffer
     }
 
@@ -605,6 +625,98 @@ enum NarrationVideoComposer {
                 ]
             )
         }
+    }
+
+    private static func drawContextOverlay(
+        step: StepMedia,
+        size: CGSize,
+        context: CGContext
+    ) {
+        withFlippedAppKitContext(context) {
+            let inset: CGFloat = 88
+            let width = size.width - inset * 2
+            var y: CGFloat = 56
+
+            ("THE SETUP" as NSString).draw(
+                in: CGRect(x: inset, y: y, width: width, height: 22),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                    .foregroundColor: NSColor.white.withAlphaComponent(0.55),
+                    .kern: 1.6,
+                ]
+            )
+            y += 28
+
+            let titleStyle = NSMutableParagraphStyle()
+            titleStyle.lineBreakMode = .byWordWrapping
+            (step.title as NSString).draw(
+                in: CGRect(x: inset, y: y, width: width, height: 88),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 36, weight: .bold),
+                    .foregroundColor: NSColor.white,
+                    .paragraphStyle: titleStyle,
+                ]
+            )
+            y += 100
+
+            if !step.contextPersona.isEmpty {
+                y = drawContextBlock(
+                    label: "WHO",
+                    body: step.contextPersona,
+                    x: inset,
+                    y: y,
+                    width: width
+                )
+                y += 28
+            }
+            if !step.contextGoal.isEmpty {
+                _ = drawContextBlock(
+                    label: "WHAT THEY WANT",
+                    body: step.contextGoal,
+                    x: inset,
+                    y: y,
+                    width: width
+                )
+            }
+        }
+    }
+
+    private static func drawContextBlock(
+        label: String,
+        body: String,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat
+    ) -> CGFloat {
+        (label as NSString).draw(
+            in: CGRect(x: x, y: y, width: width, height: 20),
+            withAttributes: [
+                .font: NSFont.systemFont(ofSize: 12, weight: .bold),
+                .foregroundColor: NSColor(calibratedRed: 0.62, green: 0.48, blue: 1.0, alpha: 1),
+                .kern: 1.4,
+            ]
+        )
+        let bodyStyle = NSMutableParagraphStyle()
+        bodyStyle.lineBreakMode = .byWordWrapping
+        bodyStyle.lineSpacing = 4
+        let bodyFrame = CGRect(x: x, y: y + 26, width: width, height: 168)
+        (body as NSString).draw(
+            in: bodyFrame,
+            withAttributes: [
+                .font: NSFont.systemFont(ofSize: 22, weight: .medium),
+                .foregroundColor: NSColor.white.withAlphaComponent(0.92),
+                .paragraphStyle: bodyStyle,
+            ]
+        )
+        let bodyHeight = (body as NSString).boundingRect(
+            with: CGSize(width: width, height: 168),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 22, weight: .medium),
+                .paragraphStyle: bodyStyle,
+            ]
+        ).height
+        return y + 26 + min(168, ceil(bodyHeight))
     }
 
     private static func drawFeedbackRail(
