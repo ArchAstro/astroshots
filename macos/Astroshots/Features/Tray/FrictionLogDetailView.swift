@@ -45,6 +45,23 @@ struct FrictionLogDetailView: View {
             }
 
             if let log = appState.selectedFrictionLog {
+                if log.reviewState != .seen, log.latestRun != nil {
+                    Button {
+                        Task {
+                            try? await appState.markFrictionLogSeen(log)
+                        }
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.purple)
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Mark this log seen")
+                    .accessibilityLabel("Mark \(log.title) seen")
+                    .accessibilityIdentifier("friction.detail.seen")
+                }
+
                 Button {
                     appState.hideFrictionLog(log)
                 } label: {

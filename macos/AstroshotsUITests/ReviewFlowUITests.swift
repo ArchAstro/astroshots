@@ -49,6 +49,30 @@ final class ReviewFlowUITests: XCTestCase {
 
         app.buttons["review.close"].click()
         XCTAssertFalse(takeover.waitForExistence(timeout: 1))
+        // Closing the large viewer must leave the tray/drawer on screen.
+        XCTAssertTrue(thumbnail.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["tray.tab.shots"].exists)
+    }
+
+    @MainActor
+    func testClosingReviewRestoresMenuBarPopover() throws {
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_TRAY_PATH"] = imageURL.path
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_POPOVER"] = "1"
+        app.launch()
+
+        let thumbnail = app.buttons["stream.review.0001-settings.png"]
+        XCTAssertTrue(thumbnail.waitForExistence(timeout: 8))
+        thumbnail.click()
+
+        let takeover = app.descendants(matching: .any)["review.takeover"]
+        XCTAssertTrue(takeover.waitForExistence(timeout: 5))
+        app.buttons["review.close"].click()
+        XCTAssertFalse(takeover.waitForExistence(timeout: 1))
+
+        XCTAssertTrue(thumbnail.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["tray.tab.shots"].waitForExistence(timeout: 3))
     }
 
     @MainActor

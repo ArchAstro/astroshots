@@ -54,7 +54,8 @@ struct StreamView: View {
                         systemImage: filter == .history
                             ? "eye"
                             : "clock.arrow.circlepath",
-                        isActive: filter == .history
+                        isActive: filter == .history,
+                        accessibilityIdentifier: "stream.history"
                     ) {
                         filter = filter == .history ? .toReview : .history
                     }
@@ -200,7 +201,7 @@ enum StreamGrouping {
     }
 }
 
-private struct SeenAllButton: View {
+struct SeenAllButton: View {
     let count: Int
     let isWorking: Bool
     let accessibilityIdentifier: String
@@ -233,10 +234,13 @@ private struct SeenAllButton: View {
     }
 }
 
-private struct StreamFilterChip: View {
+struct StreamFilterChip: View {
     let title: String
     let systemImage: String
     let isActive: Bool
+    var unseenHelp = "Show seen frame history"
+    var seenHelp = "Return to unseen frames"
+    var accessibilityIdentifier = "stream.history"
     let action: () -> Void
 
     var body: some View {
@@ -257,12 +261,10 @@ private struct StreamFilterChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(isActive ? "Return to unseen frames" : "Show seen frame history")
-        .accessibilityLabel(
-            isActive ? "Return to unseen frames" : "Show seen frame history"
-        )
+        .help(isActive ? seenHelp : unseenHelp)
+        .accessibilityLabel(isActive ? seenHelp : unseenHelp)
         .accessibilityAddTraits(isActive ? .isSelected : [])
-        .accessibilityIdentifier("stream.history")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -486,7 +488,7 @@ struct ShotRow: View {
     }
 }
 
-private enum StreamFilter: Hashable {
+enum StreamFilter: Hashable {
     case toReview
     case history
 }
@@ -510,7 +512,9 @@ struct MovieKindBadge: View {
     }
 }
 
-private struct ReviewedStreamView: View {
+struct ReviewedStreamView: View {
+    var detail = "Every current frame has been seen."
+    var accessibilityIdentifier = "stream.seen.empty"
     let showAll: () -> Void
 
     var body: some View {
@@ -522,7 +526,7 @@ private struct ReviewedStreamView: View {
             Text("You’re all caught up")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("Every current frame has been seen.")
+            Text(detail)
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
             Button("View history", action: showAll)
@@ -533,11 +537,12 @@ private struct ReviewedStreamView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("stream.seen.empty")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
-private struct EmptyHistoryView: View {
+struct EmptyHistoryView: View {
+    var detail = "Frames you mark Seen will appear here."
     let showUnseen: () -> Void
 
     var body: some View {
@@ -549,7 +554,7 @@ private struct EmptyHistoryView: View {
             Text("No history yet")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("Frames you mark Seen will appear here.")
+            Text(detail)
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted)
             Button("Back to unseen", action: showUnseen)

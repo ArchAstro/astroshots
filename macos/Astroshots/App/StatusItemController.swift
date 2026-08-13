@@ -19,6 +19,15 @@ final class StatusItemController: NSObject {
     private var observationTask: Task<Void, Never>?
     /// Sparkle controller; menu item target/action point at this when set.
     private var updaterController: SPUStandardUpdaterController?
+    /// Tray surface that was showing when full-screen review opened, restored
+    /// when the viewer closes so the drawer is still there.
+    private var trayToRestoreAfterReview: TrayRestoreTarget = .none
+
+    private enum TrayRestoreTarget {
+        case none
+        case popover
+        case pinned
+    }
 
     init(appState: AppState) {
         self.appState = appState
@@ -38,12 +47,17 @@ final class StatusItemController: NSObject {
 
     func install() {
         let reviewWindowController = ReviewWindowController(appState: appState)
-        self.reviewWindowController = reviewWindowController
-        appState.onReviewRequested = { [weak reviewWindowController] shot in
-            reviewWindowController?.open(shot)
+        reviewWindowController.onClosed = { [weak self] in
+            self?.restoreTrayAfterReview()
         }
-        appState.onFrictionStepReviewRequested = { [weak reviewWindowController] step in
-            reviewWindowController?.openFrictionStep(step)
+        self.reviewWindowController = reviewWindowController
+        appState.onReviewRequested = { [weak self] shot in
+            self?.rememberTrayForReviewRestore()
+            self?.reviewWindowController?.open(shot)
+        }
+        appState.onFrictionStepReviewRequested = { [weak self] step in
+            self?.rememberTrayForReviewRestore()
+            self?.reviewWindowController?.openFrictionStep(step)
         }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -132,6 +146,7 @@ final class StatusItemController: NSObject {
         observationTask = nil
         closePopover()
         closePinnedWindow()
+        reviewWindowController?.onClosed = nil
         reviewWindowController?.close()
         reviewWindowController = nil
         appState.onReviewRequested = nil
@@ -252,8 +267,23 @@ final class StatusItemController: NSObject {
 
             self.appState.backToStream()
             self.appState.selectTab(.frictionLogs)
+            self.appState.frictionLogFilter = .toReview
             try? await Task.sleep(nanoseconds: 450_000_000)
             self.captureTraySurface(to: out.appendingPathComponent("0004-friction-logs-list.png"))
+
+            if let first = self.appState.frictionLogs.first(where: { $0.reviewState != .seen }) {
+                try? await self.appState.markFrictionLogSeen(first)
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                self.captureTraySurface(
+                    to: out.appendingPathComponent("0004b-friction-logs-unseen.png")
+                )
+                self.appState.frictionLogFilter = .history
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                self.captureTraySurface(
+                    to: out.appendingPathComponent("0004c-friction-logs-history.png")
+                )
+                self.appState.frictionLogFilter = .toReview
+            }
 
             if let log = self.appState.frictionLogs.first {
                 self.appState.selectFrictionLog(log)
@@ -590,14 +620,46 @@ final class StatusItemController: NSObject {
     private func reviewChrome() -> ReviewChrome {
         ReviewChrome(
             open: { [weak self] shot in
-                self?.closePopover()
+                self?.beginReviewFromTray()
                 self?.reviewWindowController?.open(shot)
             },
             openFrictionStep: { [weak self] step in
-                self?.closePopover()
+                self?.beginReviewFromTray()
                 self?.reviewWindowController?.openFrictionStep(step)
             }
         )
+    }
+
+    /// Snapshot the open tray, then hide the transient popover so the
+    /// full-screen viewer can take key. Pinned window stays put underneath.
+    private func beginReviewFromTray() {
+        rememberTrayForReviewRestore()
+        closePopover()
+    }
+
+    private func rememberTrayForReviewRestore() {
+        if pinnedWindow?.isVisible == true {
+            trayToRestoreAfterReview = .pinned
+        } else if popover?.isShown == true {
+            trayToRestoreAfterReview = .popover
+        } else {
+            trayToRestoreAfterReview = .none
+        }
+    }
+
+    private func restoreTrayAfterReview() {
+        let target = trayToRestoreAfterReview
+        trayToRestoreAfterReview = .none
+        switch target {
+        case .none:
+            break
+        case .popover:
+            showPopover()
+        case .pinned:
+            pinnedWindow?.makeKeyAndOrderFront(nil)
+            pinnedWindow?.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     // MARK: - Status appearance

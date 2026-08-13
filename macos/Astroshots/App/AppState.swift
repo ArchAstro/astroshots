@@ -34,6 +34,8 @@ final class AppState {
     var selectedShotID: String?
     var pane: TrayPane = .stream
     var activeTab: TrayTab = .shots
+    /// Shared with the Friction Logs list so capture/automation can flip History.
+    var frictionLogFilter: StreamFilter = .toReview
     /// Complete on-disk catalog across watched worktrees (newest first).
     private(set) var discoveredFrictionLogs: [FrictionLog] = []
     /// Stable identities excluded from the normal Friction Logs UX.
@@ -129,6 +131,21 @@ final class AppState {
     var isEmpty: Bool { shots.isEmpty }
 
     var isFrictionLogsEmpty: Bool { frictionLogs.isEmpty }
+
+    var unseenShotCount: Int {
+        shots.filter { ($0.review?.state ?? .pending) != .seen }.count
+    }
+
+    var unseenFrictionLogCount: Int {
+        frictionLogs.filter { $0.reviewState != .seen }.count
+    }
+
+    func unseenCount(for tab: TrayTab) -> Int {
+        switch tab {
+        case .shots: return unseenShotCount
+        case .frictionLogs: return unseenFrictionLogCount
+        }
+    }
 
     init(
         preferences: Preferences = .shared,
@@ -564,6 +581,85 @@ final class AppState {
                 ? "Marked 1 frame seen"
                 : "Marked \(markedCount) frames seen"
         )
+    }
+
+    func markFrictionLogSeen(_ log: FrictionLog) async throws {
+        let snapshot = try await persistFrictionLogSeen(log)
+        applyFrictionReview(snapshot, to: log.id, runID: log.latestRun?.runID)
+        showToast("Seen")
+    }
+
+    func markAllFrictionLogsSeen(_ candidates: [FrictionLog]) async {
+        guard !isMarkingSeen else { return }
+        let unseen = candidates.filter { $0.reviewState != .seen }
+        guard !unseen.isEmpty else {
+            showToast("Already seen")
+            return
+        }
+
+        isMarkingSeen = true
+        defer { isMarkingSeen = false }
+
+        var markedCount = 0
+        var failureCount = 0
+        for log in unseen {
+            do {
+                let snapshot = try await persistFrictionLogSeen(log)
+                applyFrictionReview(snapshot, to: log.id, runID: log.latestRun?.runID)
+                markedCount += 1
+            } catch {
+                failureCount += 1
+            }
+        }
+
+        if failureCount > 0 {
+            showToast(
+                markedCount == 0
+                    ? "Couldn’t mark logs as seen"
+                    : "Marked \(markedCount) seen; \(failureCount) failed"
+            )
+            return
+        }
+        showToast(
+            markedCount == 1
+                ? "Marked 1 log seen"
+                : "Marked \(markedCount) logs seen"
+        )
+    }
+
+    private func persistFrictionLogSeen(_ log: FrictionLog) async throws -> ReviewSnapshot {
+        guard let run = log.latestRun else {
+            throw ReviewStore.StoreError.invalidImageFileName
+        }
+        let logURL = URL(fileURLWithPath: run.directoryPath)
+            .appendingPathComponent(FrictionLogPath.logFileName)
+        guard FileManager.default.fileExists(atPath: logURL.path) else {
+            throw ReviewStore.StoreError.invalidImageFileName
+        }
+        return try await reviewStore.markSeen(
+            forImage: logURL,
+            featureDirectory: URL(fileURLWithPath: run.directoryPath, isDirectory: true),
+            runID: run.runID,
+            commentBody: nil
+        )
+    }
+
+    private func applyFrictionReview(
+        _ snapshot: ReviewSnapshot,
+        to logID: String,
+        runID: String?
+    ) {
+        guard let index = discoveredFrictionLogs.firstIndex(where: { $0.id == logID }) else {
+            return
+        }
+        let log = discoveredFrictionLogs[index]
+        let runs = log.runs.map { run -> FrictionLogRun in
+            guard run.runID == runID else { return run }
+            var updated = run
+            updated.review = snapshot
+            return updated
+        }
+        discoveredFrictionLogs[index] = log.replacingRuns(runs)
     }
 
     private func applyReview(_ snapshot: ReviewSnapshot, to shotID: String) {

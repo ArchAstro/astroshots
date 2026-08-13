@@ -16,6 +16,10 @@ The two tracks are versioned independently.
 - **Non-destructive friction-log hiding:** hide individual friction logs from
   the tray while keeping their files on disk, then restore them individually or
   all at once from Settings.
+- **Unseen badges and friction-log Seen:** the Shots and Friction Logs tabs
+  show how many items still need review. Friction logs use the same Unseen /
+  History filter and mark-seen control as shots, persisted in each run's
+  `review.json`. A newer run makes the log unseen again.
 
 ### Changed
 
@@ -30,6 +34,8 @@ The two tracks are versioned independently.
 
 ### Fixed
 
+- **Tray stays after full-screen review:** closing the large viewer restores
+  the menu-bar drawer that opened it, instead of leaving the tray dismissed.
 - **Narrated video cutoff and crawl:** long step transcripts are now spoken in
   sentence chunks, trailing TTS silence is trimmed before captions are timed,
   and the voice is asked to talk at a conversational pace (temperature 0.5).
