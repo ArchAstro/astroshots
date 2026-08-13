@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.7] (macos) - 2026-08-13
+
 ## [0.2.6] (macos) - 2026-08-12
 
 ### Added
