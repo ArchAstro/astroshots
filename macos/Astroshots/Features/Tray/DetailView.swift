@@ -196,7 +196,7 @@ struct DetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 RoundedRectangle(cornerRadius: 11)
-                                    .fill(Color.white.opacity(0.7))
+                                    .fill(Theme.elevated.opacity(0.7))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 11)
                                             .stroke(Theme.line, lineWidth: 1)
@@ -375,7 +375,7 @@ struct DetailView: View {
             .lineLimit(1...3)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 9))
+            .background(Theme.elevated.opacity(0.78), in: RoundedRectangle(cornerRadius: 9))
             .overlay(
                 RoundedRectangle(cornerRadius: 9)
                     .stroke(Theme.lineStrong, lineWidth: 1)

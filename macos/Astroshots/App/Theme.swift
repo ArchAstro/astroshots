@@ -1,30 +1,53 @@
+import AppKit
 import SwiftUI
 
 /// Design tokens from docs/mocks/astroshots-menubar.html — warm paper, sibling to Rooms.
 enum Theme {
-    static let ink = Color(hex: 0x171716)
-    static let ink2 = Color(hex: 0x3F3E3A)
-    static let muted = Color(hex: 0x77736D)
-    static let muted2 = Color(hex: 0x6F6B65)
+    static let ink = adaptive(light: 0x171716, dark: 0xF5F3EE)
+    static let ink2 = adaptive(light: 0x3F3E3A, dark: 0xD6D2CA)
+    static let muted = adaptive(light: 0x77736D, dark: 0xA9A49C)
+    static let muted2 = adaptive(light: 0x6F6B65, dark: 0x918C85)
 
-    static let paper = Color(hex: 0xFAF9F6)
-    static let surface = Color(hex: 0xF1EFEA)
-    static let line = Color(hex: 0x312E29).opacity(0.12)
-    static let lineStrong = Color(hex: 0x312E29).opacity(0.18)
+    static let paper = adaptive(light: 0xFAF9F6, dark: 0x191A1D)
+    static let surface = adaptive(light: 0xF1EFEA, dark: 0x232428)
+    static let elevated = adaptive(light: 0xFFFFFF, dark: 0x2B2C30)
+    static let line = adaptive(light: 0x312E29, dark: 0xF5F3EE).opacity(0.12)
+    static let lineStrong = adaptive(light: 0x312E29, dark: 0xF5F3EE).opacity(0.18)
 
-    static let purple = Color(hex: 0x6257D9)
-    static let purpleSoft = Color(hex: 0xEFEDFF)
-    static let green = Color(hex: 0x148266)
-    static let greenSoft = Color(hex: 0xE7F5F0)
-    static let amber = Color(hex: 0xA96414)
-    static let amberSoft = Color(hex: 0xFBF0DC)
-    static let red = Color(hex: 0xB54848)
-    static let redSoft = Color(hex: 0xF9E8E7)
-    static let blue = Color(hex: 0x376E9C)
-    static let blueSoft = Color(hex: 0xE7F0F8)
+    static let purple = adaptive(light: 0x6257D9, dark: 0x9B92FF)
+    static let purpleSoft = adaptive(light: 0xEFEDFF, dark: 0x332F58)
+    static let green = adaptive(light: 0x148266, dark: 0x4BC4A2)
+    static let greenSoft = adaptive(light: 0xE7F5F0, dark: 0x183D34)
+    static let amber = adaptive(light: 0xA96414, dark: 0xE2A85D)
+    static let amberSoft = adaptive(light: 0xFBF0DC, dark: 0x49351E)
+    static let red = adaptive(light: 0xB54848, dark: 0xE47C78)
+    static let redSoft = adaptive(light: 0xF9E8E7, dark: 0x4B2728)
+    static let blue = adaptive(light: 0x376E9C, dark: 0x73AFDB)
+    static let blueSoft = adaptive(light: 0xE7F0F8, dark: 0x20394B)
 
     static let trayWidth: CGFloat = 430
     static let trayHeight: CGFloat = 640
+
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(hex: isDark ? dark : light)
+        })
+    }
+}
+
+extension NSColor {
+    convenience init(hex: UInt32) {
+        let red = CGFloat((hex >> 16) & 0xFF) / 255
+        let green = CGFloat((hex >> 8) & 0xFF) / 255
+        let blue = CGFloat(hex & 0xFF) / 255
+        self.init(
+            calibratedRed: red,
+            green: green,
+            blue: blue,
+            alpha: 1
+        )
+    }
 }
 
 extension Color {
@@ -46,7 +69,7 @@ private struct HoverHighlight: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                isHovered ? Color(hex: 0x21201C).opacity(0.06) : .clear,
+                isHovered ? Theme.ink.opacity(0.06) : .clear,
                 in: RoundedRectangle(cornerRadius: cornerRadius)
             )
             .onHover { isHovered = $0 }

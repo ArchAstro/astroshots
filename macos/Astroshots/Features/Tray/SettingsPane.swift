@@ -313,7 +313,7 @@ struct SettingsPane: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.8))
+                .fill(Theme.elevated.opacity(0.8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Theme.line, lineWidth: 1)
@@ -418,7 +418,7 @@ private struct SoftwareUpdateSettingsCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.8))
+                .fill(Theme.elevated.opacity(0.8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Theme.line, lineWidth: 1)

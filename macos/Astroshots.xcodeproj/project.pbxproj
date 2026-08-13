@@ -61,6 +61,7 @@
 		F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */; };
 		F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84934BBEECF7545EB5C02073 /* Theme.swift */; };
 		F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5679FA304E48ED78A5B24170 /* StreamView.swift */; };
+		A11D4A2B81C643ACA8771201 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11D4A2B81C643ACA8771202 /* ThemeTests.swift */; };
 		FC5EB07E736FC0E1582FD805 /* ImageClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA37DEE55FC5E2992C0612C /* ImageClipboard.swift */; };
 		FF7CB55DF3385E5F06077544 /* ReviewStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */; };
 /* End PBXBuildFile section */
@@ -141,6 +142,7 @@
 		E9F84D4D30E15FCC4EECC1C2 /* NarrationJobQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationJobQueue.swift; sourceTree = "<group>"; };
 		F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "astroshots-app-icon-master.png"; sourceTree = "<group>"; };
 		F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStoreTests.swift; sourceTree = "<group>"; };
+		A11D4A2B81C643ACA8771202 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -172,6 +174,7 @@
 				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
 				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
+				A11D4A2B81C643ACA8771202 /* ThemeTests.swift */,
 			);
 			path = AstroshotsTests;
 			sourceTree = "<group>";
@@ -486,6 +489,7 @@
 				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
 				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,
+				A11D4A2B81C643ACA8771201 /* ThemeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

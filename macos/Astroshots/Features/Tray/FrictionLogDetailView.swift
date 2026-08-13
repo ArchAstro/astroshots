@@ -148,7 +148,7 @@ struct FrictionLogDetailView: View {
         .padding(11)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.white.opacity(0.7))
+                .fill(Theme.elevated.opacity(0.7))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -337,7 +337,7 @@ struct FrictionLogDetailView: View {
             .padding(11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Color.white.opacity(0.72),
+                Theme.elevated.opacity(0.72),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
             .overlay(
@@ -388,7 +388,7 @@ struct FrictionLogDetailView: View {
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    Color.white.opacity(0.72),
+                    Theme.elevated.opacity(0.72),
                     in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                 )
                 .overlay(
@@ -444,7 +444,7 @@ struct FrictionLogDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .background(
-                        Color.white.opacity(0.76),
+                        Theme.elevated.opacity(0.76),
                         in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                     )
                     .overlay(
@@ -604,7 +604,7 @@ struct FrictionLogDetailView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.72))
+                .fill(Theme.elevated.opacity(0.72))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)

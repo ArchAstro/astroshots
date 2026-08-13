@@ -16,6 +16,7 @@ struct TrayView: View {
         }
         .frame(width: Theme.trayWidth, height: Theme.trayHeight)
         .background(Theme.paper)
+        .foregroundStyle(Theme.ink)
         .overlay(alignment: .bottom) { toastOverlay }
         .onAppear {
             appState.markTrayOpened()
@@ -61,7 +62,7 @@ struct TrayView: View {
                         .padding(.vertical, 6)
                         .foregroundStyle(appState.activeTab == tab ? Theme.ink : Theme.muted)
                         .background(
-                            appState.activeTab == tab ? Color.white : Color.clear,
+                            appState.activeTab == tab ? Theme.elevated : Color.clear,
                             in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                         )
                         .frame(maxWidth: .infinity)

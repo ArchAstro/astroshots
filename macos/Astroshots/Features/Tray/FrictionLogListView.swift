@@ -89,7 +89,7 @@ private struct FrictionLogRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.72))
+                    .fill(Theme.elevated.opacity(0.72))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

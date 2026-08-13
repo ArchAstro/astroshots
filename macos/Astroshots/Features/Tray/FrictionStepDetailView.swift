@@ -258,7 +258,7 @@ struct FrictionStepDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 11)
-                        .fill(Color.white.opacity(0.7))
+                        .fill(Theme.elevated.opacity(0.7))
                         .overlay(
                             RoundedRectangle(cornerRadius: 11)
                                 .stroke(Theme.line, lineWidth: 1)
