@@ -11,9 +11,11 @@ struct FrictionLogListView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(appState.frictionLogs) { log in
-                        FrictionLogRow(log: log) {
-                            appState.selectFrictionLog(log)
-                        }
+                        FrictionLogRow(
+                            log: log,
+                            action: { appState.selectFrictionLog(log) },
+                            hideAction: { appState.hideFrictionLog(log) }
+                        )
                     }
                 }
                 .padding(.horizontal, 10)
@@ -28,77 +30,93 @@ struct FrictionLogListView: View {
 private struct FrictionLogRow: View {
     let log: FrictionLog
     let action: () -> Void
+    let hideAction: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(log.title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                        if !log.description.isEmpty {
-                            Text(log.description)
-                                .font(.system(size: 11))
-                                .foregroundStyle(Theme.ink2)
+        HStack(spacing: 0) {
+            Button(action: action) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(log.title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
+                            if !log.description.isEmpty {
+                                Text(log.description)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Theme.ink2)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        if let status = log.status {
+                            FrictionStatusBadge(status: status)
                         }
                     }
-                    Spacer(minLength: 4)
-                    if let status = log.status {
-                        FrictionStatusBadge(status: status)
-                    }
-                }
 
-                // Quiet meta row — worktree + slug only; counts live as plain text.
-                HStack(spacing: 6) {
-                    WorktreeChip(label: log.worktreeShort)
-                    Text(log.slug)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Theme.muted2)
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(metaSummary(for: log))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
-                }
-
-                if let run = log.latestRun {
+                    // Quiet meta row — worktree + slug only; counts live as plain text.
                     HStack(spacing: 6) {
-                        Text(runFooter(log: log, run: run))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Theme.ink2)
+                        WorktreeChip(label: log.worktreeShort)
+                        Text(log.slug)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Theme.muted2)
                             .lineLimit(1)
                         Spacer(minLength: 4)
-                        Text(relativeTime(run.capturedAt))
+                        Text(metaSummary(for: log))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    }
+
+                    if let run = log.latestRun {
+                        HStack(spacing: 6) {
+                            Text(runFooter(log: log, run: run))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.ink2)
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            Text(relativeTime(run.capturedAt))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Theme.muted)
+                        }
+                        .help(run.runID)
+                    } else {
+                        Text("Prompt only · no runs yet")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Theme.muted)
                     }
-                    .help(run.runID)
-                } else {
-                    Text("Prompt only · no runs yet")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.muted)
                 }
+                .padding(11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Theme.elevated.opacity(0.72))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Theme.line, lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("friction.row.\(log.slug)")
+
+            Button(action: hideAction) {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Hide friction log")
+            .accessibilityLabel("Hide \(log.title)")
+            .accessibilityIdentifier("friction.hide.\(log.slug)")
+            .padding(.trailing, 4)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("friction.row.\(log.slug)")
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Theme.elevated.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Theme.line, lineWidth: 1)
+        )
     }
 
     private func metaSummary(for log: FrictionLog) -> String {
@@ -160,6 +178,8 @@ struct FrictionStatusBadge: View {
 }
 
 struct EmptyFrictionLogsView: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
         VStack(spacing: 14) {
             Spacer(minLength: 24)
@@ -172,16 +192,34 @@ struct EmptyFrictionLogsView: View {
                     .foregroundStyle(Theme.purple)
             }
             VStack(spacing: 6) {
-                Text("No friction logs yet")
+                Text(
+                    appState.hiddenFrictionLogIDs.isEmpty
+                        ? "No friction logs yet"
+                        : "All friction logs are hidden"
+                )
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(
-                    "Author a scenario with the friction-log skill, then run it. Results land under .astroshot/friction-logs/."
+                    appState.hiddenFrictionLogIDs.isEmpty
+                        ? "Author a scenario with the friction-log skill, then run it. Results land under .astroshot/friction-logs/."
+                        : "Their files are still on disk. Restore them from Settings whenever you need them."
                 )
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.ink2)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
+            }
+            if !appState.hiddenFrictionLogIDs.isEmpty {
+                Button("Manage hidden logs") {
+                    appState.openSettings()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.purple)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityIdentifier("friction.hidden.manage")
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("How to author")

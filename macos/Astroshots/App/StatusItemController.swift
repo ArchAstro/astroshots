@@ -185,10 +185,7 @@ final class StatusItemController: NSObject {
             appState.handleNewShot(shot)
         }
         if !logs.isEmpty {
-            appState.frictionLogs = logs
-            appState.selectedFrictionLogID = logs.first?.id
-            appState.selectedFrictionRunID = logs.first?.latestRun?.id
-            appState.selectedFrictionStepID = logs.first?.latestRun?.steps.first?.id
+            appState.replaceFrictionLogs(logs)
         }
         presentTraySurface()
     }

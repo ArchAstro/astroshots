@@ -126,6 +126,51 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
         try "ok".write(to: marker, atomically: true, encoding: .utf8)
     }
 
+    @MainActor
+    func testHideAndRestoreFrictionLogWithoutDeletingIt() throws {
+        terminateRunningAstroshots()
+        let app = XCUIApplication()
+        app.launchEnvironment["ASTROSHOTS_UI_TEST_TRAY_ROOT"] = fixtureRoot.path
+        app.launch()
+
+        let logsTab = app.buttons["tray.tab.frictionLogs"]
+        XCTAssertTrue(logsTab.waitForExistence(timeout: 10))
+        logsTab.click()
+
+        let row = app.buttons["friction.row.sample-onboarding"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let hide = app.buttons["friction.hide.sample-onboarding"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 3))
+        hide.click()
+
+        XCTAssertTrue(app.buttons["friction.hidden.manage"].waitForExistence(timeout: 3))
+        XCTAssertFalse(row.exists)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: fixtureRoot.appendingPathComponent(
+                    "demo-app/.astroshot/friction-logs/sample-onboarding/prompt.md"
+                ).path
+            )
+        )
+
+        app.buttons["friction.hidden.manage"].click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings.hidden-friction-logs"]
+                .waitForExistence(timeout: 3)
+        )
+        let restore = app.buttons["settings.hidden-friction.restore"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 3))
+        restore.click()
+
+        let back = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Stream"))
+            .firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 3))
+        back.click()
+        XCTAssertTrue(logsTab.waitForExistence(timeout: 3))
+        logsTab.click()
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+    }
+
     // MARK: - Fixture
 
     private func buildFixture(at root: URL) throws {

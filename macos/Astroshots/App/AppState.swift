@@ -34,8 +34,10 @@ final class AppState {
     var selectedShotID: String?
     var pane: TrayPane = .stream
     var activeTab: TrayTab = .shots
-    /// Discovered friction logs across watched worktrees (newest first).
-    var frictionLogs: [FrictionLog] = []
+    /// Complete on-disk catalog across watched worktrees (newest first).
+    private(set) var discoveredFrictionLogs: [FrictionLog] = []
+    /// Stable identities excluded from the normal Friction Logs UX.
+    private(set) var hiddenFrictionLogIDs: [String]
     var selectedFrictionLogID: String?
     var selectedFrictionRunID: String?
     var selectedFrictionStepID: String?
@@ -90,6 +92,17 @@ final class AppState {
         guard let selectedFrictionLogID else { return frictionLogs.first }
         return frictionLogs.first { $0.id == selectedFrictionLogID }
             ?? frictionLogs.first
+    }
+
+    /// Normal catalog after applying the non-destructive hidden-log preference.
+    var frictionLogs: [FrictionLog] {
+        let hidden = Set(hiddenFrictionLogIDs)
+        return discoveredFrictionLogs.filter { !hidden.contains($0.id) }
+    }
+
+    var hiddenFrictionLogs: [FrictionLog] {
+        let hidden = Set(hiddenFrictionLogIDs)
+        return discoveredFrictionLogs.filter { hidden.contains($0.id) }
     }
 
     var selectedFrictionRun: FrictionLogRun? {
@@ -147,6 +160,7 @@ final class AppState {
         autoDismiss = preferences.autoDismiss
         narrationEnabled = preferences.narrationEnabled
         narrationVoice = preferences.narrationVoice
+        hiddenFrictionLogIDs = preferences.hiddenFrictionLogIDs
         watchRootPaths = rootPaths
         needsWatchRootSetup = needsSetup
         shouldPresentFirstRunStartup = presentFirstRun
@@ -170,7 +184,7 @@ final class AppState {
             self?.handleNewShot(shot)
         }
         self.watcher.onFrictionLogsChanged = { [weak self] logs in
-            self?.applyFrictionLogs(logs)
+            self?.replaceFrictionLogs(logs)
         }
         self.watcher.onScanStateChanged = { [weak self] scanning in
             self?.isScanning = scanning
@@ -212,16 +226,19 @@ final class AppState {
         }
     }
 
-    private func applyFrictionLogs(_ logs: [FrictionLog]) {
-        frictionLogs = logs
+    /// Replace the discovered catalog, then repair selection against visible logs.
+    /// Internal so fixture and unit-test paths use the same filtering behavior.
+    func replaceFrictionLogs(_ logs: [FrictionLog]) {
+        discoveredFrictionLogs = logs
+        let visibleLogs = frictionLogs
         if let selectedFrictionLogID,
-           !logs.contains(where: { $0.id == selectedFrictionLogID })
+           !visibleLogs.contains(where: { $0.id == selectedFrictionLogID })
         {
-            self.selectedFrictionLogID = logs.first?.id
+            self.selectedFrictionLogID = visibleLogs.first?.id
             selectedFrictionRunID = nil
             selectedFrictionStepID = nil
         } else if selectedFrictionLogID == nil {
-            selectedFrictionLogID = logs.first?.id
+            selectedFrictionLogID = visibleLogs.first?.id
         }
 
         // Keep step/run selection valid when a run reloads mid-view.
@@ -330,6 +347,40 @@ final class AppState {
         selectedFrictionStepID = log.latestRun?.steps.first?.id
         activeTab = .frictionLogs
         pane = .frictionLogDetail
+    }
+
+    func hideFrictionLog(_ log: FrictionLog) {
+        guard !hiddenFrictionLogIDs.contains(log.id) else { return }
+        hiddenFrictionLogIDs.append(log.id)
+        hiddenFrictionLogIDs = Preferences.normalizeFrictionLogIDs(hiddenFrictionLogIDs)
+        preferences.hiddenFrictionLogIDs = hiddenFrictionLogIDs
+
+        if selectedFrictionLogID == log.id {
+            selectedFrictionLogID = frictionLogs.first?.id
+            selectedFrictionRunID = nil
+            selectedFrictionStepID = nil
+            pane = .stream
+            activeTab = .frictionLogs
+        }
+        showToast("Friction log hidden")
+    }
+
+    func restoreFrictionLog(id: String) {
+        guard hiddenFrictionLogIDs.contains(id) else { return }
+        hiddenFrictionLogIDs.removeAll { $0 == id }
+        preferences.hiddenFrictionLogIDs = hiddenFrictionLogIDs
+        showToast("Friction log restored")
+    }
+
+    func restoreAllFrictionLogs() {
+        guard !hiddenFrictionLogIDs.isEmpty else { return }
+        hiddenFrictionLogIDs = []
+        preferences.hiddenFrictionLogIDs = []
+        showToast("All friction logs restored")
+    }
+
+    func discoveredFrictionLog(id: String) -> FrictionLog? {
+        discoveredFrictionLogs.first { $0.id == id }
     }
 
     func selectFrictionRun(_ run: FrictionLogRun) {
@@ -606,7 +657,7 @@ final class AppState {
         shots.removeAll {
             !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
         }
-        frictionLogs.removeAll {
+        discoveredFrictionLogs.removeAll {
             !Preferences.isPath($0.worktreePath, coveredBy: watchRootPaths)
         }
         if let selectedShotID,
@@ -624,7 +675,7 @@ final class AppState {
         guard !watchRootPaths.isEmpty else {
             didStartWatching = false
             watcher.stop()
-            frictionLogs = []
+            discoveredFrictionLogs = []
             return
         }
         suppressOverlay = true
