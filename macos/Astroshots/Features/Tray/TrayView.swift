@@ -56,17 +56,27 @@ struct TrayView: View {
                 Button {
                     appState.selectTab(tab)
                 } label: {
-                    Text(tab.label)
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(width: 99)
-                        .padding(.vertical, 6)
-                        .foregroundStyle(appState.activeTab == tab ? Theme.ink : Theme.muted)
-                        .background(
-                            appState.activeTab == tab ? Theme.elevated : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        )
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
+                    HStack(spacing: 5) {
+                        Text(tab.label)
+                            .font(.system(size: 10, weight: .semibold))
+                        if appState.unseenCount(for: tab) > 0 {
+                            Text("\(appState.unseenCount(for: tab))")
+                                .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .background(Theme.amber, in: Capsule())
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(appState.activeTab == tab ? Theme.ink : Theme.muted)
+                    .background(
+                        appState.activeTab == tab ? Theme.elevated : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(
@@ -74,6 +84,7 @@ struct TrayView: View {
                     modifiers: .command
                 )
                 .accessibilityIdentifier("tray.tab.\(tab.rawValue)")
+                .accessibilityLabel(tabAccessibilityLabel(tab))
                 .accessibilityAddTraits(appState.activeTab == tab ? .isSelected : [])
             }
         }
@@ -226,6 +237,14 @@ struct TrayView: View {
         .buttonStyle(.plain)
         .hoverHighlight()
         .help(title)
+    }
+
+    private func tabAccessibilityLabel(_ tab: TrayTab) -> String {
+        let unseen = appState.unseenCount(for: tab)
+        guard unseen > 0 else { return tab.label }
+        return unseen == 1
+            ? "\(tab.label), 1 unseen"
+            : "\(tab.label), \(unseen) unseen"
     }
 
     private func showCurrentCaptureInFinder() {

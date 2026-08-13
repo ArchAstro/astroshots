@@ -83,6 +83,11 @@ struct FrictionLog: Identifiable, Hashable, Sendable {
 
     var latestRun: FrictionLogRun? { runs.first }
 
+    /// Latest run's review, matching how the stream treats the current capture.
+    var reviewState: ReviewState {
+        latestRun?.reviewState ?? .pending
+    }
+
     var runCount: Int { runs.count }
 
     var stepCount: Int { latestRun?.steps.count ?? 0 }
@@ -93,6 +98,21 @@ struct FrictionLog: Identifiable, Hashable, Sendable {
 
     var goodCount: Int {
         latestRun?.steps.reduce(0) { $0 + $1.good.count } ?? 0
+    }
+
+    func replacingRuns(_ runs: [FrictionLogRun]) -> FrictionLog {
+        FrictionLog(
+            worktree: worktree,
+            worktreePath: worktreePath,
+            slug: slug,
+            title: title,
+            description: description,
+            promptPath: promptPath,
+            promptMarkdown: promptMarkdown,
+            status: status,
+            runs: runs,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -105,6 +125,12 @@ struct FrictionLogRun: Identifiable, Hashable, Sendable {
     let steps: [FrictionLogStep]
     let capturedAt: Date
     let status: FrictionLogStatus?
+    /// Human review of this run (`review.json` next to `log.jsonl`).
+    var review: ReviewSnapshot?
+
+    var reviewState: ReviewState {
+        review?.state ?? .pending
+    }
 
     /// Human label for chips/list — prefers a short clock from skill-style
     /// `YYYYMMDDTHHMMSSZ` ids, else a trimmed raw id.
@@ -440,13 +466,24 @@ enum FrictionLogLoader {
         let metaURL = directory.appendingPathComponent(FrictionLogPath.metaFileName)
         let runMeta = loadMeta(from: metaURL)
         let status = FrictionLogStatus(raw: runMeta?.status)
+        let review: ReviewSnapshot?
+        if FileManager.default.fileExists(atPath: logURL.path) {
+            review = try? ReviewStore.readReview(
+                forImage: logURL,
+                featureDirectory: directory,
+                expectedRunID: runID
+            )
+        } else {
+            review = nil
+        }
 
         return FrictionLogRun(
             runID: runID,
             directoryPath: directory.standardizedFileURL.path,
             steps: steps,
             capturedAt: mtime,
-            status: status
+            status: status,
+            review: review
         )
     }
 

@@ -18,6 +18,8 @@ final class ReviewWindowController {
     private var panel: ReviewPanel?
     private var currentShotID: String?
     private var mode: Mode = .shot
+    /// Invoked after the takeover is ordered out (close button, Escape, Seen).
+    var onClosed: (() -> Void)?
 
     init(appState: AppState) {
         self.appState = appState
@@ -57,9 +59,13 @@ final class ReviewWindowController {
     }
 
     func close() {
+        let wasVisible = panel?.isVisible == true
         panel?.orderOut(nil)
         currentShotID = nil
         mode = .shot
+        if wasVisible {
+            onClosed?()
+        }
     }
 
     private func present<Content: View>(_ root: Content) {

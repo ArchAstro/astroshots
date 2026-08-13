@@ -104,6 +104,59 @@ struct FrictionLogLoaderTests {
         #expect(FrictionLogLoader.loadRun(directory: worktree) == nil)
         #expect(log.stepCount == 1)
         #expect(log.goodCount == 1)
+        #expect(log.reviewState == .pending)
+    }
+
+    @Test func runReviewSidecarMarksTheLatestRunSeen() async throws {
+        let worktree = FileManager.default.temporaryDirectory
+            .appendingPathComponent("friction-review-\(UUID().uuidString)", isDirectory: true)
+        let slugDir = worktree
+            .appendingPathComponent(".astroshot/friction-logs/checkout", isDirectory: true)
+        let first = slugDir.appendingPathComponent("runs/20260807T120000Z", isDirectory: true)
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: worktree) }
+
+        try "# prompt".write(
+            to: slugDir.appendingPathComponent("prompt.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try """
+        {"step":1,"id":"home","title":"Home","description":"Landed","screenshots":[],"good":[],"improve":[]}
+        """.write(
+            to: first.appendingPathComponent("log.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let store = ReviewStore()
+        _ = try await store.markSeen(
+            forImage: first.appendingPathComponent("log.jsonl"),
+            featureDirectory: first,
+            runID: "20260807T120000Z"
+        )
+
+        let astroshot = worktree.appendingPathComponent(".astroshot", isDirectory: true)
+        let seenLogs = FrictionLogLoader.loadLogs(inAstroshot: astroshot)
+        #expect(seenLogs.first?.reviewState == .seen)
+
+        let second = slugDir.appendingPathComponent("runs/20260807T130000Z", isDirectory: true)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        try """
+        {"step":1,"id":"home","title":"Home","description":"Again","screenshots":[],"good":[],"improve":[]}
+        """.write(
+            to: second.appendingPathComponent("log.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(60)],
+            ofItemAtPath: second.path
+        )
+
+        let nextLogs = FrictionLogLoader.loadLogs(inAstroshot: astroshot)
+        #expect(nextLogs.first?.latestRun?.runID == "20260807T130000Z")
+        #expect(nextLogs.first?.reviewState == .pending)
     }
 
     @Test func humanizesSkillStyleRunIDs() {

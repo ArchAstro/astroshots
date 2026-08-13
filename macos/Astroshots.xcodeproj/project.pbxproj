@@ -43,6 +43,7 @@
 		967A58CBD25BFB06C924D2DD /* NarrationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28BEB6B07761BB8C9BE0687 /* NarrationModels.swift */; };
 		96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */; };
 		9E7A5FC5E617434C14891B39 /* ImageClipboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE183D1FC1B91442E70D281A /* ImageClipboardTests.swift */; };
+		A1624B4638732301C92739FB /* ReviewWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */; };
 		A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */; };
 		A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */; };
 		AC6530122CF24B9A06DCF3E6 /* ImagePagingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4705ECE07E4CA31E16A35EDC /* ImagePagingTests.swift */; };
@@ -145,6 +146,7 @@
 		DFDC12CB9342C5E685FD8A25 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
 		E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogLoaderTests.swift; sourceTree = "<group>"; };
 		E9F84D4D30E15FCC4EECC1C2 /* NarrationJobQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationJobQueue.swift; sourceTree = "<group>"; };
+		EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowControllerTests.swift; sourceTree = "<group>"; };
 		F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "astroshots-app-icon-master.png"; sourceTree = "<group>"; };
 		F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -175,6 +177,7 @@
 				C7975C24FB04A3D1A9DA4227 /* NarrationTests.swift */,
 				26844F440291050990A83490 /* PreferencesTests.swift */,
 				F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */,
+				EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */,
 				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
 				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
@@ -492,6 +495,7 @@
 				3D70DEAA463D3459B886ED95 /* NarrationTests.swift in Sources */,
 				CA8C19581F533AF4120AD2C4 /* PreferencesTests.swift in Sources */,
 				FF7CB55DF3385E5F06077544 /* ReviewStoreTests.swift in Sources */,
+				A1624B4638732301C92739FB /* ReviewWindowControllerTests.swift in Sources */,
 				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
 				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,

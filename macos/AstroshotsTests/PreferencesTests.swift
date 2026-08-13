@@ -95,6 +95,77 @@ struct PreferencesTests {
     }
 
     @Test @MainActor
+    func unseenCountsBadgeShotsAndFrictionLogs() async throws {
+        let suiteName = "astroshots-unseen-badge-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("astroshots-unseen-badge-\(UUID().uuidString)")
+        let runDir = root.appendingPathComponent("run", isDirectory: true)
+        try FileManager.default.createDirectory(at: runDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try """
+        {"step":1,"id":"home","title":"Home","description":"Landed","screenshots":[],"good":[],"improve":[]}
+        """.write(
+            to: runDir.appendingPathComponent("log.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let run = FrictionLogRun(
+            runID: "20260813T120000Z",
+            directoryPath: runDir.path,
+            steps: [
+                FrictionLogStep(
+                    step: 1,
+                    stepID: "home",
+                    title: "Home",
+                    description: "Landed",
+                    transcript: "",
+                    screenshotPaths: [],
+                    good: [],
+                    improve: [],
+                    url: nil,
+                    capturedAt: nil
+                ),
+            ],
+            capturedAt: Date(),
+            status: .complete
+        )
+        let log = FrictionLog(
+            worktree: "demo",
+            worktreePath: root.path,
+            slug: "checkout",
+            title: "Checkout",
+            description: "",
+            promptPath: nil,
+            promptMarkdown: nil,
+            status: .complete,
+            runs: [run],
+            updatedAt: Date()
+        )
+        let state = AppState(
+            preferences: Preferences(defaults: defaults),
+            watcher: makeWatcher(root: root),
+            automaticallyStartsWatching: false
+        )
+        state.replaceFrictionLogs([log])
+
+        #expect(state.unseenFrictionLogCount == 1)
+        #expect(state.unseenCount(for: .frictionLogs) == 1)
+        #expect(state.unseenShotCount == 0)
+
+        try await state.markFrictionLogSeen(log)
+        #expect(state.unseenFrictionLogCount == 0)
+        #expect(state.frictionLogs.first?.reviewState == .seen)
+        #expect(
+            FileManager.default.fileExists(
+                atPath: runDir.appendingPathComponent("review.json").path
+            )
+        )
+    }
+
+    @Test @MainActor
     func freshInstallNeedsFirstRunStartup() {
         let suiteName = "astroshots-preferences-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

@@ -8,29 +8,110 @@ struct FrictionLogListView: View {
         if appState.isFrictionLogsEmpty {
             EmptyFrictionLogsView()
         } else {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(appState.frictionLogs) { log in
-                        FrictionLogRow(
-                            log: log,
-                            action: { appState.selectFrictionLog(log) },
-                            hideAction: { appState.hideFrictionLog(log) }
-                        )
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Text(
+                        appState.frictionLogFilter == .toReview
+                            ? "Unseen (\(pendingCount))"
+                            : "History (\(seenCount))"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.ink2)
+
+                    Spacer()
+
+                    if appState.frictionLogFilter == .toReview {
+                        SeenAllButton(
+                            count: pendingCount,
+                            isWorking: appState.isMarkingSeen,
+                            accessibilityIdentifier: "friction.seen.all"
+                        ) {
+                            Task {
+                                await appState.markAllFrictionLogsSeen(appState.frictionLogs)
+                            }
+                        }
+                    }
+
+                    StreamFilterChip(
+                        title: appState.frictionLogFilter == .history ? "Unseen" : "History",
+                        systemImage: appState.frictionLogFilter == .history
+                            ? "eye"
+                            : "clock.arrow.circlepath",
+                        isActive: appState.frictionLogFilter == .history,
+                        unseenHelp: "Show seen friction-log history",
+                        seenHelp: "Return to unseen friction logs",
+                        accessibilityIdentifier: "friction.history"
+                    ) {
+                        appState.frictionLogFilter =
+                            appState.frictionLogFilter == .history ? .toReview : .history
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+
+                if displayedLogs.isEmpty {
+                    if appState.frictionLogFilter == .history {
+                        EmptyHistoryView(
+                            detail: "Logs you mark Seen will appear here."
+                        ) {
+                            appState.frictionLogFilter = .toReview
+                        }
+                    } else {
+                        ReviewedStreamView(
+                            detail: "Every current friction log has been seen.",
+                            accessibilityIdentifier: "friction.seen.empty"
+                        ) {
+                            appState.frictionLogFilter = .history
+                        }
+                    }
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(displayedLogs) { log in
+                                FrictionLogRow(
+                                    log: log,
+                                    showsSeenAction: appState.frictionLogFilter == .toReview,
+                                    action: { appState.selectFrictionLog(log) },
+                                    seenAction: {
+                                        Task {
+                                            try? await appState.markFrictionLogSeen(log)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 8)
+                    }
+                    .scrollIndicators(.hidden)
+                }
             }
-            .scrollIndicators(.hidden)
         }
+    }
+
+    private var displayedLogs: [FrictionLog] {
+        switch appState.frictionLogFilter {
+        case .toReview:
+            return appState.frictionLogs.filter { $0.reviewState != .seen }
+        case .history:
+            return appState.frictionLogs.filter { $0.reviewState == .seen }
+        }
+    }
+
+    private var pendingCount: Int {
+        appState.frictionLogs.filter { $0.reviewState != .seen }.count
+    }
+
+    private var seenCount: Int {
+        appState.frictionLogs.filter { $0.reviewState == .seen }.count
     }
 }
 
 private struct FrictionLogRow: View {
     let log: FrictionLog
+    var showsSeenAction = true
     let action: () -> Void
-    let hideAction: () -> Void
+    let seenAction: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -96,18 +177,21 @@ private struct FrictionLogRow: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("friction.row.\(log.slug)")
 
-            Button(action: hideAction) {
-                Image(systemName: "eye.slash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 30, height: 30)
-                    .contentShape(Rectangle())
+            if showsSeenAction, log.reviewState != .seen, log.latestRun != nil {
+                Button(action: seenAction) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.purple)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.purpleSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Mark \(log.title) seen")
+                .accessibilityLabel("Mark \(log.title) seen")
+                .accessibilityIdentifier("friction.seen.\(log.slug)")
+                .padding(.trailing, 6)
             }
-            .buttonStyle(.plain)
-            .help("Hide friction log")
-            .accessibilityLabel("Hide \(log.title)")
-            .accessibilityIdentifier("friction.hide.\(log.slug)")
-            .padding(.trailing, 4)
         }
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)

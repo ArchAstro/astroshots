@@ -139,7 +139,8 @@ final class FrictionLogTrayJourneyUITests: XCTestCase {
 
         let row = app.buttons["friction.row.sample-onboarding"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        let hide = app.buttons["friction.hide.sample-onboarding"]
+        row.click()
+        let hide = app.buttons["friction.detail.hide"]
         XCTAssertTrue(hide.waitForExistence(timeout: 3))
         hide.click()
 
