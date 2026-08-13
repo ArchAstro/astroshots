@@ -98,6 +98,10 @@ struct FrictionLogLoaderTests {
         #expect(log.runs.count == 1)
         #expect(log.runs[0].runID == "20260807T120000Z")
         #expect(log.runs[0].steps.count == 1)
+        let located = try #require(FrictionLogLoader.loadRun(directory: runDir))
+        #expect(located.0.slug == "checkout-as-new-user")
+        #expect(located.1.runID == "20260807T120000Z")
+        #expect(FrictionLogLoader.loadRun(directory: worktree) == nil)
         #expect(log.stepCount == 1)
         #expect(log.goodCount == 1)
     }

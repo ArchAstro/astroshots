@@ -201,6 +201,24 @@ enum FrictionLogLoader {
         var captured_at: String?
     }
 
+    /// Load the log + run that own a `runs/<id>/` directory.
+    static func loadRun(directory: URL) -> (FrictionLog, FrictionLogRun)? {
+        let runDir = directory.standardizedFileURL
+        let slugDir = runDir.deletingLastPathComponent().deletingLastPathComponent()
+        let frictionRoot = slugDir.deletingLastPathComponent()
+        let astroshot = frictionRoot.deletingLastPathComponent()
+        guard frictionRoot.lastPathComponent == FrictionLogPath.directoryName,
+              astroshot.lastPathComponent == ShotPath.astroshotDirName
+        else { return nil }
+        let logs = loadLogs(inAstroshot: astroshot)
+        let runID = runDir.lastPathComponent
+        let slug = slugDir.lastPathComponent
+        guard let log = logs.first(where: { $0.slug == slug }),
+              let run = log.runs.first(where: { $0.runID == runID })
+        else { return nil }
+        return (log, run)
+    }
+
     /// Scan `.astroshot/friction-logs/*` under a single `.astroshot` directory.
     static func loadLogs(inAstroshot astroshot: URL) -> [FrictionLog] {
         let root = FrictionLogPath.root(inAstroshot: astroshot)

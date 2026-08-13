@@ -17,8 +17,22 @@ The two tracks are versioned independently.
   the tray while keeping their files on disk, then restore them individually or
   all at once from Settings.
 
+### Changed
+
+- **Narrated-video captions are now opt-in:** Settings → Narration has a
+  **Burn in captions** toggle, off by default. Word-clock captions cannot stay
+  locked to Qwen's actual pacing.
+- **Steadier narrator across a video:** each job synthesizes one short Ryan
+  (or chosen speaker) clip, then clones every later sentence from that same
+  reference so timbre does not wander between chunks.
+- **Setup card after the intro:** narrated videos open the friction-log Goal
+  and Persona as a spoken, typeset page before the first screenshot.
+
 ### Fixed
 
+- **Narrated video cutoff and crawl:** long step transcripts are now spoken in
+  sentence chunks, trailing TTS silence is trimmed before captions are timed,
+  and the voice is asked to talk at a conversational pace (temperature 0.5).
 - **macOS dark mode:** tray, Settings, detail views, friction logs, overlays,
   and review sheets now use appearance-aware backgrounds, text, borders, and
   accent colors instead of mixing dark system text with fixed light cards.

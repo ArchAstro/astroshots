@@ -36,7 +36,8 @@ final class NarrationJobQueue {
     func enqueue(
         log: FrictionLog,
         run: FrictionLogRun,
-        voice: String = NarrationDefaults.voice
+        voice: String = NarrationDefaults.voice,
+        showCaptions: Bool = false
     ) throws -> NarrationJob {
         guard modelManager.readiness.isReady else {
             throw NarrationError.notReady
@@ -51,7 +52,12 @@ final class NarrationJobQueue {
             return existing
         }
 
-        let job = NarrationJob.make(log: log, run: run, voice: voice)
+        let job = NarrationJob.make(
+            log: log,
+            run: run,
+            voice: voice,
+            showCaptions: showCaptions
+        )
         jobs.insert(job, at: 0)
         if jobs.count > 40 {
             jobs = Array(jobs.prefix(40))
@@ -79,6 +85,47 @@ final class NarrationJobQueue {
     func revealOutput(for id: UUID) {
         guard let path = jobs.first(where: { $0.id == id })?.outputPath else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Run the same pipeline as the tray queue, but await the MP4 path.
+    func renderImmediately(
+        log: FrictionLog,
+        run: FrictionLogRun,
+        voice: String = NarrationDefaults.voice,
+        showCaptions: Bool = false
+    ) async throws -> URL {
+        let job = NarrationJob.make(
+            log: log,
+            run: run,
+            voice: voice,
+            showCaptions: showCaptions
+        )
+        jobs.insert(job, at: 0)
+        activeJobID = job.id
+        update(id: job.id) {
+            $0.phase = .synthesizing
+            $0.progress = 0.02
+            $0.message = "Loading Qwen3-TTS…"
+        }
+        do {
+            let output = try await render(job: job)
+            update(id: job.id) {
+                $0.phase = .complete
+                $0.progress = 1
+                $0.message = "Narrated video ready"
+                $0.outputPath = output.path
+            }
+            activeJobID = nil
+            return output
+        } catch {
+            update(id: job.id) {
+                $0.phase = .failed
+                $0.message = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+            activeJobID = nil
+            throw error
+        }
     }
 
     private func kick() {
@@ -140,12 +187,47 @@ final class NarrationJobQueue {
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
 
         let model = try await modelManager.modelForSynthesis()
-        let total = max(job.stepTranscripts.count, 1)
+        update(id: job.id) {
+            $0.message = "Locking narrator voice…"
+        }
+        let anchor = try await modelManager.makeVoiceAnchor(voice: job.voice, using: model)
+        let hasBrief = job.brief?.hasContent == true
+        let total = max(job.stepTranscripts.count + (hasBrief ? 1 : 0), 1)
         var media: [NarrationVideoComposer.StepMedia] = []
+
+        if let brief = job.brief, brief.hasContent {
+            try Task.checkCancellation()
+            update(id: job.id) {
+                $0.phase = .synthesizing
+                $0.progress = 0.04
+                $0.message = "Speaking the setup…"
+            }
+            let wav = workDir.appendingPathComponent("context.wav")
+            let duration = try await synthesize(
+                model: model,
+                text: brief.transcript,
+                voice: job.voice,
+                output: wav,
+                anchor: anchor
+            )
+            media.append(
+                NarrationVideoComposer.StepMedia(
+                    imagePath: nil,
+                    audioPath: wav.path,
+                    duration: duration,
+                    title: brief.title,
+                    transcript: brief.transcript,
+                    isContextCard: true,
+                    contextPersona: brief.persona,
+                    contextGoal: brief.goal
+                )
+            )
+        }
 
         for (index, step) in job.stepTranscripts.enumerated() {
             try Task.checkCancellation()
-            let base = Double(index) / Double(total)
+            let spokenIndex = index + (hasBrief ? 1 : 0)
+            let base = Double(spokenIndex) / Double(total)
             let span = 0.75 / Double(total)
             update(id: job.id) {
                 $0.phase = .synthesizing
@@ -160,7 +242,8 @@ final class NarrationJobQueue {
                 model: model,
                 text: step.transcript,
                 voice: job.voice,
-                output: wav
+                output: wav,
+                anchor: anchor
             )
             update(id: job.id) {
                 $0.progress = base + span
@@ -193,7 +276,8 @@ final class NarrationJobQueue {
         try await NarrationVideoComposer.compose(
             steps: media,
             outputURL: output,
-            logTitle: job.logTitle
+            logTitle: job.logTitle,
+            showCaptions: job.showCaptions
         )
 
         update(id: job.id) {
@@ -207,7 +291,8 @@ final class NarrationJobQueue {
         model: any SpeechGenerationModel,
         text: String,
         voice: String,
-        output: URL
+        output: URL,
+        anchor: NarrationVoiceAnchor
     ) async throws -> Double {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -217,7 +302,8 @@ final class NarrationJobQueue {
         let audio = try await modelManager.synthesizeAudio(
             trimmed,
             voice: voice,
-            using: model
+            using: model,
+            anchor: anchor
         )
         let samples = audio.samples
         guard !samples.isEmpty else {

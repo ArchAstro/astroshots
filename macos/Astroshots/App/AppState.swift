@@ -58,6 +58,7 @@ final class AppState {
     /// Opt-in narrated friction-log videos (MLX Audio + Qwen3-TTS).
     var narrationEnabled: Bool
     var narrationVoice: String
+    var narrationCaptionsEnabled: Bool
     let narration: NarrationModelManager
     let narrationQueue: NarrationJobQueue
     var watchRootPaths: [String]
@@ -160,6 +161,7 @@ final class AppState {
         autoDismiss = preferences.autoDismiss
         narrationEnabled = preferences.narrationEnabled
         narrationVoice = preferences.narrationVoice
+        narrationCaptionsEnabled = preferences.narrationCaptionsEnabled
         hiddenFrictionLogIDs = preferences.hiddenFrictionLogIDs
         watchRootPaths = rootPaths
         needsWatchRootSetup = needsSetup
@@ -601,10 +603,20 @@ final class AppState {
         preferences.narrationVoice = normalized
     }
 
+    func setNarrationCaptionsEnabled(_ enabled: Bool) {
+        narrationCaptionsEnabled = enabled
+        preferences.narrationCaptionsEnabled = enabled
+    }
+
     @discardableResult
     func enqueueNarration(for log: FrictionLog, run: FrictionLogRun) -> Bool {
         do {
-            _ = try narrationQueue.enqueue(log: log, run: run, voice: narrationVoice)
+            _ = try narrationQueue.enqueue(
+                log: log,
+                run: run,
+                voice: narrationVoice,
+                showCaptions: narrationCaptionsEnabled
+            )
             showToast("Narration queued")
             return true
         } catch {

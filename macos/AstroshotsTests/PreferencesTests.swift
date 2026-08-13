@@ -18,6 +18,18 @@ struct PreferencesTests {
     }
 
     @Test @MainActor
+    func narrationCaptionsDefaultOffAndPersist() {
+        let suiteName = "astroshots-preferences-captions-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = Preferences(defaults: defaults)
+
+        #expect(preferences.narrationCaptionsEnabled == false)
+        preferences.narrationCaptionsEnabled = true
+        #expect(Preferences(defaults: defaults).narrationCaptionsEnabled)
+    }
+
+    @Test @MainActor
     func hiddenFrictionLogIDsAreDeduplicatedAndPersisted() {
         let suiteName = "astroshots-hidden-friction-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
