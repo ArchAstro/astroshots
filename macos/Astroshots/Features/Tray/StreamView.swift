@@ -595,7 +595,7 @@ struct EmptyStreamView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Theme.lineStrong, lineWidth: 1)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 8))
                 )
                 .accessibilityIdentifier("setup-choose-folders")
             } else {
@@ -609,7 +609,7 @@ struct EmptyStreamView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Theme.lineStrong, lineWidth: 1)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 8))
                 )
             }
             Spacer()

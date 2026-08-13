@@ -11,6 +11,12 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **macOS dark mode:** tray, Settings, detail views, friction logs, overlays,
+  and review sheets now use appearance-aware backgrounds, text, borders, and
+  accent colors instead of mixing dark system text with fixed light cards.
+
 ## [0.2.6] (macos) - 2026-08-12
 
 ### Added

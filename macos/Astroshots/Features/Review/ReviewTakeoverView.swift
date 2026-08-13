@@ -399,7 +399,7 @@ struct ReviewTakeoverView: View {
                     .accessibilityIdentifier("review.comment.editor")
             }
             .frame(height: 88)
-            .background(Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 9))
+            .background(Theme.elevated.opacity(0.82), in: RoundedRectangle(cornerRadius: 9))
             .overlay(
                 RoundedRectangle(cornerRadius: 9)
                     .stroke(composerFocused ? Theme.purple.opacity(0.7) : Theme.lineStrong, lineWidth: 1)

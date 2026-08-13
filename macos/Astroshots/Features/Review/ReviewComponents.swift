@@ -349,7 +349,7 @@ struct ReviewCommentView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.white.opacity(0.78))
+                .fill(Theme.elevated.opacity(0.78))
                 .overlay(
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .stroke(Theme.line, lineWidth: 1)
@@ -417,7 +417,7 @@ struct ReviewActionButtonStyle: ButtonStyle {
     private func background(configuration: Configuration) -> Color {
         switch tone {
         case .quiet:
-            return configuration.isPressed ? Theme.surface : Color.white.opacity(0.7)
+            return configuration.isPressed ? Theme.surface : Theme.elevated.opacity(0.7)
         case .primary:
             return Theme.blue
         }
