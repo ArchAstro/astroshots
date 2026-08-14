@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.8] (macos) - 2026-08-14
+
 ### Added
 
 - **Non-destructive friction-log hiding:** hide individual friction logs from
