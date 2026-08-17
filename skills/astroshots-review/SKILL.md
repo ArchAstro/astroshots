@@ -20,6 +20,7 @@ images; Astroshots transports them to a human and writes feedback.
 
 | Frame must prove | Capture skill |
 |---|---|
+| Nothing yet — only that the pipe works | **`astroshot demo`** (zero prerequisites) |
 | Fixed React, Ink, or terminal executable state | **astroshot** (still PNG) |
 | Journey **movie** (web / TUI / native window / frames) | **`astroshot movie`** |
 | Routing, auth, live data, or browser shell | **agent-browser** |
@@ -174,9 +175,24 @@ open Astroshots.xcodeproj
 The app is menu-bar only. Configure watched folders and overlay visibility
 from its gear menu.
 
+Start every investigation with the diagnostics instead of guessing:
+
+```bash
+astroshot doctor          # required/optional checks plus the exact fix command
+astroshot doctor --json   # same report, machine readable
+astroshot demo            # seed real frames to prove the path end to end
+```
+
+`doctor` reads the app's live watched-folder configuration, so "empty tray"
+resolves into three distinct answers with different fixes: first-launch setup
+never completed, setup completed but this project is outside every watched
+folder, or the project is watched and the problem is elsewhere. It is read-only
+— it never installs anything or changes app state.
+
 | Symptom | Check |
 |---|---|
-| Empty tray | The file is under `.astroshot/` and a watched folder contains the worktree |
+| Empty tray | `astroshot doctor` — it names the watch-root state and the fix |
+| Unsure the contract works at all | `astroshot demo`, then open **Shots** |
 | No overlay | App is running, overlay is enabled, and the file has settled |
 | Wrong project badge | `.astroshot` is at the intended worktree root |
 | Manifest metadata missing | JSON parses and `file` matches the image basename |

@@ -372,6 +372,25 @@ try {
   run("npx", ["--no-install", "astroshot", "--help"], {
     cwd: consumerDir,
   });
+  run("npx", ["--no-install", "astroshot", "demo", "--help"], {
+    cwd: consumerDir,
+  });
+  run("npx", ["--no-install", "astroshot", "doctor", "--help"], {
+    cwd: consumerDir,
+  });
+  // The bundled demo payload must survive packing, with no Chromium available.
+  run("npx", ["--no-install", "astroshot", "demo", "--feature", "pack-check"], {
+    cwd: consumerDir,
+    env: { PLAYWRIGHT_BROWSERS_PATH: path.join(tempRoot, "empty-browsers") },
+  });
+  run(
+    "node",
+    [
+      path.join(repoRoot, "scripts", "assert-demo-manifest.mjs"),
+      path.join(consumerDir, ".astroshot", "pack-check"),
+    ],
+    { cwd: consumerDir },
+  );
   run("npx", ["--no-install", "astroshot", "react", "--help"], {
     cwd: consumerDir,
   });
@@ -413,6 +432,10 @@ try {
   for (const requiredPath of [
     "package.json",
     "bin/astroshot.mjs",
+    "bin/demo.mjs",
+    "bin/doctor.mjs",
+    "bin/mac-preferences.mjs",
+    "fixtures/demo/fixtures.json",
     "react.d.ts",
     "react.js",
     "ink.d.ts",

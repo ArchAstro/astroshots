@@ -61,6 +61,12 @@ require_reference "skills/friction-log/references/contract.md" "screenshots"
 require_reference "skills/friction-log/references/contract.md" "transcript"
 require_reference "skills/astroshot/SKILL.md" "astroshot movie which-source"
 require_reference "skills/astroshot/SKILL.md" "desktop.window"
+require_reference "skills/astroshot/SKILL.md" "astroshot demo"
+require_reference "skills/astroshot/SKILL.md" "astroshot doctor"
+require_reference "skills/astroshots-review/SKILL.md" "astroshot demo"
+require_reference "skills/astroshots-review/SKILL.md" "astroshot doctor"
+require_reference "README.md" "@archastro/astroshot demo"
+require_reference "README.md" "@archastro/astroshot doctor"
 require_reference "skills/astroshots-review/SKILL.md" "full-screen controls"
 require_reference "skills/astroshots-review/references/manifest.md" "duration_ms"
 require_reference "skills/screenshot/SKILL.md" "movie badge/filter"
@@ -108,6 +114,13 @@ grep -Fq "astroshot pty" <<<"$help_output" ||
   fail "astroshot --help did not document PTY capture"
 grep -Fq "install-browser" <<<"$help_output" ||
   fail "astroshot --help did not document browser installation"
+grep -Fq "astroshot demo" <<<"$help_output" ||
+  fail "astroshot --help did not document the demo first-win command"
+grep -Fq "astroshot doctor" <<<"$help_output" ||
+  fail "astroshot --help did not document the doctor diagnostic"
+node packages/astroshot/bin/astroshot.mjs demo --help >/dev/null
+node packages/astroshot/bin/astroshot.mjs doctor --help >/dev/null
+bash scripts/verify-demo-doctor.sh
 node packages/astroshot/bin/astroshot.mjs react --help >/dev/null
 node packages/astroshot/bin/astroshot.mjs ink --help >/dev/null
 node packages/astroshot/bin/astroshot.mjs pty --help >/dev/null
