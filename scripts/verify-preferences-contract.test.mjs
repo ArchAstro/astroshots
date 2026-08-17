@@ -176,3 +176,23 @@ test("fails when the contract doc loses its discoverability links", () => {
     assert.match(result.stderr, /README\.md must link the preferences contract/);
   });
 });
+
+test("fails when a new preference key is left undocumented", () => {
+  withFixtureRepo((dir, git) => {
+    const swift = path.join(dir, "macos/Astroshots/App/Preferences.swift");
+    fs.writeFileSync(
+      swift,
+      fs
+        .readFileSync(swift, "utf8")
+        .replace(
+          '        static let watchRoots = "watchRoots"',
+          '        static let watchRoots = "watchRoots"\n        static let undocumentedKnob = "undocumentedKnob"',
+        ),
+    );
+    git("add", "--all");
+
+    const result = runGuard(dir);
+    assert.equal(result.status, 1, "guard must require new keys to be documented");
+    assert.match(result.stderr, /does not mention the preference key "undocumentedKnob"/);
+  });
+});
