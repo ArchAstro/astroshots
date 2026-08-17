@@ -29,6 +29,8 @@ test("documents React, Ink, PTY, and movie modes from one executable", () => {
   assert.match(result.stdout, /astroshot movie/);
   assert.match(result.stdout, /desktop\.window/);
   assert.match(result.stdout, /astroshot init/);
+  assert.match(result.stdout, /astroshot demo/);
+  assert.match(result.stdout, /astroshot doctor/);
   assert.match(result.stdout, /alias for "astroshot ink"/);
   assert.match(result.stdout, /install-browser/);
 });
@@ -124,6 +126,17 @@ test("generates valid fixture templates for every capture mode", () => {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("documents demo and doctor as the first-win commands", () => {
+  const demo = run("demo", "--help");
+  const doctor = run("doctor", "--help");
+  assert.equal(demo.status, 0, demo.stderr);
+  assert.equal(doctor.status, 0, doctor.stderr);
+  assert.match(demo.stdout, /no prerequisites/);
+  assert.match(demo.stdout, /--feature/);
+  assert.match(doctor.stdout, /read-only/);
+  assert.match(doctor.stdout, /Exits non-zero when a required check fails/);
 });
 
 test("rejects an unknown screenshot mode", () => {

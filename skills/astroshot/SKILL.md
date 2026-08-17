@@ -21,6 +21,13 @@ Use one CLI with four capture boundaries:
 | Real terminal executable and keyboard flow | `pty` | [Terminal modes](references/terminal.md) |
 | Multi-step journey recording | `movie` | Run `astroshot movie which-source "<intent>"` first |
 
+Two setup verbs come before all of them:
+
+| Need | Command |
+|---|---|
+| Prove the `.astroshot` path works, with zero prerequisites | `astroshot demo` |
+| Diagnose why nothing appears in the Astroshots tray | `astroshot doctor` |
+
 Choose the smallest boundary that proves the intended state. Do not rebuild a
 full application shell in a fixture merely to avoid running the application.
 
@@ -32,6 +39,28 @@ The public command is:
 npx astroshot --help
 ```
 
+Prove the setup before capturing anything real:
+
+```bash
+astroshot demo      # writes a real .astroshot/ set: stills + movie + manifest.json
+astroshot doctor    # per-check pass/fail with the exact fix command
+```
+
+- `demo` requires **no** Chromium download and no assets of your own. It writes
+  bundled fixtures, so it works immediately after install and while the app is
+  closed, then prints where to look. Options: `--feature <name>`,
+  `--root <dir>`, `--json`.
+- `doctor` reports Node vs `engines`, whether this project sits inside a folder
+  Astroshots actually watches (read live from the app's own configuration —
+  never a guessed `~/Projects`), whether the app is installed and running,
+  whether the managed Chromium runtime is present, and macOS Screen Recording
+  state for `desktop.window`. Every failing line carries the exact remediation
+  command. It exits non-zero when a required check fails, and it never installs
+  or mutates anything. Options: `--root <dir>`, `--json`, `--skip-screen`.
+
+When the tray stays empty, run `astroshot doctor` and follow its `fix:` line
+instead of guessing about watched folders.
+
 From a clone of the Astroshots repository, use the checked-out CLI when the
 package is not yet available from npm:
 
@@ -41,7 +70,7 @@ node packages/astroshot/bin/astroshot.mjs --help
 
 Do not silently substitute the old `react-shot`, `tui-shot`, or
 `astroshot-movie` executables. They are engine packages; the supported command
-surface is `astroshot react|ink|pty|movie`.
+surface is `astroshot demo|doctor|react|ink|pty|movie`.
 
 Install Chromium once:
 

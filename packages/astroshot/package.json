@@ -47,6 +47,7 @@
   },
   "files": [
     "bin",
+    "fixtures",
     "react.d.ts",
     "react.js",
     "ink.d.ts",
@@ -59,7 +60,8 @@
   ],
   "scripts": {
     "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot && npm run build --workspace @archastro/movie-harness",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "build:demo-fixtures": "node scripts/build-demo-fixtures.mjs"
   },
   "engines": {
     "node": ">=22.14.0"

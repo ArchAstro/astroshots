@@ -6,11 +6,15 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { writeFixtureTemplate } from "./templates.mjs";
+import { demoHelp, runDemo } from "./demo.mjs";
+import { doctorHelp, runDoctor } from "./doctor.mjs";
 
 function help() {
   console.log(`astroshot — one CLI for React, Ink, PTY stills, and movies
 
 Usage:
+  astroshot demo [--feature <name>] [--root <dir>]
+  astroshot doctor [--root <dir>] [--json]
   astroshot init react [fixture.tsx] [--force]
   astroshot init ink [fixture.tsx] [--force]
   astroshot init pty [fixture.yaml] [--force]
@@ -22,6 +26,10 @@ Usage:
   astroshot pty <fixture.yaml|json> -o <out.png> [options]
   astroshot movie <command> [options]
   astroshot install-browser [--with-deps]
+
+Start here:
+  demo               Write a complete .astroshot/ example set (no prerequisites)
+  doctor             Check Node, watched folders, app, Chromium, permissions
 
 Commands:
   react              Capture an isolated React component (still PNG)
@@ -194,6 +202,28 @@ if (command === "-v" || command === "--version") {
 if (!command || command === "help" || command === "-h" || command === "--help") {
   help();
   process.exit(command ? 0 : 1);
+}
+
+if (command === "demo") {
+  try {
+    process.exit(runDemo(arguments_));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    console.error("");
+    console.error(demoHelp());
+    process.exit(1);
+  }
+}
+
+if (command === "doctor") {
+  try {
+    process.exit(runDoctor(arguments_));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    console.error("");
+    console.error(doctorHelp());
+    process.exit(1);
+  }
 }
 
 if (command === "install-browser") {

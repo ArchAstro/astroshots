@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "generated_by": "npm run build:demo-fixtures --workspace @archastro/astroshot",
+  "viewport": "720x450",
+  "shots": [
+    {
+      "asset": "welcome.png",
+      "slug": "welcome",
+      "title": "Watch path works",
+      "description": "astroshot demo wrote this still into .astroshot/ with zero prerequisites."
+    },
+    {
+      "asset": "next-steps.png",
+      "slug": "next-steps",
+      "title": "Next steps",
+      "description": "The commands that capture real React, Ink, PTY, and movie states."
+    },
+    {
+      "asset": "journey.png",
+      "video": "journey.webm",
+      "slug": "journey",
+      "title": "Journey movie",
+      "description": "A poster PNG plus sibling WebM proves movie playback, duration, and chapters.",
+      "duration_ms": 4240,
+      "source": "frames",
+      "chapters": [
+        {
+          "slug": "recording",
+          "t_ms": 0
+        },
+        {
+          "slug": "poster",
+          "t_ms": 2685
+        },
+        {
+          "slug": "streaming",
+          "t_ms": 3180
+        }
+      ]
+    }
+  ]
+}

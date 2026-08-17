@@ -3,6 +3,29 @@
 One command for deterministic React, Ink, and arbitrary terminal screenshots —
 plus **journey movies** into `.astroshot/`.
 
+## Start here (no prerequisites)
+
+```bash
+# Write a real .astroshot/ set: stills + movie poster/video + manifest.json.
+# No Chromium download, no assets of your own; works with the app closed.
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot demo
+
+# Check Node, watched folders, app install/run state, Chromium, and macOS
+# Screen Recording. Each failure prints the exact fix command. Read-only.
+npx --@archastro:registry=https://registry.npmjs.org \
+  @archastro/astroshot doctor
+```
+
+`demo` accepts `--feature <name>`, `--root <dir>`, and `--json`. `doctor`
+accepts `--root <dir>`, `--json`, and `--skip-screen`, and exits non-zero when a
+required check fails. Watched-folder coverage comes from the Astroshots app's
+own live configuration, so an "empty tray" resolves to one of: first-launch
+setup never completed, this project is outside every watched folder, or the
+project is watched and the problem is elsewhere.
+
+## Capture
+
 ```bash
 npx astroshot init react
 npx astroshot init ink

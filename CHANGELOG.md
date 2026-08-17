@@ -20,6 +20,24 @@ The two tracks are versioned independently.
   no longer produce an E404. `npm run pack:check` proves this by installing the
   package with `@archastro` pointed at an unreachable registry and then running
   the CLI. See [`docs/UNSCOPED-CLI-DESIGN.md`](docs/UNSCOPED-CLI-DESIGN.md).
+- **`astroshot demo` — a one-command first win:** writes a complete
+  `.astroshot/<feature>/` set (two stills, a movie poster + WebM pair, and a
+  contract-valid `manifest.json`) from bundled fixtures. It needs no Chromium
+  download, no ffmpeg, and no assets of your own, so it works immediately after
+  install and even while the app is closed. This replaces the README
+  quickstart's manual "copy any PNG into `.astroshot/quickstart/`" step.
+- **`astroshot doctor` — one line per silent failure mode:** reports Node
+  version vs `engines`, whether this project is inside a folder Astroshots
+  actually watches (read from the app's live `watchRoots` / legacy `watchRoot`
+  configuration, never a guessed `~/Projects`), whether the app is installed and
+  running, whether the managed Chromium runtime is present, and macOS Screen
+  Recording state for `desktop.window`. Every check prints pass/fail plus the
+  exact remediation command, `--json` emits the same report for tooling, and the
+  process exits non-zero when a required check fails. `doctor` is read-only: it
+  never installs anything and never changes app state. "Empty tray" now resolves
+  to three distinct answers with different fixes: first-launch setup never
+  completed, this project is outside every watched folder, or the project is
+  watched and the problem is elsewhere.
 
 ### Changed
 

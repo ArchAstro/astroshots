@@ -62,16 +62,34 @@ Prerequisites: **macOS 14+** and **Node.js 22.14+**.
    npx astroshot install-browser
    ```
 
-5. Verify the watch path from any project inside the folder selected in step 2:
+5. Verify the whole path from any project inside the folder selected in step 2 —
+   one command, no assets of your own:
 
    ```bash
    cd /path/to/your/project
-   mkdir -p .astroshot/quickstart
-   cp /path/to/any-screenshot.png .astroshot/quickstart/0001-ready.png
+   npx --@archastro:registry=https://registry.npmjs.org \
+     @archastro/astroshot demo
    ```
 
-   Open the Astroshots menu-bar icon → **Shots**. A **quickstart** entry with
-   `0001-ready.png` confirms the app and on-disk contract are connected.
+   `astroshot demo` writes real stills, a movie poster+video pair, and a
+   `manifest.json` into `.astroshot/astroshot-demo/`. It needs no Chromium and
+   works even with the app closed. Open the Astroshots menu-bar icon →
+   **Shots**: an **astroshot-demo** entry with a movie badge confirms the app
+   and the on-disk contract are connected.
+
+6. If nothing appears — or before filing a bug — diagnose it in one line:
+
+   ```bash
+   npx --@archastro:registry=https://registry.npmjs.org \
+     @archastro/astroshot doctor
+   ```
+
+   `doctor` reports Node version, whether this project is inside a folder
+   Astroshots actually watches, whether the app is installed and running,
+   whether the managed Chromium runtime is present, and macOS Screen Recording
+   state — each failing line carries the exact command that fixes it. It exits
+   non-zero when a required check fails, and it never installs anything or
+   changes app state.
 
 The sections below cover project-local or individual skill installs, capture
 modes, movies, friction logs, and the complete file contract.
