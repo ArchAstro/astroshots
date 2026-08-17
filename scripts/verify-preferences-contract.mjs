@@ -4,10 +4,10 @@
  *
  * Two silent-false-negative bugs this prevents:
  *   1. Reading the wrong preferences domain. The real domain is
- *      `ai.archastro.Astroshots`; `com.archastro.…` is the plausible guess, and
- *      `defaults read` on a missing domain looks like "not configured" instead
- *      of an error. Any tracked file that names a wrong-prefix `*.archastro`
- *      domain fails this check.
+ *      `ai.archastro.Astroshots`; the plausible wrong guess keeps the
+ *      organization but swaps the `ai.` prefix, and `defaults read` on a
+ *      missing domain looks like "not configured" instead of an error. Any
+ *      tracked file naming a wrong-prefix organization domain fails here.
  *   2. Documenting the bundle identifier as an unchecked literal. The
  *      identifier is derived here from macos/project.yml and every other
  *      occurrence is asserted against it.
@@ -95,11 +95,14 @@ function trackedFiles() {
 }
 
 /**
- * Every tracked mention of `<something>.archastro` must use the prefix that
+ * Every tracked mention of `<owner>.<organization>` must use the prefix that
  * macos/project.yml declares.
  */
 function checkDomainPrefixes({ organization, organizationPrefix, prefix }) {
-  const pattern = new RegExp(String.raw`[A-Za-z0-9_.-]*\.${organization}\b`, "gi");
+  const pattern = new RegExp(
+    String.raw`\b([A-Za-z0-9_]+)\.${organization}(?:\.[A-Za-z0-9_]+)*\b`,
+    "gi",
+  );
   for (const relativePath of trackedFiles()) {
     if (BINARY_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) continue;
     const absolute = path.join(repoRoot, relativePath);
@@ -115,8 +118,7 @@ function checkDomainPrefixes({ organization, organizationPrefix, prefix }) {
       for (const match of line.matchAll(pattern)) {
         // Compare only the component immediately left of the organization, so
         // `-ai.archastro` inside a shell default keeps passing.
-        const leading = match[0].slice(0, -`.${organization}`.length);
-        const owner = leading.split(/[^A-Za-z0-9]/).at(-1) ?? "";
+        const owner = match[1];
         if (owner.toLowerCase() === organizationPrefix.toLowerCase()) continue;
         const location = `${relativePath}:${index + 1}`;
         if (line.includes(ALLOW_MARKER)) {
@@ -163,7 +165,10 @@ function checkWatchRootContract() {
     }
   }
 
-  const getter = swift.match(/var watchRootPaths: \[String\] \{\n\s*get \{([\s\S]*?)\n\s*\}\n/)?.[1];
+  // The getter is everything between `get {` and the matching `set {`.
+  const getter = swift.match(
+    /var watchRootPaths: \[String\] \{\s*\n\s*get \{([\s\S]*?)\n\s*set \{/,
+  )?.[1];
   if (!getter) {
     fail(`${PREFERENCES_SWIFT}: could not locate the watchRootPaths getter`);
   } else {

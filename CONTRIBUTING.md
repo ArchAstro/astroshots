@@ -53,6 +53,12 @@ Run focused tests while developing. Before requesting review, run the checks
 for every surface you changed and describe the user-visible behavior you
 verified.
 
+If you touch the app's `UserDefaults` keys — especially the watch roots — or any
+tool that reads them, update [`docs/PREFERENCES.md`](docs/PREFERENCES.md) in the
+same change. `npm test` runs `scripts/verify-preferences-contract.mjs`, which
+derives the canonical preferences domain from `macos/project.yml` and fails on a
+wrong-prefix domain string or a drifted watch-root read contract.
+
 ## Pull requests
 
 A useful pull request includes:

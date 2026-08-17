@@ -18,16 +18,18 @@
     "node-pty@1.2.0-beta.14": true
   },
   "scripts": {
-    "test": "npm run test --workspaces --if-present && npm run test:capture-helper && npm run test:review-contract && npm run test:changelog",
+    "test": "npm run test --workspaces --if-present && npm run test:capture-helper && npm run test:review-contract && npm run test:changelog && npm run test:preferences-contract",
     "test:capture-helper": "bash skills/astroshots-review/scripts/test-astroshot-capture",
     "test:review-contract": "bash scripts/test-review-contract.sh",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run typecheck && npm test && npm run verify:skills && npm run pack:check",
     "screenshots:readme": "bash scripts/capture-readme-screenshots.sh",
     "verify:skills": "bash scripts/verify-skills.sh",
+    "verify:preferences": "node scripts/verify-preferences-contract.mjs",
     "pack:check": "node scripts/verify-packages.mjs",
     "version:packages": "node scripts/set-package-version.mjs",
     "changelog:roll": "node scripts/roll-changelog.mjs",
-    "test:changelog": "node --test scripts/roll-changelog.test.mjs"
+    "test:changelog": "node --test scripts/roll-changelog.test.mjs",
+    "test:preferences-contract": "node --test scripts/verify-preferences-contract.test.mjs"
   }
 }
