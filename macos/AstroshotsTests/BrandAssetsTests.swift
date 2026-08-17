@@ -24,9 +24,7 @@ struct BrandAssetsTests {
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let suiteName = "astroshots-status-menu-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let watcher = AstroshotWatcher(

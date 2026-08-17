@@ -49,9 +49,7 @@ struct StreamGroupingTests {
         try Data("beta image".utf8).write(to: betaImage)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let suiteName = "astroshots-bulk-seen-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let watcher = AstroshotWatcher(
@@ -106,9 +104,7 @@ struct StreamGroupingTests {
         try Data("valid image".utf8).write(to: validImage)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let suiteName = "astroshots-partial-bulk-seen-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let watcher = AstroshotWatcher(

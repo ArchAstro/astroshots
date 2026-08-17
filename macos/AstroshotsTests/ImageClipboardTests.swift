@@ -71,9 +71,7 @@ struct ImageClipboardTests {
         let png = try #require(rep.representation(using: .png, properties: [:]))
         try png.write(to: imageURL)
 
-        let suiteName = "astroshots-clipboard-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [temporary.path]
         preferences.markFirstRunSetupComplete()

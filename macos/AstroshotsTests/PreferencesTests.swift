@@ -5,9 +5,7 @@ import Testing
 struct PreferencesTests {
     @Test @MainActor
     func narrationVoicePersistsAndRejectsUnknownValues() {
-        let suiteName = "astroshots-preferences-voice-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
 
         #expect(preferences.narrationVoice == "Ryan")
@@ -19,9 +17,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func narrationCaptionsDefaultOffAndPersist() {
-        let suiteName = "astroshots-preferences-captions-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
 
         #expect(preferences.narrationCaptionsEnabled == false)
@@ -31,9 +27,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func hiddenFrictionLogIDsAreDeduplicatedAndPersisted() {
-        let suiteName = "astroshots-hidden-friction-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
 
         preferences.hiddenFrictionLogIDs = ["/tmp/b::two", "", "/tmp/a::one", "/tmp/b::two"]
@@ -46,9 +40,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func hidingFiltersTheUXPersistsAndLeavesFilesOnDisk() throws {
-        let suiteName = "astroshots-hidden-friction-state-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("astroshots-hidden-friction-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -96,9 +88,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func unseenCountsBadgeShotsAndFrictionLogs() async throws {
-        let suiteName = "astroshots-unseen-badge-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("astroshots-unseen-badge-\(UUID().uuidString)")
         let runDir = root.appendingPathComponent("run", isDirectory: true)
@@ -167,9 +157,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func freshInstallNeedsFirstRunStartup() {
-        let suiteName = "astroshots-preferences-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
 
         #expect(preferences.hasCompletedFirstRunSetup == false)
@@ -180,9 +168,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func upgradeWithSavedRootsSkipsFirstRunStartup() {
-        let suiteName = "astroshots-preferences-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         defaults.set(["/tmp/astroshots-existing-work"], forKey: "watchRoots")
 
         let preferences = Preferences(defaults: defaults)
@@ -198,9 +184,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func legacyWatchRootMigratesIntoTheMultipleRootModel() {
-        let suiteName = "astroshots-preferences-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         defaults.set("~/legacy-work", forKey: "watchRoot")
 
         let preferences = Preferences(defaults: defaults)
@@ -217,9 +201,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func rootsAreDeduplicatedAndPersistedForOlderBuilds() {
-        let suiteName = "astroshots-preferences-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         let parent = "/tmp/astroshots-work"
         let nested = "\(parent)/nested-project"
@@ -270,9 +252,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func appStatePresentsFirstRunUntilSetupCompletes() {
-        let suiteName = "astroshots-first-run-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         let temporary = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -317,9 +297,7 @@ struct PreferencesTests {
 
     @Test @MainActor
     func cancellingFirstRunKeepsStartupPendingForNextLaunch() {
-        let suiteName = "astroshots-first-run-cancel-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
 
         #expect(preferences.shouldPresentFirstRunStartup)

@@ -289,9 +289,7 @@ struct NarrationTests {
         #expect(NarrationModelManager.isAppleSilicon())
 
         NarrationPaths.ensureDirectories()
-        let suite = "astroshots.narration.e2e.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = TestDefaults()
         defaults.set(true, forKey: "narrationEnabled")
         let manager = NarrationModelManager(preferences: Preferences(defaults: defaults))
         await manager.refreshAndBootstrapIfNeeded()
@@ -357,9 +355,7 @@ struct NarrationTests {
         #expect(!loaded.1.steps.isEmpty)
 
         NarrationPaths.ensureDirectories()
-        let suite = "astroshots.narration.render.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = TestDefaults()
         defaults.set(true, forKey: "narrationEnabled")
         let manager = NarrationModelManager(preferences: Preferences(defaults: defaults))
         await manager.refreshAndBootstrapIfNeeded()
