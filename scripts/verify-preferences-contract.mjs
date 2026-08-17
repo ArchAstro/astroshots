@@ -58,6 +58,18 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
+/**
+ * Whole-token containment. A plain substring test would let a new short key
+ * (`overlay`) count as documented because a longer existing one
+ * (`overlayEnabled`) happens to contain it.
+ */
+function documentsToken(text, token) {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A dotted qualifier still counts (`Preferences.normalizeWatchRootPaths`
+  // documents `normalizeWatchRootPaths`); adjacent word characters do not.
+  return new RegExp(String.raw`(?<![\w-])${escaped}(?![\w-])`).test(text);
+}
+
 /** Single source of truth: the app's own project definition. */
 function resolveBundleIdentifier() {
   const projectYml = read(PROJECT_YML);
@@ -192,16 +204,27 @@ function checkWatchRootContract() {
     "hasCompletedFirstRunSetup",
     "normalizeWatchRootPaths",
   ]) {
-    if (!doc.includes(claim)) fail(`${CONTRACT_DOC} must document ${claim}`);
+    if (!documentsToken(doc, claim)) fail(`${CONTRACT_DOC} must document ${claim}`);
   }
 
   // Every persisted key must appear on the page, so adding a preference cannot
-  // silently leave the contract incomplete for external readers.
-  for (const [, key] of swift.matchAll(/static let [A-Za-z]+ = "([A-Za-z]+)"/g)) {
-    if (!doc.includes(key)) {
-      fail(
-        `${CONTRACT_DOC} does not mention the preference key "${key}" defined in ${PREFERENCES_SWIFT}`,
-      );
+  // silently leave the contract incomplete for external readers. Scoped to the
+  // `Key` enum so unrelated string constants elsewhere in the file are not
+  // mistaken for preference keys.
+  const keyEnum = swift.match(/private enum Key \{\n([\s\S]*?)\n {4}\}/)?.[1];
+  if (!keyEnum) {
+    fail(`${PREFERENCES_SWIFT}: could not locate the private enum Key block`);
+  } else {
+    const declarations = [...keyEnum.matchAll(/static let \w+ = "([\w.-]+)"/g)];
+    if (declarations.length === 0) {
+      fail(`${PREFERENCES_SWIFT}: enum Key declared no preference keys`);
+    }
+    for (const [, key] of declarations) {
+      if (!documentsToken(doc, key)) {
+        fail(
+          `${CONTRACT_DOC} does not mention the preference key "${key}" defined in ${PREFERENCES_SWIFT}`,
+        );
+      }
     }
   }
 }
