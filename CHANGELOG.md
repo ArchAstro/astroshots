@@ -38,6 +38,11 @@ The two tracks are versioned independently.
   to three distinct answers with different fixes: first-launch setup never
   completed, this project is outside every watched folder, or the project is
   watched and the problem is elsewhere.
+- **Homebrew cask install:** `brew install --cask ArchAstro/tools/astroshots`
+  installs the signed, notarized app into `/Applications` — no DMG download or
+  drag step. The cask declares `auto_updates true` so Sparkle keeps handling
+  updates, and **Release DMG** bumps the cask version and sha256 automatically
+  after each release. The DMG download remains available as a secondary path.
 
 ### Changed
 
