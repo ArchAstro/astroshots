@@ -177,6 +177,13 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             test
 
+      # Must run after `test`: Swift Testing parallelism means no in-process
+      # test can be scheduled last, and cfprefsd flushes a leaked suite to disk
+      # after the test process exits.
+      - name: Assert tests leaked no preference plists
+        working-directory: macos
+        run: ./scripts/check-preference-leaks.sh
+
       - name: Compile signed-desktop review proof
         working-directory: macos
         run: |

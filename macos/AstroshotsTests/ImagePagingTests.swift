@@ -88,9 +88,7 @@ struct ImagePagingTests {
     }
 
     private func isolatedPreferences() -> Preferences {
-        let suiteName = "astroshots-paging-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let defaults = TestDefaults()
         return Preferences(defaults: defaults)
     }
 

@@ -42,9 +42,7 @@ struct AstroshotWatcherTests {
         )
         defer { try? FileManager.default.removeItem(at: temporary) }
 
-        let suiteName = "astroshots-multiple-roots-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [firstRoot.path]
         let cacheURL = temporary.appendingPathComponent("shot-index.json")
@@ -346,9 +344,7 @@ struct AstroshotWatcherTests {
             )
         )
         defer { watcher.stop() }
-        let suiteName = "astroshots-manifest-arrival-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = TestDefaults()
         let preferences = Preferences(defaults: defaults)
         preferences.watchRootPaths = [root.path]
         let state = AppState(
