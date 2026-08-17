@@ -215,7 +215,7 @@ function checkWatchRootContract() {
   if (!keyEnum) {
     fail(`${PREFERENCES_SWIFT}: could not locate the private enum Key block`);
   } else {
-    const declarations = [...keyEnum.matchAll(/static let \w+ = "([\w.-]+)"/g)];
+    const declarations = [...keyEnum.matchAll(/static let \w+(?:\s*:\s*\w+)? = "([\w.-]+)"/g)];
     if (declarations.length === 0) {
       fail(`${PREFERENCES_SWIFT}: enum Key declared no preference keys`);
     }

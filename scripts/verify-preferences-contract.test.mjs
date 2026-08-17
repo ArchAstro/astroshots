@@ -177,22 +177,81 @@ test("fails when the contract doc loses its discoverability links", () => {
   });
 });
 
+/**
+ * Insert an extra `static let` into the fixture's `Key` enum. Asserts the edit
+ * landed so a reformat of Preferences.swift surfaces as a stale fixture rather
+ * than a phantom guard regression.
+ */
+function addKeyToFixture(dir, declaration) {
+  const swift = path.join(dir, "macos/Astroshots/App/Preferences.swift");
+  const text = fs.readFileSync(swift, "utf8");
+  const anchor = /( *)static let watchRoots = "watchRoots"\n/;
+  assert.match(text, anchor, "fixture must contain the watchRoots declaration");
+  const updated = text.replace(
+    anchor,
+    (line, indent) => `${line}${indent}${declaration}\n`,
+  );
+  assert.notEqual(updated, text, "fixture edit must add a key declaration");
+  fs.writeFileSync(swift, updated);
+}
+
 test("fails when a new preference key is left undocumented", () => {
+  for (const declaration of [
+    'static let undocumentedKnob = "undocumentedKnob"',
+    // Digits, underscores, and an explicit type must be scanned too.
+    'static let watchRootsV2 = "watchRoots_v2"',
+    'static let annotatedKnob: String = "annotatedKnob"',
+  ]) {
+    withFixtureRepo((dir, git) => {
+      addKeyToFixture(dir, declaration);
+      git("add", "--all");
+
+      const result = runGuard(dir);
+      assert.equal(result.status, 1, `guard must reject undocumented key: ${declaration}`);
+      assert.match(result.stderr, /does not mention the preference key/);
+    });
+  }
+});
+
+test("does not accept a short key covered only by a longer documented name", () => {
+  withFixtureRepo((dir, git) => {
+    // `overlay` is a substring of the documented `overlayEnabled`; a substring
+    // check would wave it through.
+    addKeyToFixture(dir, 'static let overlay = "overlay"');
+    git("add", "--all");
+
+    const result = runGuard(dir);
+    assert.equal(result.status, 1, "substring coverage must not count as documented");
+    assert.match(result.stderr, /does not mention the preference key "overlay"/);
+  });
+});
+
+test("fails when the doc drops a key the app still persists", () => {
+  withFixtureRepo((dir, git) => {
+    const doc = path.join(dir, "docs/PREFERENCES.md");
+    const text = fs.readFileSync(doc, "utf8");
+    assert.ok(text.includes("narrationModelReady"), "fixture doc must list the key");
+    fs.writeFileSync(doc, text.replaceAll("narrationModelReady", "removedFromDocs"));
+    git("add", "--all");
+
+    const result = runGuard(dir);
+    assert.equal(result.status, 1, "guard must notice a key missing from the doc");
+    assert.match(result.stderr, /does not mention the preference key "narrationModelReady"/);
+  });
+});
+
+test("ignores non-key string constants outside the Key enum", () => {
   withFixtureRepo((dir, git) => {
     const swift = path.join(dir, "macos/Astroshots/App/Preferences.swift");
-    fs.writeFileSync(
+    // Mirrors the real default-voice constant style: not a preference key, so
+    // it must not be demanded of the doc.
+    fs.appendFileSync(
       swift,
-      fs
-        .readFileSync(swift, "utf8")
-        .replace(
-          '        static let watchRoots = "watchRoots"',
-          '        static let watchRoots = "watchRoots"\n        static let undocumentedKnob = "undocumentedKnob"',
-        ),
+      '\nextension Preferences {\n    static let defaultVoiceName = "Ryan"\n}\n',
     );
     git("add", "--all");
 
     const result = runGuard(dir);
-    assert.equal(result.status, 1, "guard must require new keys to be documented");
-    assert.match(result.stderr, /does not mention the preference key "undocumentedKnob"/);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
   });
 });
