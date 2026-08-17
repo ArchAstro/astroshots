@@ -22,7 +22,7 @@ async function getBrowser(headed: boolean): Promise<Browser> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Could not launch Chromium. Install it with "npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser".\n${message}`,
+      `Could not launch Chromium. Install it with "npx astroshot install-browser".\n${message}`,
     );
   }
   return sharedBrowser;

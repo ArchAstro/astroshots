@@ -59,8 +59,7 @@ Prerequisites: **macOS 14+** and **Node.js 22.14+**.
    managed Chromium runtime once:
 
    ```bash
-   npx --@archastro:registry=https://registry.npmjs.org \
-     @archastro/astroshot install-browser
+   npx astroshot install-browser
    ```
 
 5. Verify the watch path from any project inside the folder selected in step 2:
@@ -289,9 +288,10 @@ screenshots and transcripts, not TTS output.
 
 ## Capture tools
 
-Astroshots publishes one fixture-driven CLI,
-[`@archastro/astroshot`](packages/astroshot), for deterministic React, Ink,
-and PTY stills plus source-aware journey movies:
+Astroshots publishes one fixture-driven CLI for deterministic React, Ink, and
+PTY stills plus source-aware journey movies. Install it as
+[`astroshot`](packages/astroshot-unscoped), the unscoped package, which needs no
+registry configuration:
 
 | Mode | Use it for | Command |
 |------|------------|---------|
@@ -305,10 +305,18 @@ Generate a typed or declarative starting fixture with `astroshot init react`,
 unless `--force` is explicit. The former `tui` command remains an alias for
 `ink`.
 
+**Two package names, one CLI.** `astroshot` is the recommended install: it
+bundles [`@archastro/astroshot`](packages/astroshot) and the three capture
+engines inside its own tarball, so it installs with no registry flags even when
+your `~/.npmrc` maps the `@archastro` scope to a private registry. The scoped
+packages remain published and fully supported — use them directly if you already
+resolve `@archastro` from the public registry. See
+[`docs/UNSCOPED-CLI-DESIGN.md`](docs/UNSCOPED-CLI-DESIGN.md).
+
 Install Chromium once for the browser-backed modes:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
+npx astroshot install-browser
 ```
 
 On Linux CI images that also need Chromium's system libraries, add
@@ -317,8 +325,7 @@ On Linux CI images that also need Chromium's system libraries, add
 Capture a React fixture:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react ./fixtures/account-dialog.tsx \
+npx astroshot react ./fixtures/account-dialog.tsx \
   -o ./screenshots/account-dialog.png
 ```
 
@@ -326,16 +333,14 @@ Capture an Ink fixture:
 
 ```bash
 npm install --save-dev ink@^7.1 react@^19
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot ink ./fixtures/install-wizard.tsx \
+npx astroshot ink ./fixtures/install-wizard.tsx \
   -o ./screenshots/install-wizard.png
 ```
 
 Capture a real Ratatui or other terminal executable through a pseudoterminal:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot pty ./fixtures/ratatui.yaml \
+npx astroshot pty ./fixtures/ratatui.yaml \
   -o ./screenshots/ratatui.png
 ```
 
@@ -387,8 +392,7 @@ To make a generated image appear in the Astroshots app, feed it to the capture
 helper:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react ./fixtures/account-dialog.tsx \
+npx astroshot react ./fixtures/account-dialog.tsx \
   -o /tmp/account-dialog.png
 
 ./bin/astroshot-capture \

@@ -16,18 +16,16 @@ when using Ink mode:
 
 ```bash
 npm install --save-dev ink@^7.1 react@^19
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot init ink
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot init pty
+npx astroshot install-browser
+npx astroshot init ink
+npx astroshot init pty
 ```
 
 Then capture either boundary:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot ink ./ink.shot.tsx -o ./ink.png
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot pty ./pty.shot.yaml -o ./ratatui.png
+npx astroshot ink ./ink.shot.tsx -o ./ink.png
+npx astroshot pty ./pty.shot.yaml -o ./ratatui.png
 ```
 
 On Linux hosts missing Chromium's system libraries, install the browser with

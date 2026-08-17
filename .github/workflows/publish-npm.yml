@@ -94,7 +94,8 @@ jobs:
             packages/react-shot \
             packages/tui-shot \
             packages/movie-harness \
-            packages/astroshot
+            packages/astroshot \
+            packages/astroshot-unscoped
           do
             package_version="$(node -p "require('./${directory}/package.json').version")"
             if [[ "$package_version" != "$TAG_VERSION" ]]; then
@@ -105,6 +106,7 @@ jobs:
           node --input-type=module <<'NODE'
           import assert from "node:assert/strict";
           import astroshot from "./packages/astroshot/package.json" with { type: "json" };
+          import unscoped from "./packages/astroshot-unscoped/package.json" with { type: "json" };
 
           const version = process.env.TAG_VERSION;
           for (const dep of [
@@ -116,6 +118,27 @@ jobs:
               astroshot.dependencies[dep],
               version,
               `@archastro/astroshot must depend on the release version of ${dep}`,
+            );
+          }
+
+          // The unscoped `astroshot` wrapper bundles the CLI and all three
+          // engines. Each must be pinned to the release version AND listed in
+          // bundleDependencies, or npm resolves it through the consumer's
+          // (hijackable) @archastro scope registry at install time.
+          for (const dep of [
+            "@archastro/react-shot",
+            "@archastro/tui-shot",
+            "@archastro/movie-harness",
+            "@archastro/astroshot",
+          ]) {
+            assert.equal(
+              unscoped.dependencies[dep],
+              version,
+              `astroshot must depend on the release version of ${dep}`,
+            );
+            assert.ok(
+              (unscoped.bundleDependencies ?? []).includes(dep),
+              `astroshot must bundle ${dep} instead of fetching it at install time`,
             );
           }
           NODE
@@ -139,6 +162,12 @@ jobs:
       - name: Publish unified CLI
         run: node scripts/publish-package.mjs @archastro/astroshot
 
+      # The unscoped `astroshot` package bundles the unified CLI, so it must be
+      # published last. It is what a plain `npx astroshot` resolves with no
+      # registry flags; see docs/UNSCOPED-CLI-DESIGN.md.
+      - name: Publish unscoped astroshot wrapper
+        run: node scripts/publish-package.mjs astroshot
+
       - name: Create GitHub Release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -153,6 +182,13 @@ jobs:
           - https://www.npmjs.com/package/@archastro/tui-shot/v/$VERSION
           - https://www.npmjs.com/package/@archastro/movie-harness/v/$VERSION
           - https://www.npmjs.com/package/@archastro/astroshot/v/$VERSION
+          - https://www.npmjs.com/package/astroshot/v/$VERSION
+
+          Install with no registry flags:
+
+          \`\`\`bash
+          npx astroshot@$VERSION --help
+          \`\`\`
 
           CLI includes \`astroshot movie\` (browser / pty / frames / desktop.window).
 
@@ -163,7 +199,7 @@ jobs:
             gh release edit "$TAG" --notes "$notes"
           else
             gh release create "$TAG" \
-              --title "@archastro/astroshot v$VERSION" \
+              --title "astroshot v$VERSION" \
               --notes "$notes" \
               --generate-notes
           fi

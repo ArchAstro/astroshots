@@ -18,14 +18,36 @@ require_reference() {
     fail "$file does not document: $text"
 }
 
+forbid_reference() {
+  local file="$1"
+  local text="$2"
+  [[ -f "$file" ]] || fail "missing $file"
+  if grep -Fq -- "$text" "$file"; then
+    fail "$file must not document: $text"
+  fi
+}
+
 # Keep the one public npx entry point discoverable in the README and capture
-# skills.
+# skills. The documented command is the plain unscoped `npx astroshot`, which is
+# installable with no registry flags because the unscoped `astroshot` package
+# bundles the @archastro packages (see docs/UNSCOPED-CLI-DESIGN.md).
 require_reference "packages/astroshot/package.json" '"name": "@archastro/astroshot"'
+require_reference "packages/astroshot-unscoped/package.json" '"name": "astroshot"'
 for file in README.md packages/astroshot/README.md \
+  packages/astroshot-unscoped/README.md \
   skills/astroshot/SKILL.md; do
-  require_reference "$file" "npx --@archastro:registry=https://registry.npmjs.org"
-  require_reference "$file" "@archastro/astroshot"
+  require_reference "$file" "npx astroshot"
+  # A registry override on an npx invocation means the plain install path
+  # regressed. The unscoped README explains the ~/.npmrc line it defends
+  # against, so forbid the CLI *flag* form rather than any mention of the key.
+  forbid_reference "$file" "npx --@archastro:registry"
+  forbid_reference "$file" "--@archastro:registry=https://registry.npmjs.org \\"
 done
+
+# No skill may reintroduce a scope-registry workaround either.
+while IFS= read -r skill_doc; do
+  forbid_reference "$skill_doc" "@archastro:registry"
+done < <(find skills -name '*.md')
 
 for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness friction-log; do
   require_reference "skills/$skill/SKILL.md" "name: $skill"

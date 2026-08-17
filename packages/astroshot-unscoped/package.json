@@ -1,0 +1,68 @@
+{
+  "name": "astroshot",
+  "version": "0.2.0",
+  "description": "One CLI for deterministic React, terminal, and movie UI captures — installable with a plain npx astroshot",
+  "keywords": [
+    "react",
+    "ink",
+    "pty",
+    "ratatui",
+    "terminal",
+    "screenshot",
+    "movie",
+    "screencast",
+    "visual-testing"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchAstro/astroshots.git",
+    "directory": "packages/astroshot-unscoped"
+  },
+  "homepage": "https://github.com/ArchAstro/astroshots#readme",
+  "bugs": {
+    "url": "https://github.com/ArchAstro/astroshots/issues"
+  },
+  "type": "module",
+  "bin": {
+    "astroshot": "bin/astroshot.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node scripts/prepare-bundle.mjs",
+    "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot && npm run build --workspace @archastro/movie-harness",
+    "test": "node scripts/assert-bundled-deps.mjs && node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "@archastro/astroshot": "0.2.0",
+    "@archastro/movie-harness": "0.2.0",
+    "@archastro/react-shot": "0.2.0",
+    "@archastro/tui-shot": "0.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@xterm/headless": "^5.5.0",
+    "playwright": "1.61.1",
+    "tsx": "^4.20.0",
+    "vite": "^6.2.0",
+    "yaml": "^2.8.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "1.2.0-beta.14"
+  },
+  "bundleDependencies": [
+    "@archastro/astroshot",
+    "@archastro/movie-harness",
+    "@archastro/react-shot",
+    "@archastro/tui-shot"
+  ]
+}

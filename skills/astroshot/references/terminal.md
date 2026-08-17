@@ -16,8 +16,7 @@ Ink capture requires project-local peers:
 
 ```bash
 npm install --save-dev ink@^7.1 react@^19
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init ink ./fixtures/install-wizard.tsx
+npx astroshot init ink ./fixtures/install-wizard.tsx
 ```
 
 Use a typed fixture:
@@ -43,8 +42,7 @@ export default {
 Capture it:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot ink ./fixtures/install-wizard.tsx \
+npx astroshot ink ./fixtures/install-wizard.tsx \
   -o ./screenshots/install-wizard.png
 ```
 
@@ -53,8 +51,7 @@ npx --@archastro:registry=https://registry.npmjs.org \
 Build the target program first, then generate a declarative fixture:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init pty ./fixtures/install-wizard.yaml
+npx astroshot init pty ./fixtures/install-wizard.yaml
 ```
 
 ```yaml
@@ -92,8 +89,7 @@ Nonzero exit fails by default; use `allowNonZeroExit: true` only for an
 intentional failure-state capture.
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot pty ./fixtures/install-wizard.yaml \
+npx astroshot pty ./fixtures/install-wizard.yaml \
   -o ./screenshots/install-wizard.png
 ```
 

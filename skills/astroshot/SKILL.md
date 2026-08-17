@@ -29,8 +29,7 @@ full application shell in a fixture merely to avoid running the application.
 The public command is:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot --help
+npx astroshot --help
 ```
 
 From a clone of the Astroshots repository, use the checked-out CLI when the
@@ -47,8 +46,7 @@ surface is `astroshot react|ink|pty|movie`.
 Install Chromium once:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot install-browser
+npx astroshot install-browser
 ```
 
 On Linux CI images that need browser system libraries, add `--with-deps`.
