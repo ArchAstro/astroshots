@@ -194,6 +194,16 @@ function checkWatchRootContract() {
   ]) {
     if (!doc.includes(claim)) fail(`${CONTRACT_DOC} must document ${claim}`);
   }
+
+  // Every persisted key must appear on the page, so adding a preference cannot
+  // silently leave the contract incomplete for external readers.
+  for (const [, key] of swift.matchAll(/static let [A-Za-z]+ = "([A-Za-z]+)"/g)) {
+    if (!doc.includes(key)) {
+      fail(
+        `${CONTRACT_DOC} does not mention the preference key "${key}" defined in ${PREFERENCES_SWIFT}`,
+      );
+    }
+  }
 }
 
 /** A tool author must be able to find the contract from the obvious entry points. */
