@@ -1,6 +1,13 @@
 import Foundation
 
 /// User-tunable settings persisted in UserDefaults.
+///
+/// Non-Swift consumers read these through the app's preferences domain
+/// (`PRODUCT_BUNDLE_IDENTIFIER` in `macos/project.yml`). The canonical domain
+/// and the watch-root read contract — `watchRoots` first, legacy singular
+/// `watchRoot` as the fallback — are documented in `docs/PREFERENCES.md` and
+/// guarded by `scripts/verify-preferences-contract.mjs`. Update that page when
+/// these keys or their precedence change.
 @MainActor
 final class Preferences {
     static let shared = Preferences()
@@ -65,6 +72,8 @@ final class Preferences {
     /// Empty until first-run (or Settings) configures folders — there is no
     /// automatic default root. Reads the former singular preference when
     /// necessary so upgrades retain the directory the user already chose.
+    /// External readers must follow the same precedence; see
+    /// `docs/PREFERENCES.md`.
     var watchRootPaths: [String] {
         get {
             if defaults.object(forKey: Key.watchRoots) != nil {

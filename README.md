@@ -238,6 +238,16 @@ Feedback is scoped to `run_id`. When the manifest has a run id, a missing or
 different `review.json.run_id` makes the current run unseen; the prior run's
 acknowledgement and comments do not carry forward, even when the bytes match.
 
+### Reading Astroshots' own settings
+
+A tool that needs to know **which folders Astroshots watches** must read the
+app's preferences domain, and must read both watch-root keys in the right order
+— reading only the current key silently reports "not configured" for an upgraded
+install, and guessing the wrong domain prefix fails the same silent way. The
+canonical domain and the full read contract are in
+[`docs/PREFERENCES.md`](docs/PREFERENCES.md), enforced by
+[`scripts/verify-preferences-contract.mjs`](scripts/verify-preferences-contract.mjs).
+
 ---
 
 ## Friction-log layout
@@ -601,6 +611,9 @@ mode, which captures React, Ink, and PTY images, streams them through
 [`scripts/verify-packages.mjs`](scripts/verify-packages.mjs) proof packs all
 four npm workspaces, installs the tarballs into a clean temporary npm project,
 and executes the public still and movie `npx` commands.
+[`scripts/verify-preferences-contract.mjs`](scripts/verify-preferences-contract.mjs)
+guards the preferences domain and watch-root read contract documented in
+[`docs/PREFERENCES.md`](docs/PREFERENCES.md).
 
 ---
 
