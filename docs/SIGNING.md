@@ -151,6 +151,7 @@ You need **all** of these names:
 - `APPLE_API_ISSUER_ID`
 - `APPLE_API_KEY_BASE64`
 - `SPARKLE_ED_PRIVATE_KEY` (Sparkle auto-update; step 10b)
+- `ARCHASTRO_RELEASE_GITHUB_TOKEN` (Homebrew cask bump; step 10c)
 
 Quick check:
 
@@ -164,6 +165,7 @@ need=(
   APPLE_API_ISSUER_ID
   APPLE_API_KEY_BASE64
   SPARKLE_ED_PRIVATE_KEY
+  ARCHASTRO_RELEASE_GITHUB_TOKEN
 )
 have="$(gh secret list --repo "$GH_REPO" --json name --jq '.[].name')"
 for s in "${need[@]}"; do
@@ -218,6 +220,40 @@ Each **Release DMG** run uploads `Astroshots-X.Y.Z.dmg` (manual install),
 
 ---
 
+### 10c. Homebrew cask bump token (one-time setup — not yet configured)
+
+`brew install --cask ArchAstro/tools/astroshots` is the primary install path, so
+**Release DMG** ends by bumping `Casks/astroshots.rb` in
+[ArchAstro/homebrew-tools](https://github.com/ArchAstro/homebrew-tools). That
+push needs a token this repository **does not have yet**:
+
+```bash
+gh secret list --repo "$GH_REPO" | grep ARCHASTRO_RELEASE_GITHUB_TOKEN
+# no output today -> the Bump Homebrew cask step will fail the release job
+```
+
+Requirements for the token value:
+
+- **Push access to `ArchAstro/homebrew-tools`** (the step commits to `main`).
+- The **same actor** used by the `ArchAstro/archastro-cli` and `ArchAstro/scopey`
+  release workflows, which already hold a secret of this exact name and push to
+  the same tap. Copy that credential rather than minting a new identity.
+- Allowed to bypass the tap's pull-request rule, if one is later enabled.
+
+```bash
+gh secret set ARCHASTRO_RELEASE_GITHUB_TOKEN --repo "$GH_REPO"
+# paste the same token used by the scopey / archastro-cli release workflows
+```
+
+Until this is set, the **Bump Homebrew cask** step fails fast with an explicit
+message instead of silently shipping a stale cask. Everything before it (build,
+sign, notarize, appcast, GitHub Release) has already completed, so the DMG and
+Sparkle update are unaffected; re-run the workflow for that tag once the secret
+exists, or bump the cask by hand with
+`scripts/update-astroshots-cask.sh` in the tap.
+
+---
+
 ### 11. Cut a release + signed DMG (not on every PR)
 
 PRs only run **tests**. To ship:
@@ -231,6 +267,11 @@ That workflow:
 - Pushes branch `release/vX.Y.Z` and tag `vX.Y.Z`
 - Opens a PR back to `main`
 - Tag push starts **Release DMG** (sign + notarize → GitHub Release)
+- **Release DMG** then bumps `Casks/astroshots.rb` in
+  [ArchAstro/homebrew-tools](https://github.com/ArchAstro/homebrew-tools), so
+  `brew install --cask ArchAstro/tools/astroshots` serves the new version with
+  no manual edit. This needs the `ARCHASTRO_RELEASE_GITHUB_TOKEN` secret (the
+  same one the ArchAstro CLI and Scopey release workflows use).
 
 ```bash
 gh workflow run "Cut release" --repo "$GH_REPO" -f bump=patch

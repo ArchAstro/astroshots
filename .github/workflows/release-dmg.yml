@@ -250,3 +250,61 @@ jobs:
           ./scripts/test-update-feed.sh \
             https://github.com/ArchAstro/astroshots/releases/download/appcast/appcast.xml \
             "$VERSION"
+
+      # First install comes from `brew install --cask ArchAstro/tools/astroshots`;
+      # Sparkle handles every update after that (the cask sets auto_updates true).
+      - name: Bump Homebrew cask
+        env:
+          GH_TOKEN: ${{ secrets.ARCHASTRO_RELEASE_GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "error: ARCHASTRO_RELEASE_GITHUB_TOKEN is not configured" >&2
+            echo >&2
+            echo "ACTION REQUIRED (one-time setup by a maintainer):" >&2
+            echo "  Add ARCHASTRO_RELEASE_GITHUB_TOKEN to this repository's secrets:" >&2
+            echo "    gh secret set ARCHASTRO_RELEASE_GITHUB_TOKEN --repo ${GITHUB_REPOSITORY}" >&2
+            echo "  Use the same token as the ArchAstro CLI and Scopey release" >&2
+            echo "  workflows; it needs push access to ArchAstro/homebrew-tools." >&2
+            echo "  See docs/SIGNING.md step 10c." >&2
+            echo >&2
+            echo "The DMG, appcast, and GitHub Release for this tag already published" >&2
+            echo "successfully; only the Homebrew cask bump was skipped. Re-run this" >&2
+            echo "workflow for the tag once the secret exists." >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+
+          # Hash the asset as published, so the cask matches what users download.
+          PUBLISHED="$RUNNER_TEMP/published"
+          mkdir -p "$PUBLISHED"
+          gh release download "$TAG" \
+            --pattern "Astroshots-${VERSION}.dmg" \
+            --dir "$PUBLISHED" \
+            --clobber
+          dmg_sha="$(shasum -a 256 "$PUBLISHED/Astroshots-${VERSION}.dmg" | cut -d ' ' -f 1)"
+          local_sha="$(shasum -a 256 "dist/Astroshots-${VERSION}.dmg" | cut -d ' ' -f 1)"
+          if [[ "$dmg_sha" != "$local_sha" ]]; then
+            echo "error: published DMG does not match the built DMG" >&2
+            echo "  published: $dmg_sha" >&2
+            echo "  built:     $local_sha" >&2
+            exit 1
+          fi
+
+          gh auth setup-git
+          git clone https://github.com/ArchAstro/homebrew-tools.git "$RUNNER_TEMP/homebrew-tools"
+          cd "$RUNNER_TEMP/homebrew-tools"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          ./scripts/update-astroshots-cask.sh "$VERSION" "$dmg_sha"
+
+          if [[ -z "$(git status --porcelain -- Casks/astroshots.rb)" ]]; then
+            echo "Homebrew cask is already current"
+            exit 0
+          fi
+
+          git add Casks/astroshots.rb
+          git commit -m "astroshots v${VERSION}"
+          git push origin main

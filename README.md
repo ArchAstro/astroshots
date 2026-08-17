@@ -41,9 +41,16 @@ icon in the menu bar.
 
 Prerequisites: **macOS 14+** and **Node.js 22.14+**.
 
-1. Download the latest **Astroshots-x.y.z.dmg** from
-   [Releases](https://github.com/ArchAstro/astroshots/releases), drag
-   **Astroshots** into **Applications**, and launch it.
+1. Install the app and launch it:
+
+   ```bash
+   brew install --cask ArchAstro/tools/astroshots
+   open -a Astroshots
+   ```
+
+   No DMG, no drag to Applications. Prefer a direct download, or hitting
+   `No available cask` because the tap change has not merged yet? Use
+   [App from a release](#app-from-a-release).
 2. Choose the folder that contains your coding projects when first-launch setup
    asks what to watch. Add more later from the menu-bar icon → gear →
    **Add folders…**.
@@ -94,18 +101,45 @@ Prerequisites: **macOS 14+** and **Node.js 22.14+**.
 The sections below cover project-local or individual skill installs, capture
 modes, movies, friction logs, and the complete file contract.
 
-### App from a release (recommended)
+### App with Homebrew (recommended)
+
+```bash
+brew install --cask ArchAstro/tools/astroshots
+open -a Astroshots
+```
+
+The cask installs the same Developer ID signed and notarized build into
+`/Applications`, straight from the release DMG. It declares `auto_updates true`,
+so Sparkle keeps handling updates and Homebrew does not fight the app's own
+self-update. To remove it: `brew uninstall --cask astroshots` (add
+`--zap` to also delete preferences and caches).
+
+> **Requires the cask to be merged in the tap.** `Casks/astroshots.rb` lives in
+> [ArchAstro/homebrew-tools](https://github.com/ArchAstro/homebrew-tools), a
+> separate repository. Until that change merges, `brew install --cask` reports
+> `No available cask` — use [App from a release](#app-from-a-release) in the
+> meantime. Verify with `brew info --cask ArchAstro/tools/astroshots`. The exact
+> files and steps to land it are in
+> [`docs/plans/2026-08-17-homebrew-cask-tap-changes.md`](docs/plans/2026-08-17-homebrew-cask-tap-changes.md).
+
+After first launch:
+
+1. Astroshots lives in the **menu bar** (no Dock icon). There is **no default watch folder**: first launch **asks which folders to watch** (the open panel starts in `~/Projects` when that folder exists).
+2. After setup it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
+3. Click the Astroshots icon → gear → **Add folders…** to watch more locations later.
+4. **Right-click** the Astroshots icon → **Quit Astroshots** to exit (left-click opens the tray).
+
+### App from a release
+
+Prefer a direct download, or not using Homebrew?
 
 1. Download the latest versioned **Astroshots-x.y.z.dmg** from [Releases](https://github.com/ArchAstro/astroshots/releases).
 2. Open the DMG and drag **Astroshots** into **Applications**.
-3. Launch Astroshots — it lives in the **menu bar** (no Dock icon). There is **no default watch folder**: first launch **asks which folders to watch** (the open panel starts in `~/Projects` when that folder exists).
-4. After setup it **warms from a local index** of known `.astroshot` folders and replays newer filesystem events, avoiding another full workspace walk.
-5. Click the Astroshots icon → gear → **Add folders…** to watch more locations later.
-6. **Right-click** the Astroshots icon → **Quit Astroshots** to exit (left-click opens the tray).
+3. Launch Astroshots and follow the same first-launch steps as above.
 
 Builds are Developer ID signed and notarized so Gatekeeper accepts a normal open.
 Installed copies can **Check for Updates…** (Sparkle) against the latest GitHub
-Release appcast.
+Release appcast, however they were installed.
 
 ### App from source
 
@@ -563,6 +597,7 @@ macOS app and npm package versions are independent tracks
 | **Actions → Cut release** | Bump macOS marketing version + build, roll changelog, tag `vX.Y.Z`, **dispatch Release DMG**, PR to main |
 | **Actions → Cut npm release** | Bump all four `@archastro/*` packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
 | [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed DMG (macOS) and npm release notes |
+| [ArchAstro/homebrew-tools](https://github.com/ArchAstro/homebrew-tools) | `Casks/astroshots.rb`, bumped automatically by **Release DMG** after the DMG is published |
 
 Both cut workflows follow the same shape as `archastro-js` / `archastro-python`
 `release.yml`: GITHUB_TOKEN tag pushes do not chain other workflows, so publish
