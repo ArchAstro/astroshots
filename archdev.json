@@ -3,5 +3,109 @@
   "local": {
     "project_id": "project_24d9568d-58a8-4db6-8d0c-0848e469f21e",
     "repo_name": "astroshots"
+  },
+  "pipelines": {
+    "branch-validation": {
+      "steps": [
+        {
+          "id": "install",
+          "run": ["npm", "ci"],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "build",
+          "run": ["npm", "run", "build", "--workspaces", "--if-present"],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "install-browser",
+          "run": [
+            "node",
+            "packages/astroshot/bin/astroshot.mjs",
+            "install-browser"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "typecheck",
+          "run": ["npm", "run", "typecheck"],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "test-cli",
+          "run": ["npm", "test", "--workspace", "@archastro/astroshot"],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "build-movie-harness",
+          "run": [
+            "npm",
+            "run",
+            "build",
+            "--workspace",
+            "@archastro/movie-harness"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "test-movie-harness",
+          "run": [
+            "npm",
+            "exec",
+            "--workspace=@archastro/movie-harness",
+            "--",
+            "vitest",
+            "run",
+            "--exclude",
+            "src/desktop-macos.test.ts"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "test-react",
+          "run": ["npm", "test", "--workspace", "@archastro/react-shot"],
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "test-tui",
+          "run": ["npm", "test", "--workspace", "@archastro/tui-shot"],
+          "timeout_seconds": 3600
+        },
+        {
+          "id": "test-contracts",
+          "run": ["npm", "run", "test:review-contract"],
+          "timeout_seconds": 900
+        },
+        {
+          "id": "test-capture-helper",
+          "run": ["npm", "run", "test:capture-helper"],
+          "timeout_seconds": 900
+        },
+        {
+          "id": "test-changelog",
+          "run": ["npm", "run", "test:changelog"],
+          "timeout_seconds": 900
+        },
+        {
+          "id": "verify-skills",
+          "run": ["npm", "run", "verify:skills"],
+          "env": {
+            "ASTROSHOTS_VERIFY_INTEGRATION": "1"
+          },
+          "timeout_seconds": 1800
+        },
+        {
+          "id": "pack-check",
+          "run": ["npm", "run", "pack:check"],
+          "env": {
+            "ASTROSHOTS_VERIFY_PACKAGES_CAPTURE": "1"
+          },
+          "timeout_seconds": 1800
+        }
+      ]
+    }
+  },
+  "pipeline_bindings": {
+    "branch_update": "branch-validation"
   }
 }
