@@ -11,6 +11,25 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **Unscoped `astroshot` npm package:** `npx astroshot` now works with no
+  registry flags. The new package bundles `@archastro/astroshot` and its three
+  capture engines via `bundleDependencies`, so nothing scoped is fetched at
+  install time and a `~/.npmrc` that maps `@archastro` to a private registry can
+  no longer produce an E404. `npm run pack:check` proves this by installing the
+  package with `@archastro` pointed at an unreachable registry and then running
+  the CLI. See [`docs/UNSCOPED-CLI-DESIGN.md`](docs/UNSCOPED-CLI-DESIGN.md).
+
+### Changed
+
+- **The documented install path is now a plain command:** every
+  `npx --@archastro:registry=… @archastro/astroshot …` invocation in the README,
+  the package READMEs, the skills, and the go-live checklist is now
+  `npx astroshot …`. Chromium setup errors from `react-shot` and `tui-shot`
+  point at the same plain command. The scoped packages keep working unchanged
+  for existing consumers.
+
 ## [0.2.8] (macos) - 2026-08-14
 
 ### Added

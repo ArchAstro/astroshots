@@ -4,19 +4,13 @@ One command for deterministic React, Ink, and arbitrary terminal screenshots —
 plus **journey movies** into `.astroshot/`.
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init react
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init ink
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init pty
+npx astroshot init react
+npx astroshot init ink
+npx astroshot init pty
 
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react ./react.shot.tsx -o ./react.png
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot ink ./ink.shot.tsx -o ./ink.png
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot pty ./pty.shot.yaml -o ./terminal.png
+npx astroshot react ./react.shot.tsx -o ./react.png
+npx astroshot ink ./ink.shot.tsx -o ./ink.png
+npx astroshot pty ./pty.shot.yaml -o ./terminal.png
 ```
 
 ## Movies (`astroshot movie`)
@@ -57,8 +51,7 @@ npm install --save-dev ink@^7.1 react@^19
 Install the shared Chromium runtime once:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot install-browser
+npx astroshot install-browser
 ```
 
 Use `react batch <manifest>` or `ink batch <manifest>` for maintained fixture

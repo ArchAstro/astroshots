@@ -8,8 +8,7 @@ state without a running application.
 Generate a starting fixture:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot init react ./fixtures/account-dialog.tsx
+npx astroshot init react ./fixtures/account-dialog.tsx
 ```
 
 A fixture default-exports the component and capture metadata:
@@ -32,8 +31,7 @@ export default {
 Capture it:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react ./fixtures/account-dialog.tsx \
+npx astroshot react ./fixtures/account-dialog.tsx \
   -o ./screenshots/account-dialog.png
 ```
 

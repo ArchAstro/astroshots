@@ -81,14 +81,16 @@ access before anything else will work.
   ASTROSHOTS_VERIFY_PACKAGES_CAPTURE=1 npm run pack:check
   ```
 
-- [ ] Confirm all three manifests say `0.1.0`:
+- [ ] Confirm every manifest reports the same version:
 
   ```bash
   node -e '
   for (const path of [
     "./packages/react-shot/package.json",
     "./packages/tui-shot/package.json",
+    "./packages/movie-harness/package.json",
     "./packages/astroshot/package.json",
+    "./packages/astroshot-unscoped/package.json",
   ]) {
     const pkg = require(path);
     console.log(pkg.name, pkg.version);
@@ -96,13 +98,21 @@ access before anything else will work.
   '
   ```
 
-  Expected:
+  Expected (five lines, one shared version):
 
   ```text
   @archastro/react-shot 0.1.0
   @archastro/tui-shot 0.1.0
+  @archastro/movie-harness 0.1.0
   @archastro/astroshot 0.1.0
+  astroshot 0.1.0
   ```
+
+  The last line is the **unscoped** `astroshot` package: the public entry point
+  that a plain `npx astroshot` resolves with no registry flags. It bundles the
+  four scoped packages above via `bundleDependencies`, which is why nothing
+  scoped is fetched at install time. See
+  [`UNSCOPED-CLI-DESIGN.md`](./UNSCOPED-CLI-DESIGN.md).
 
 **STOP if:** a test fails, the worktree becomes dirty, or the versions differ.
 Do not publish a package you have not just proven.
@@ -113,7 +123,7 @@ npm requires each package to exist before GitHub trusted publishing can be
 authorized. Do this from the **monorepo root** after `npm ci` and build.
 
 ArchAstro machines often map `@archastro` → GitHub Packages. Always force
-the scope to the public registry:
+the scope to the public registry for the four **scoped** packages:
 
 ```bash
 # From repo root (directory with workspaces: packages/*)
@@ -124,12 +134,26 @@ npm publish \
   --provenance=false
 ```
 
+The unscoped `astroshot` package needs no scope override, because its own name
+is not scoped:
+
+```bash
+npm publish \
+  --workspace astroshot \
+  --access public \
+  --provenance=false
+```
+
+Its `prepack` builds all three engines and materializes the bundle, so publish
+it from a tree where `npm ci` has already run.
+
 Order for a full bootstrap:
 
 1. `@archastro/react-shot`
 2. `@archastro/tui-shot`
-3. `@archastro/movie-harness` (new — required for `astroshot movie`)
-4. `@archastro/astroshot` **last** (depends on the three engines)
+3. `@archastro/movie-harness` (required for `astroshot movie`)
+4. `@archastro/astroshot` (depends on the three engines)
+5. `astroshot` — the unscoped wrapper, **last** (bundles the unified CLI)
 
 `--provenance=false` is only for these first manual publishes. Later releases
 use **Cut npm release** + OIDC provenance via `publish-npm.yml`.
@@ -147,7 +171,8 @@ under `packages/` (pull `main`).
     @archastro/react-shot \
     @archastro/tui-shot \
     @archastro/movie-harness \
-    @archastro/astroshot
+    @archastro/astroshot \
+    astroshot
   do
     npm view "$PACKAGE" name version \
       --registry=https://registry.npmjs.org
@@ -162,7 +187,8 @@ under `packages/` (pull `main`).
     @archastro/react-shot \
     @archastro/tui-shot \
     @archastro/movie-harness \
-    @archastro/astroshot
+    @archastro/astroshot \
+    astroshot
   do
     npm trust github "$PACKAGE" \
       --repo ArchAstro/astroshots \
@@ -200,7 +226,18 @@ Do not add an npm token to GitHub secrets.
   The bootstrap versions already exist, so the workflow should verify that
   their tarballs match the tag and safely skip republishing them.
 
-- [ ] Prove a public user can run the CLI:
+- [ ] Prove a public user can run the CLI with **no registry flags**. This is
+      the acceptance test for the unscoped package — run it on a machine whose
+      `~/.npmrc` maps `@archastro` to GitHub Packages, because that is the
+      configuration that used to fail with E404:
+
+  ```bash
+  npx --yes astroshot@0.1.0 --help
+  ```
+
+- [ ] Prove the scoped package still works for existing consumers (it needs the
+      scope override on such a machine, which is exactly why the unscoped
+      package exists):
 
   ```bash
   npx --yes \
@@ -224,10 +261,12 @@ Do not add an npm token to GitHub secrets.
 
 You are done when all five are true:
 
-- [ ] The four npm package pages show a published version
-      (`react-shot`, `tui-shot`, `movie-harness`, `astroshot`)
+- [ ] The five npm package pages show a published version
+      (`react-shot`, `tui-shot`, `movie-harness`, `@archastro/astroshot`, and
+      the unscoped `astroshot`)
 - [ ] `Publish npm package` is green for the latest `astroshot-v*` tag
-- [ ] The public `npx` command prints help, including `astroshot movie`
+- [ ] Plain `npx astroshot --help` prints help, including `astroshot movie`,
+      on a machine with `@archastro` mapped to a private registry
 - [ ] A project-local install discovers all five skills
 - [x] The signed macOS v0.1.7 DMG is downloadable
 
@@ -235,23 +274,22 @@ You are done when all five are true:
 
 ## Next npm release (after packages are live)
 
-1. Ensure `@archastro/movie-harness` exists on npmjs and has
-   `npm trust github` for `publish-npm.yml` (one-time bootstrap if new).
+1. Ensure every package exists on npmjs and has `npm trust github` for
+   `publish-npm.yml` (one-time bootstrap if new). The unscoped `astroshot`
+   package needs its own trust entry.
 2. Add notes under `## [Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).
 3. **Actions → Cut npm release → patch / minor / major** (or
    `gh workflow run "Cut npm release" -f bump=minor`).
-4. Confirm **Publish npm package** is green and all **four** package pages
+4. Confirm **Publish npm package** is green and all **five** package pages
    show the new version with provenance.
-5. Smoke:
+5. Smoke the documented plain command:
 
    ```bash
-   npx --yes --@archastro:registry=https://registry.npmjs.org \
-     @archastro/astroshot@<version> --help
-   npx --yes --@archastro:registry=https://registry.npmjs.org \
-     @archastro/astroshot@<version> movie --help
+   npx --yes astroshot@<version> --help
+   npx --yes astroshot@<version> movie --help
    ```
 
-The cut workflow bumps all four packages, rolls the changelog, tags
+The cut workflow bumps all five packages, rolls the changelog, tags
 `astroshot-vX.Y.Z`, dispatches publish, and opens a PR to main.
 
 Manual fallback (if Actions is unavailable) is still documented in the root

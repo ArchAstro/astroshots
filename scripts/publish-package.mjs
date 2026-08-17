@@ -11,6 +11,9 @@ const allowedPackages = new Map([
   ["@archastro/tui-shot", "packages/tui-shot/package.json"],
   ["@archastro/movie-harness", "packages/movie-harness/package.json"],
   ["@archastro/astroshot", "packages/astroshot/package.json"],
+  // Unscoped wrapper. Publish LAST: it bundles the unified CLI, which depends
+  // on the three engines.
+  ["astroshot", "packages/astroshot-unscoped/package.json"],
 ]);
 
 if (!allowedPackages.has(packageName)) {

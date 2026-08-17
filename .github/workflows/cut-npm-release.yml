@@ -1,8 +1,9 @@
 name: Cut npm release
 
 # Manually trigger from the Actions tab to:
-#   1. Bump all four @archastro/* packages to the same version
-#      (react-shot, tui-shot, movie-harness, astroshot)
+#   1. Bump all five public packages to the same version
+#      (react-shot, tui-shot, movie-harness, @archastro/astroshot, and the
+#      unscoped astroshot wrapper)
 #   2. Roll CHANGELOG.md Unreleased → ## [X.Y.Z] (npm)
 #   3. Push tag astroshot-vX.Y.Z
 #   4. Explicitly dispatch Publish npm package (GITHUB_TOKEN tag pushes do
@@ -77,7 +78,8 @@ jobs:
             packages/react-shot \
             packages/tui-shot \
             packages/movie-harness \
-            packages/astroshot
+            packages/astroshot \
+            packages/astroshot-unscoped
           do
             package_version="$(node -p "require('./${directory}/package.json').version")"
             if [[ "$package_version" != "$CUR" ]]; then
@@ -150,6 +152,7 @@ jobs:
             packages/tui-shot/package.json \
             packages/movie-harness/package.json \
             packages/astroshot/package.json \
+            packages/astroshot-unscoped/package.json \
             package-lock.json \
             CHANGELOG.md
           git commit -m "release: npm $TAG"

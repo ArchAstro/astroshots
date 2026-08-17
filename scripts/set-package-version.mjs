@@ -18,6 +18,8 @@ const packagePaths = [
   "packages/tui-shot/package.json",
   "packages/movie-harness/package.json",
   "packages/astroshot/package.json",
+  // Unscoped `astroshot`; bundles the four packages above.
+  "packages/astroshot-unscoped/package.json",
 ];
 
 const engineDeps = [
@@ -25,6 +27,9 @@ const engineDeps = [
   "@archastro/tui-shot",
   "@archastro/movie-harness",
 ];
+
+/** The unscoped wrapper bundles the unified CLI as well, so it pins all four. */
+const wrapperBundledDeps = [...engineDeps, "@archastro/astroshot"];
 
 for (const packagePath of packagePaths) {
   const absolutePath = path.join(root, packagePath);
@@ -42,6 +47,23 @@ for (const packagePath of packagePaths) {
     }
   }
 
+  if (packageJson.name === "astroshot") {
+    for (const dep of wrapperBundledDeps) {
+      if (!(dep in (packageJson.dependencies ?? {}))) {
+        throw new Error(
+          `astroshot is missing dependency ${dep}; cannot set release version`,
+        );
+      }
+      if (!(packageJson.bundleDependencies ?? []).includes(dep)) {
+        throw new Error(
+          `astroshot must bundle ${dep}; a plain dependency would be resolved ` +
+            "through the consumer's @archastro scope registry at install time",
+        );
+      }
+      packageJson.dependencies[dep] = version;
+    }
+  }
+
   fs.writeFileSync(absolutePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
@@ -51,5 +73,6 @@ execFileSync("npm", ["install", "--package-lock-only"], {
 });
 
 console.log(
-  `Set react-shot, tui-shot, movie-harness, and astroshot (+ engine deps) to ${version}.`,
+  "Set react-shot, tui-shot, movie-harness, astroshot (+ engine deps), and the " +
+    `unscoped astroshot wrapper (+ bundled deps) to ${version}.`,
 );

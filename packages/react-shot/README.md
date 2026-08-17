@@ -17,11 +17,11 @@ Node.js 22.14 or newer is required. Install the package's compatible Chromium
 build once:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser
+npx astroshot install-browser
 ```
 
 On a Linux machine that also needs Chromium's operating-system libraries, run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser --with-deps`.
+`npx astroshot install-browser --with-deps`.
 
 Then create `example.shot.tsx`:
 
@@ -50,8 +50,7 @@ export default {
 Capture it without a permanent install:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react example.shot.tsx --out welcome.png
+npx astroshot react example.shot.tsx --out welcome.png
 ```
 
 Or install the unified package and use `astroshot` in project scripts:
@@ -134,8 +133,7 @@ the manifest file. Destinations are normalized and checked as a complete batch
 before capture; duplicate and case-only colliding output paths are rejected:
 
 ```bash
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot react batch shots.yaml
+npx astroshot react batch shots.yaml
 ```
 
 ## Programmatic API
@@ -170,7 +168,7 @@ It does not provide a sandbox for fixture code.
 ## Troubleshooting
 
 - `Executable doesn't exist`: run
-  `npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot install-browser`.
+  `npx astroshot install-browser`.
 - Import failures: pass `--root` or define `root` and `alias` in the config.
 - Missing styles: add their entry files to `styles`; CSS is not inferred.
 - A modal includes a dimmer: target `[role=dialog]` or set
@@ -179,5 +177,5 @@ It does not provide a sandbox for fixture code.
   deterministic providers, or capture the running application instead.
 
 Run
-`npx --@archastro:registry=https://registry.npmjs.org @archastro/astroshot react --help`
+`npx astroshot react --help`
 for all CLI options.
