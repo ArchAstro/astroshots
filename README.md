@@ -74,8 +74,7 @@ Prerequisites: **macOS 14+** and **Node.js 22.14+**.
 
    ```bash
    cd /path/to/your/project
-   npx --@archastro:registry=https://registry.npmjs.org \
-     @archastro/astroshot demo
+   npx astroshot demo
    ```
 
    `astroshot demo` writes real stills, a movie poster+video pair, and a
@@ -87,8 +86,7 @@ Prerequisites: **macOS 14+** and **Node.js 22.14+**.
 6. If nothing appears — or before filing a bug — diagnose it in one line:
 
    ```bash
-   npx --@archastro:registry=https://registry.npmjs.org \
-     @archastro/astroshot doctor
+   npx astroshot doctor
    ```
 
    `doctor` reports Node version, whether this project is inside a folder
