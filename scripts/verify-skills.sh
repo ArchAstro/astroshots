@@ -65,8 +65,12 @@ require_reference "skills/astroshot/SKILL.md" "astroshot demo"
 require_reference "skills/astroshot/SKILL.md" "astroshot doctor"
 require_reference "skills/astroshots-review/SKILL.md" "astroshot demo"
 require_reference "skills/astroshots-review/SKILL.md" "astroshot doctor"
-require_reference "README.md" "@archastro/astroshot demo"
-require_reference "README.md" "@archastro/astroshot doctor"
+# The README must keep both first-win verbs discoverable. Assert the plain
+# unscoped form, not `@archastro/astroshot demo`: the scoped invocation requires
+# a registry override that the line above forbids, so requiring it here would
+# contradict the unscoped install path (docs/UNSCOPED-CLI-DESIGN.md).
+require_reference "README.md" "npx astroshot demo"
+require_reference "README.md" "npx astroshot doctor"
 require_reference "skills/astroshots-review/SKILL.md" "full-screen controls"
 require_reference "skills/astroshots-review/references/manifest.md" "duration_ms"
 require_reference "skills/screenshot/SKILL.md" "movie badge/filter"

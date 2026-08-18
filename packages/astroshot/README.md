@@ -8,13 +8,11 @@ plus **journey movies** into `.astroshot/`.
 ```bash
 # Write a real .astroshot/ set: stills + movie poster/video + manifest.json.
 # No Chromium download, no assets of your own; works with the app closed.
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot demo
+npx astroshot demo
 
 # Check Node, watched folders, app install/run state, Chromium, and macOS
 # Screen Recording. Each failure prints the exact fix command. Read-only.
-npx --@archastro:registry=https://registry.npmjs.org \
-  @archastro/astroshot doctor
+npx astroshot doctor
 ```
 
 `demo` accepts `--feature <name>`, `--root <dir>`, and `--json`. `doctor`
