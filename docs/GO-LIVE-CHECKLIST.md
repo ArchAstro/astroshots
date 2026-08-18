@@ -11,14 +11,30 @@ Checked on **July 29, 2026**:
       [v0.1.7](https://github.com/ArchAstro/astroshots/releases/tag/v0.1.7)
 - [x] `Astroshots.dmg` is signed, notarized, and attached to that release
 - [x] The five agent skills are on `main` and install directly from GitHub
-- [ ] The three npm packages are **not published yet**
+- [ ] The npm packages are **not published yet**
 - [ ] npm trusted publishing is **not configured yet**
 
-The npm release to publish now is **0.1.0**:
+Five packages publish together at one shared version — the four scoped packages
+plus the **unscoped** `astroshot`, which is what a plain `npx astroshot`
+resolves with no registry flags:
 
 1. `@archastro/react-shot`
 2. `@archastro/tui-shot`
-3. `@archastro/astroshot`
+3. `@archastro/movie-harness`
+4. `@archastro/astroshot`
+5. `astroshot` — unscoped wrapper, published **last** (it bundles the CLI)
+
+Do not hardcode the release version below. Read it from the manifest once and
+reuse it, so this checklist cannot drift from the workspaces. Run this from the
+repository root, and re-run it in every new shell you open — an **empty**
+`$VERSION` would tag `astroshot-v` and make `npx astroshot@` silently resolve
+`latest` instead of the version you just proved:
+
+```bash
+VERSION="$(node -p 'require("./packages/astroshot/package.json").version')"
+test -n "$VERSION" || echo "STOP: VERSION is empty — are you in the repo root?"
+echo "$VERSION"
+```
 
 Budget **15–25 minutes** if your npm account already belongs to the
 `@archastro` organization. Stop after any failed command. Fix that failure
@@ -98,14 +114,14 @@ access before anything else will work.
   '
   ```
 
-  Expected (five lines, one shared version):
+  Expected: five lines that all report the **same** version as `$VERSION`:
 
   ```text
-  @archastro/react-shot 0.1.0
-  @archastro/tui-shot 0.1.0
-  @archastro/movie-harness 0.1.0
-  @archastro/astroshot 0.1.0
-  astroshot 0.1.0
+  @archastro/react-shot <VERSION>
+  @archastro/tui-shot <VERSION>
+  @archastro/movie-harness <VERSION>
+  @archastro/astroshot <VERSION>
+  astroshot <VERSION>
   ```
 
   The last line is the **unscoped** `astroshot` package: the public entry point
@@ -215,9 +231,9 @@ Do not add an npm token to GitHub secrets.
   test -z "$(git status --porcelain)"
   test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
-  git tag -a astroshot-v0.1.0 \
-    -m "Release @archastro/astroshot 0.1.0"
-  git push origin astroshot-v0.1.0
+  git tag -a "astroshot-v$VERSION" \
+    -m "Release astroshot $VERSION"
+  git push origin "astroshot-v$VERSION"
   ```
 
 - [ ] Watch **Actions → Publish npm package**:
@@ -232,7 +248,7 @@ Do not add an npm token to GitHub secrets.
       configuration that used to fail with E404:
 
   ```bash
-  npx --yes astroshot@0.1.0 --help
+  npx --yes "astroshot@$VERSION" --help
   ```
 
 - [ ] Prove the scoped package still works for existing consumers (it needs the
@@ -242,7 +258,7 @@ Do not add an npm token to GitHub secrets.
   ```bash
   npx --yes \
     --@archastro:registry=https://registry.npmjs.org \
-    @archastro/astroshot@0.1.0 --help
+    @archastro/astroshot@"$VERSION" --help
   ```
 
 - [ ] Prove the skills install into a project:
