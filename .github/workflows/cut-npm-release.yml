@@ -5,10 +5,14 @@ name: Cut npm release
 #      (react-shot, tui-shot, movie-harness, @archastro/astroshot, and the
 #      unscoped astroshot wrapper)
 #   2. Roll CHANGELOG.md Unreleased → ## [X.Y.Z] (npm)
-#   3. Push tag astroshot-vX.Y.Z
-#   4. Explicitly dispatch Publish npm package (GITHUB_TOKEN tag pushes do
+#   3. Open a PR back to main and rebase-merge it, so main carries the bump
+#   4. Tag the merged commit on main as astroshot-vX.Y.Z
+#   5. Explicitly dispatch Publish npm package (GITHUB_TOKEN tag pushes do
 #      not trigger other workflows)
-#   5. Open a PR back to main so main tracks the bump
+#
+# Steps 3 and 4 are in that order on purpose: publish-npm.yml rejects any tag
+# whose commit is not already in origin/main, and rebase-merge rewrites SHAs,
+# so a tag cut before the merge can never satisfy that gate.
 #
 # Same shape as archastro-js release.yml. First-time package publish still
 # requires a manual bootstrap + npm trust github for each new package
@@ -157,27 +161,13 @@ jobs:
             CHANGELOG.md
           git commit -m "release: npm $TAG"
           git push origin "$BRANCH"
-
-      - name: Create + push tag
-        env:
-          TAG: ${{ steps.bump.outputs.tag }}
-        run: |
-          set -euo pipefail
-          git tag -a "$TAG" -m "Release @archastro/astroshot ${TAG#astroshot-v}"
-          git push origin "$TAG"
-
-      - name: Dispatch Publish npm package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.bump.outputs.tag }}
-        run: |
-          set -euo pipefail
-          gh workflow run "Publish npm package" \
-            --repo "${{ github.repository }}" \
-            --ref "$TAG"
-          echo "Dispatched Publish npm package for $TAG" >>"$GITHUB_STEP_SUMMARY"
-
-      - name: Open PR back to main
+      # Order matters. `publish-npm.yml` refuses any tag whose commit is not
+      # already contained in origin/main, and this repository allows ONLY
+      # rebase-merge, which rewrites the commit SHA. Tagging the release branch
+      # and dispatching before the merge therefore produced a tag that could
+      # never satisfy that gate. Merge first, then tag whatever main became.
+      - name: Open + merge the release PR
+        id: release_pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.bump.outputs.branch }}
@@ -192,12 +182,12 @@ jobs:
           | | |
           |--|--|
           | Version | \`$CUR\` → \`$NEXT\` |
-          | Tag | \`$TAG\` |
-          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/movie-harness\`, \`@archastro/astroshot\` |
-          | Publish | **Publish npm package** (explicitly dispatched after the tag) |
+          | Tag | \`$TAG\` (pushed after this PR merges) |
+          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/movie-harness\`, \`@archastro/astroshot\`, \`astroshot\` |
+          | Publish | **Publish npm package** (dispatched once the tag is on main) |
           | Changelog | \`## [$NEXT] (npm)\` rolled from Unreleased |
 
-          Once checks pass, merge so \`main\` tracks the published version.
+          Merging this PR is what allows the release to publish.
           EOF
           )
           pr_url=$(gh pr create \
@@ -206,11 +196,59 @@ jobs:
             --title "release: npm $TAG" \
             --body "$body")
           echo "Opened $pr_url" >>"$GITHUB_STEP_SUMMARY"
-          echo "PR: $pr_url"
 
-          if gh pr merge "$pr_url" --squash --delete-branch 2>/dev/null; then
-            echo "Merged $pr_url"
-          else
-            echo "Left PR open (merge when ready): $pr_url"
-            gh pr merge "$pr_url" --auto --squash 2>/dev/null || true
+          # --rebase, not --squash: squash merging is disabled on this repo, so
+          # the old --squash call always failed and silently left the PR open.
+          merged=0
+          for attempt in $(seq 1 30); do
+            if gh pr merge "$pr_url" --rebase --delete-branch; then
+              merged=1
+              break
+            fi
+            echo "Not mergeable yet (attempt $attempt/30); waiting for checks…"
+            sleep 20
+          done
+          if [[ "$merged" != "1" ]]; then
+            echo "Could not merge $pr_url — nothing tagged, nothing published." >&2
+            echo "Merge it by hand, then re-run this workflow." >&2
+            exit 1
           fi
+          echo "Merged $pr_url" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Tag the release commit now on main
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git checkout -B main origin/main
+          # The rebase-merge produced a new SHA; prove it really carries this
+          # release before pinning a tag to it.
+          for directory in \
+            packages/react-shot \
+            packages/tui-shot \
+            packages/movie-harness \
+            packages/astroshot \
+            packages/astroshot-unscoped
+          do
+            actual="$(node -p "require('./${directory}/package.json').version")"
+            if [[ "$actual" != "$NEXT" ]]; then
+              echo "main has $directory at $actual, expected $NEXT" >&2
+              exit 1
+            fi
+          done
+          git tag -a "$TAG" -m "Release astroshot $NEXT"
+          git push origin "$TAG"
+          echo "Tagged $(git rev-parse --short HEAD) as $TAG" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch Publish npm package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run "Publish npm package" \
+            --repo "${{ github.repository }}" \
+            --ref "$TAG"
+          echo "Dispatched Publish npm package for $TAG" >>"$GITHUB_STEP_SUMMARY"
