@@ -1,6 +1,6 @@
 {
   "name": "@archastro/astroshot",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "One CLI for deterministic React, terminal, and movie UI captures",
   "keywords": [
     "react",
@@ -72,8 +72,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@archastro/movie-harness": "0.2.0",
-    "@archastro/react-shot": "0.2.0",
-    "@archastro/tui-shot": "0.2.0"
+    "@archastro/movie-harness": "0.2.1",
+    "@archastro/react-shot": "0.2.1",
+    "@archastro/tui-shot": "0.2.1"
   }
 }

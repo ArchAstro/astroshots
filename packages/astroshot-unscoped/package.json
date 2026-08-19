@@ -1,6 +1,6 @@
 {
   "name": "astroshot",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "One CLI for deterministic React, terminal, and movie UI captures — installable with a plain npx astroshot",
   "keywords": [
     "react",
@@ -45,10 +45,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@archastro/astroshot": "0.2.0",
-    "@archastro/movie-harness": "0.2.0",
-    "@archastro/react-shot": "0.2.0",
-    "@archastro/tui-shot": "0.2.0",
+    "@archastro/astroshot": "0.2.1",
+    "@archastro/movie-harness": "0.2.1",
+    "@archastro/react-shot": "0.2.1",
+    "@archastro/tui-shot": "0.2.1",
     "@vitejs/plugin-react": "^5.2.0",
     "@xterm/headless": "^5.5.0",
     "playwright": "1.61.1",

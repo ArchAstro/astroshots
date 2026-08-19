@@ -1,6 +1,6 @@
 {
   "name": "@archastro/movie-harness",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Universal movie capture harness for browser, PTY, desktop, and raw frames into .astroshot/",
   "keywords": [
     "astroshots",
