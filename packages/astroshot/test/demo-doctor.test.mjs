@@ -255,7 +255,14 @@ test("doctor prints a fix line for each failure and never mutates state", () => 
     assert.ok([0, 1].includes(result.status), result.stderr);
     assert.match(result.stdout, /astroshot doctor —/);
     assert.match(result.stdout, /Node\.js version \[required\]/);
-    assert.match(result.stdout, /Watched folder covers this project \[required\]/);
+    // Watch coverage is only enforceable where the review app can run; off
+    // macOS doctor reports it as an optional skip, so assert the tag the
+    // platform actually contracts for instead of assuming macOS.
+    const watchTag = process.platform === "darwin" ? "required" : "optional";
+    assert.match(
+      result.stdout,
+      new RegExp(`Watched folder covers this project \\[${watchTag}\\]`),
+    );
     assert.match(result.stdout, /Managed Chromium runtime \[optional\]/);
     const failureLines = result.stdout
       .split("\n")
