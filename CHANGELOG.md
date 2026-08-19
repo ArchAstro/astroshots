@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.1] (npm) - 2026-08-19
+
 ### Added
 
 - **Unscoped `astroshot` npm package:** `npx astroshot` now works with no
