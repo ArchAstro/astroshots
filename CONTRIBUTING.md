@@ -21,7 +21,8 @@ node packages/astroshot/bin/astroshot.mjs install-browser
 npm run check
 ```
 
-For the macOS app, install Xcode 16 and XcodeGen:
+For the macOS app, install Xcode 26 or later (Swift tools 6.2, required by
+mlx-audio-swift) and XcodeGen:
 
 ```bash
 cd macos
@@ -75,7 +76,8 @@ repository's [MIT License](LICENSE) and that you will follow the
 
 ## Releases
 
-Maintainers cut releases from GitHub Actions (see root README):
+Maintainers cut releases from GitHub Actions (see
+[`docs/releasing.md`](docs/releasing.md)):
 
 - **Cut release** — macOS app version + signed DMG
 - **Cut npm release** — `@archastro/*` packages via OIDC trusted publishing

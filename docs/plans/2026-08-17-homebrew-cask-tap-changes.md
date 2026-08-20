@@ -336,8 +336,8 @@ fails CI. `actionlint` + `shellcheck` clean.
 ## After the tap merges
 
 1. Confirm the cask resolves: `brew info --cask ArchAstro/tools/astroshots`.
-2. Drop the "Requires the cask to be merged in the tap" caveat from this repo's
-   README Homebrew section and the `No available cask` aside in the Quickstart.
+2. Drop the "Requires the cask to be merged in the tap" caveat from
+   `docs/install.md` and the `No available cask` aside in the README Quick Start.
 3. Add `ARCHASTRO_RELEASE_GITHUB_TOKEN` to this repo's secrets
    (`docs/SIGNING.md` step 10c) so the next release bumps the cask automatically
    instead of failing the `Bump Homebrew cask` step.
