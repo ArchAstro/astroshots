@@ -5,7 +5,7 @@ new frames as desktop overlays, and streams them from every worktree in one list
 
 Design source: [`../docs/mocks/astroshots-menubar.html`](../docs/mocks/astroshots-menubar.html).
 
-Requires macOS 14+ (Apple Silicon for narration), Xcode 16+,
+Requires macOS 14+ (Apple Silicon for narration), Xcode 26+,
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 Narration pulls **mlx-audio-swift** (→ **mlx-swift**). That stack needs:

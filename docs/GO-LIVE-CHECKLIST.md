@@ -308,8 +308,8 @@ You are done when all five are true:
 The cut workflow bumps all five packages, rolls the changelog, tags
 `astroshot-vX.Y.Z`, dispatches publish, and opens a PR to main.
 
-Manual fallback (if Actions is unavailable) is still documented in the root
-README history and `npm run version:packages -- X.Y.Z`.
+Manual fallback (if Actions is unavailable) is still documented in
+[`releasing.md`](releasing.md) and `npm run version:packages -- X.Y.Z`.
 
 ---
 
