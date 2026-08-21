@@ -4,17 +4,29 @@
     "project_id": "project_24d9568d-58a8-4db6-8d0c-0848e469f21e",
     "repo_name": "astroshots"
   },
+  "publish": {
+    "auto": true
+  },
   "pipelines": {
     "branch-validation": {
       "steps": [
         {
           "id": "install",
-          "run": ["npm", "ci"],
+          "run": [
+            "npm",
+            "ci"
+          ],
           "timeout_seconds": 1800
         },
         {
           "id": "build",
-          "run": ["npm", "run", "build", "--workspaces", "--if-present"],
+          "run": [
+            "npm",
+            "run",
+            "build",
+            "--workspaces",
+            "--if-present"
+          ],
           "timeout_seconds": 1800
         },
         {
@@ -28,12 +40,21 @@
         },
         {
           "id": "typecheck",
-          "run": ["npm", "run", "typecheck"],
+          "run": [
+            "npm",
+            "run",
+            "typecheck"
+          ],
           "timeout_seconds": 1800
         },
         {
           "id": "test-cli",
-          "run": ["npm", "test", "--workspace", "@archastro/astroshot"],
+          "run": [
+            "npm",
+            "test",
+            "--workspace",
+            "@archastro/astroshot"
+          ],
           "timeout_seconds": 1800
         },
         {
@@ -63,32 +84,58 @@
         },
         {
           "id": "test-react",
-          "run": ["npm", "test", "--workspace", "@archastro/react-shot"],
+          "run": [
+            "npm",
+            "test",
+            "--workspace",
+            "@archastro/react-shot"
+          ],
           "timeout_seconds": 1800
         },
         {
           "id": "test-tui",
-          "run": ["npm", "test", "--workspace", "@archastro/tui-shot"],
+          "run": [
+            "npm",
+            "test",
+            "--workspace",
+            "@archastro/tui-shot"
+          ],
           "timeout_seconds": 3600
         },
         {
           "id": "test-contracts",
-          "run": ["npm", "run", "test:review-contract"],
+          "run": [
+            "npm",
+            "run",
+            "test:review-contract"
+          ],
           "timeout_seconds": 900
         },
         {
           "id": "test-capture-helper",
-          "run": ["npm", "run", "test:capture-helper"],
+          "run": [
+            "npm",
+            "run",
+            "test:capture-helper"
+          ],
           "timeout_seconds": 900
         },
         {
           "id": "test-changelog",
-          "run": ["npm", "run", "test:changelog"],
+          "run": [
+            "npm",
+            "run",
+            "test:changelog"
+          ],
           "timeout_seconds": 900
         },
         {
           "id": "verify-skills",
-          "run": ["npm", "run", "verify:skills"],
+          "run": [
+            "npm",
+            "run",
+            "verify:skills"
+          ],
           "env": {
             "ASTROSHOTS_VERIFY_INTEGRATION": "1"
           },
@@ -96,7 +143,11 @@
         },
         {
           "id": "pack-check",
-          "run": ["npm", "run", "pack:check"],
+          "run": [
+            "npm",
+            "run",
+            "pack:check"
+          ],
           "env": {
             "ASTROSHOTS_VERIFY_PACKAGES_CAPTURE": "1"
           },
