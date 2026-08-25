@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 const testRequire = createRequire(import.meta.url);
+const PROCESS_TIMEOUT_MS = 60_000;
 
 function makeIsolatedInkConsumer(consumerDir: string): string {
   const installedInk = path.resolve(
@@ -93,7 +94,12 @@ describe("tui-shot CLI boundary", () => {
           "-o",
           outPath,
         ],
-        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+        {
+          cwd: path.resolve("."),
+          env: process.env,
+          encoding: "utf8",
+          timeout: PROCESS_TIMEOUT_MS,
+        },
       );
 
       // The fixture's expectText validates semantic content before capture; inspect
@@ -146,7 +152,12 @@ describe("tui-shot CLI boundary", () => {
           "--out-dir",
           outDir,
         ],
-        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+        {
+          cwd: path.resolve("."),
+          env: process.env,
+          encoding: "utf8",
+          timeout: PROCESS_TIMEOUT_MS,
+        },
       );
 
       expect(stdout).toContain("done: 2/2 shots");
