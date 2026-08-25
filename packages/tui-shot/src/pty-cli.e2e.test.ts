@@ -6,6 +6,8 @@ import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
+const PROCESS_TIMEOUT_MS = 60_000;
+
 describe("arbitrary PTY capture boundary", () => {
   it("drives a full-screen terminal process and captures the selected state", async () => {
     // Arrange a disposable output while keeping the fixture beside its real
@@ -24,7 +26,12 @@ describe("arbitrary PTY capture boundary", () => {
           "-o",
           outPath,
         ],
-        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+        {
+          cwd: path.resolve("."),
+          env: process.env,
+          encoding: "utf8",
+          timeout: PROCESS_TIMEOUT_MS,
+        },
       );
 
       // The fixture's final wait and expectText prove the externally visible
@@ -62,7 +69,12 @@ describe("arbitrary PTY capture boundary", () => {
           "-o",
           outPath,
         ],
-        { cwd: path.resolve("."), env: process.env, encoding: "utf8" },
+        {
+          cwd: path.resolve("."),
+          env: process.env,
+          encoding: "utf8",
+          timeout: PROCESS_TIMEOUT_MS,
+        },
       );
 
       // A successful CLI result and real PNG prove waitForExit crossed the
@@ -104,8 +116,8 @@ describe("arbitrary PTY capture boundary", () => {
             ASTROSHOT_TEST_DELAY_PTY_EXIT_MARKER_MS: "1500",
           },
           encoding: "utf8",
-          // Cold Windows runners need headroom for node → wrapper → child.
-          timeout: 30_000,
+          // Match the e2e vitest budget so a hung child is not a tighter race.
+          timeout: PROCESS_TIMEOUT_MS,
           maxBuffer: 2 * 1024 * 1024,
         },
       );
@@ -146,6 +158,7 @@ describe("arbitrary PTY capture boundary", () => {
             ASTROSHOT_TEST_FORCE_PTY_EXIT_WRAPPER: "1",
           },
           encoding: "utf8",
+          timeout: PROCESS_TIMEOUT_MS,
         },
       );
 
@@ -196,6 +209,7 @@ describe("arbitrary PTY capture boundary", () => {
               PATH: `${tempDir}${path.delimiter}${process.env.PATH ?? ""}`,
             },
             encoding: "utf8",
+            timeout: PROCESS_TIMEOUT_MS,
           },
         );
 
