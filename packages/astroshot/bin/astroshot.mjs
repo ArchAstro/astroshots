@@ -13,7 +13,7 @@ function help() {
   console.log(`astroshot — one CLI for React, Ink, PTY stills, and movies
 
 Usage:
-  astroshot demo [--feature <name>] [--root <dir>]
+  astroshot demo [--feature <name>] [--root <dir>] [--dry-run] [--clean]
   astroshot doctor [--root <dir>] [--json]
   astroshot init react [fixture.tsx] [--force]
   astroshot init ink [fixture.tsx] [--force]

@@ -30,6 +30,8 @@ Options:
   --feature <name>   Feature directory under .astroshot/ (default: ${DEFAULT_DEMO_FEATURE})
   --root <dir>       Worktree root (default: git root, else cwd)
   --json             Print the written paths as JSON
+  --dry-run          Print planned paths without writing
+  --clean            Accepted; does not delete yet
   -h, --help         Show this help
 
 Writes two stills, one movie poster + video pair, and manifest.json using
@@ -112,14 +114,24 @@ export function loadDemoFixtures(fixturesDirectory = FIXTURES_DIR) {
   return index;
 }
 
+function publicDemoResult(plan) {
+  return {
+    root: plan.root,
+    feature: plan.feature,
+    featureDirectory: plan.featureDirectory,
+    manifestPath: plan.manifestPath,
+    runId: plan.runId,
+    shots: plan.shots,
+    files: plan.files,
+  };
+}
+
 /**
- * Write the demo set and return the paths, without printing anything.
- *
- * Each invocation is its own run: a new `run_id` with a fresh shot list, while
- * earlier numbered frames stay on disk as prior-run evidence. That matches the
- * documented lifecycle used by astroshot-capture and the movie harness.
+ * Read-only plan of the next demo write: same root/feature resolve, kebab-case
+ * check, fixtures, next sequence, and file names (including manifest.json).
+ * Does not mkdir or write.
  */
-export function writeDemo({
+export function planDemo({
   root,
   feature = DEFAULT_DEMO_FEATURE,
   fixturesDirectory = FIXTURES_DIR,
@@ -130,7 +142,6 @@ export function writeDemo({
   const featureDirectory = path.join(resolvedRoot, ".astroshot", feature);
   const index = loadDemoFixtures(fixturesDirectory);
 
-  fs.mkdirSync(featureDirectory, { recursive: true });
   const startSequence = nextSequence(featureDirectory);
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   // The first sequence of this run keeps the id unique when two runs land in
@@ -140,11 +151,16 @@ export function writeDemo({
 
   const shots = [];
   const files = [];
+  const copies = [];
   index.shots.forEach((fixture, offset) => {
     const sequence = String(startSequence + offset).padStart(4, "0");
     const posterName = `${sequence}-${fixture.slug}.png`;
-    copyAtomic(path.join(fixturesDirectory, fixture.asset), path.join(featureDirectory, posterName));
-    files.push(path.join(featureDirectory, posterName));
+    const posterPath = path.join(featureDirectory, posterName);
+    copies.push({
+      source: path.join(fixturesDirectory, fixture.asset),
+      destination: posterPath,
+    });
+    files.push(posterPath);
 
     const shot = {
       id: sequence,
@@ -159,8 +175,12 @@ export function writeDemo({
     if (fixture.video) {
       const videoExtension = path.extname(fixture.video) || ".webm";
       const videoName = `${sequence}-${fixture.slug}${videoExtension}`;
-      copyAtomic(path.join(fixturesDirectory, fixture.video), path.join(featureDirectory, videoName));
-      files.push(path.join(featureDirectory, videoName));
+      const videoPath = path.join(featureDirectory, videoName);
+      copies.push({
+        source: path.join(fixturesDirectory, fixture.video),
+        destination: videoPath,
+      });
+      files.push(videoPath);
       shot.kind = "movie";
       shot.video = videoName;
       shot.duration_ms = fixture.duration_ms;
@@ -181,7 +201,6 @@ export function writeDemo({
       "Synthetic proof set written by `astroshot demo` — stills plus one journey movie.",
     shots,
   };
-  writeAtomic(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   files.push(manifestPath);
 
   return {
@@ -189,10 +208,29 @@ export function writeDemo({
     feature,
     featureDirectory,
     manifestPath,
+    manifest,
     runId,
     shots,
     files,
+    copies,
   };
+}
+
+/**
+ * Write the demo set and return the paths, without printing anything.
+ *
+ * Each invocation is its own run: a new `run_id` with a fresh shot list, while
+ * earlier numbered frames stay on disk as prior-run evidence. That matches the
+ * documented lifecycle used by astroshot-capture and the movie harness.
+ */
+export function writeDemo(options = {}) {
+  const plan = planDemo(options);
+  fs.mkdirSync(plan.featureDirectory, { recursive: true });
+  for (const { source, destination } of plan.copies) {
+    copyAtomic(source, destination);
+  }
+  writeAtomic(plan.manifestPath, `${JSON.stringify(plan.manifest, null, 2)}\n`);
+  return publicDemoResult(plan);
 }
 
 function coverageAdvice(root) {
@@ -231,7 +269,13 @@ function coverageAdvice(root) {
 }
 
 export function runDemo(argv, { log = console.log } = {}) {
-  const options = { feature: DEFAULT_DEMO_FEATURE, root: undefined, json: false };
+  const options = {
+    feature: DEFAULT_DEMO_FEATURE,
+    root: undefined,
+    json: false,
+    dryRun: false,
+    clean: false,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "-h" || token === "--help" || token === "help") {
@@ -240,6 +284,14 @@ export function runDemo(argv, { log = console.log } = {}) {
     }
     if (token === "--json") {
       options.json = true;
+      continue;
+    }
+    if (token === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+    if (token === "--clean") {
+      options.clean = true;
       continue;
     }
     if (token === "--feature" || token === "--root") {
@@ -254,18 +306,22 @@ export function runDemo(argv, { log = console.log } = {}) {
     throw new Error(`Unknown demo argument: ${token}`);
   }
 
-  const result = writeDemo(options);
+  const result = options.dryRun
+    ? publicDemoResult(planDemo(options))
+    : writeDemo(options);
   if (options.json) {
     log(JSON.stringify({ ...result, advice: coverageAdvice(result.root) }, null, 2));
     return 0;
   }
 
-  const movies = result.shots.filter((shot) => shot.kind === "movie").length;
-  const stills = result.shots.length - movies;
   log(`astroshot demo → ${result.featureDirectory}`);
   for (const file of result.files) {
     log(`  ${path.relative(result.root, file)}`);
   }
+  if (options.dryRun) return 0;
+
+  const movies = result.shots.filter((shot) => shot.kind === "movie").length;
+  const stills = result.shots.length - movies;
   log("");
   log(
     `Wrote ${stills} still${stills === 1 ? "" : "s"}, ${movies} movie${movies === 1 ? "" : "s"} (poster + video), and manifest.json.`,
