@@ -25,11 +25,53 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Validate user-supplied dispatch input before checking out or executing
+      # release-tree code in this secrets-bearing workflow.
+      - name: Validate release tag
+        env:
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: expected a semantic version tag (vX.Y.Z), got: $TAG" >&2
+            exit 1
+          fi
+          git ls-remote --exit-code --refs \
+            "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$TAG" >/dev/null || {
+            echo "error: $TAG is not an existing tag" >&2
+            exit 1
+          }
+
       - uses: actions/checkout@v4
         with:
-          # For workflow_dispatch with a tag input, still check out default ref;
-          # packaging builds from the tree at that ref if you check out the tag.
-          ref: ${{ inputs.tag != '' && inputs.tag || github.ref }}
+          # Always use the immutable tag namespace; a semver-shaped branch
+          # must never supply code to this signing workflow.
+          ref: refs/tags/${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+
+      - name: Set up Node.js for the embedded offline tools payload
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Build Node dependencies for the embedded tools payload
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build --workspaces --if-present
+
+      - name: Save native Node runtime path
+        run: echo "ASTROSHOTS_NODE_BINARY=$(command -v node)" >> "$GITHUB_ENV"
+
+      - name: Set up x86_64 Node.js for universal embedded runtime
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          architecture: x64
+          package-manager-cache: false
+
+      - name: Save x86_64 Node runtime path
+        run: echo "ASTROSHOTS_NODE_X64_BINARY=$(command -v node)" >> "$GITHUB_ENV"
 
       - name: Check signing secrets
         id: secrets

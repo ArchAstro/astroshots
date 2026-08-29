@@ -20,12 +20,14 @@ xcodebuild -downloadComponent MetalToolchain   # once per machine
 xcodebuild … -skipPackagePluginValidation
 ```
 
-`./scripts/bootstrap.sh` and `scripts/xcode-env.sh` handle the Metal/flags side.
+`./scripts/bootstrap.sh` installs the locked Node build dependencies, stages the
+embedded offline tools payload, and handles the Metal/flags side. The staged
+payload contains its own Node runtime; Astroshots installation never runs npm.
 
 ## Getting started
 
 ```bash
-./scripts/bootstrap.sh      # Metal prereqs + xcodegen → Astroshots.xcodeproj
+./scripts/bootstrap.sh      # Node deps + offline payload + Metal prereqs + xcodegen → Astroshots.xcodeproj
 open Astroshots.xcodeproj
 ```
 
