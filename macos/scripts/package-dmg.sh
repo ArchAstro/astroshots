@@ -83,6 +83,11 @@ EOF
   exit 1
 fi
 
+# Build the fully offline payload before project generation. It is a resource
+# directory, so Xcode signs it with the rest of Astroshots.app.
+echo "==> Building embedded tools payload"
+./scripts/build-tools-payload.sh
+
 echo "==> Generating Xcode project"
 xcodegen generate
 
@@ -134,11 +139,13 @@ if [[ ! -d "$APP_SRC" ]]; then
   echo "error: expected app missing: $APP_SRC" >&2
   exit 1
 fi
+./scripts/verify-tools-payload.sh "$ROOT/Astroshots/Resources/ToolsPayload" "$APP_SRC"
 
 # Copy with resource forks / xattrs preserved for codesign.
 APP="$STAGE/Astroshots.app"
 echo "==> Staging app"
 ditto "$APP_SRC" "$APP"
+./scripts/verify-tools-payload.sh "$ROOT/Astroshots/Resources/ToolsPayload" "$APP"
 ln -s /Applications "$STAGE/Applications"
 
 DMG_BACKGROUND="$ROOT/Design/Generated/astroshots-dmg-background.png"

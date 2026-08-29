@@ -16,9 +16,15 @@
 # Build
 build/
 macos/build/
+macos/Astroshots/Resources/ToolsPayload/
 dist/
 .swiftpm/
 Package.resolved
+
+# Local Node runtime cache used by macos/scripts/build-tools-payload.sh.
+# Ignore before downloading: Factory commits untracked non-ignored files.
+tmp/node-v*/
+tmp/*.tar.gz
 
 # Node.js workspaces
 node_modules/

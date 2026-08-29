@@ -131,6 +131,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Node.js for the embedded offline tools payload
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Build Node dependencies for the embedded tools payload
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build --workspaces --if-present
+
+      - name: Save native Node runtime path
+        run: echo "ASTROSHOTS_NODE_BINARY=$(command -v node)" >> "$GITHUB_ENV"
+
+      - name: Set up x86_64 Node.js for universal embedded runtime
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          architecture: x64
+          package-manager-cache: false
+
+      - name: Stage universal embedded tools payload
+        run: |
+          export ASTROSHOTS_NODE_X64_BINARY="$(command -v node)"
+          echo "ASTROSHOTS_NODE_X64_BINARY=$ASTROSHOTS_NODE_X64_BINARY" >> "$GITHUB_ENV"
+          macos/scripts/build-tools-payload.sh
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

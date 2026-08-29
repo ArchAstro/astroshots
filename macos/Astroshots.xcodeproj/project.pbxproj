@@ -63,6 +63,7 @@
 		E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009EED7A72CCCCF8A86260D /* Preferences.swift */; };
 		F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */; };
 		F39BFBFFE1979733110EA44D /* FrictionLogDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */; };
+		F3FF977EC54805A4B104BCDC /* ToolsPayload in Resources */ = {isa = PBXBuildFile; fileRef = ACE61FE45DA2E96D3B744026 /* ToolsPayload */; };
 		F426C9555D678EC535E2E581 /* ReviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD17CC89BE4C1AA3A933FB87 /* ReviewComponents.swift */; };
 		F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */; };
 		F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84934BBEECF7545EB5C02073 /* Theme.swift */; };
@@ -136,6 +137,7 @@
 		A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManifestParserTests.swift; sourceTree = "<group>"; };
 		A5C02F3A8C0151D3E00FB1AB /* astroshots-dmg-background.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "astroshots-dmg-background.png"; sourceTree = "<group>"; };
 		A9CC5FF9EEBB57A3DF50450A /* SoftwareUpdateLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdateLog.swift; sourceTree = "<group>"; };
+		ACE61FE45DA2E96D3B744026 /* ToolsPayload */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ToolsPayload; path = Astroshots/Resources/ToolsPayload; sourceTree = SOURCE_ROOT; };
 		AD17CC89BE4C1AA3A933FB87 /* ReviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewComponents.swift; sourceTree = "<group>"; };
 		B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotThumbnail.swift; sourceTree = "<group>"; };
 		B879878D858221AB43F32C45 /* NarrationModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationModelManager.swift; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 			isa = PBXGroup;
 			children = (
 				369606653B9FD1E6FBE4B43D /* Assets.xcassets */,
+				ACE61FE45DA2E96D3B744026 /* ToolsPayload */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -480,6 +483,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				51D0FFA42C1196281E94E2F5 /* Assets.xcassets in Resources */,
+				F3FF977EC54805A4B104BCDC /* ToolsPayload in Resources */,
 				77469FC8404628A2CE0A1894 /* astroshots-app-icon-master.png in Resources */,
 				59CBDD8B9BEAE40E1935FD03 /* astroshots-dmg-background.png in Resources */,
 			);

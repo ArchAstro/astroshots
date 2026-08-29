@@ -43,5 +43,8 @@ cmp \
   "$ROOT/Design/Generated/astroshots-dmg-background.png" \
   "$MOUNT/.background/Astroshots.png"
 codesign --verify --deep --strict "$MOUNT/Astroshots.app"
+"$ROOT/scripts/verify-tools-payload.sh" \
+  "$ROOT/Astroshots/Resources/ToolsPayload" \
+  "$MOUNT/Astroshots.app"
 
 echo "Branded DMG end-to-end proof passed"
