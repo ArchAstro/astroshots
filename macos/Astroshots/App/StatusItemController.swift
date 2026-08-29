@@ -437,7 +437,9 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func openSettingsFromMenu(_ sender: Any?) {
-        appState.pane = .settings
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            appState.pane = .settings
+        }
         showPopover()
     }
 
@@ -451,7 +453,9 @@ final class StatusItemController: NSObject {
     /// otherwise the popover is a no-op.
     func presentFirstRunSetupIfNeeded() {
         guard appState.shouldPresentFirstRunStartup else { return }
-        appState.pane = .stream
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            appState.pane = .stream
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self, self.appState.shouldPresentFirstRunStartup else { return }
             self.showPopover()
@@ -506,10 +510,12 @@ final class StatusItemController: NSObject {
 
     private func showPopover() {
         guard let button = statusItem?.button, let popover else { return }
-        reloadPopoverContent()
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        button.highlight(true)
+        PerformanceLog.interval(PerformanceLog.clickToShown) {
+            reloadPopoverContent()
+            NSApp.activate(ignoringOtherApps: true)
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            button.highlight(true)
+        }
     }
 
     private func closePopover() {
