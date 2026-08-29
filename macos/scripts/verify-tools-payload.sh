@@ -88,14 +88,29 @@ manifest_node_version="$(PAYLOAD="$PAYLOAD" python3 -c 'import json, os; print(j
 # system libraries, and relocatable loader/rpath references are the only valid
 # dependencies; executing the copied runtime below proves those resolve inside
 # the staged payload rather than from a user's Node installation.
+#
+# otool -L prints an unindented header per file, and one header *per slice* for
+# a universal binary ("node (architecture arm64):"). Dependencies are always the
+# tab-indented lines, so select on that indentation instead of dropping a fixed
+# count of leading lines: a fat runtime would otherwise leak its second slice
+# header through and have its own path misread as a host-library dependency.
 if command -v otool >/dev/null 2>&1; then
   while IFS= read -r runtime_file; do
+    # Only Mach-O images carry load commands. Skipping anything else keeps the
+    # "no dependencies parsed" guard below meaningful instead of tripping over a
+    # text stub that merely happens to be named like a library.
+    file -b "$runtime_file" | grep -q 'Mach-O' || continue
+    dependency_count=0
     while IFS= read -r dependency; do
+      dependency_count=$((dependency_count + 1))
       case "$dependency" in
         /usr/lib/*|/System/Library/*|@loader_path/*|@executable_path/*|@rpath/*) ;;
         *) fail "runtime depends on host library: $dependency ($runtime_file)" ;;
       esac
-    done < <(otool -L "$runtime_file" | tail -n +2 | sed -E 's/^[[:space:]]*([^[:space:]]+).*/\1/')
+    done < <(otool -L "$runtime_file" | grep -E '^[[:space:]]' | sed -E 's/^[[:space:]]*([^[:space:]]+).*/\1/')
+    # Every Mach-O image links at least one library, so parsing nothing means
+    # this inspection silently stopped working rather than genuinely passing.
+    [[ "$dependency_count" -gt 0 ]] || fail "could not inspect runtime dependencies: $runtime_file"
   done < <(find "$PAYLOAD/runtime" -type f \( -name '*.dylib' -o -path '*/bin/node' \))
 fi
 # The launcher is deliberately a direct local exec, never an npm/npx install

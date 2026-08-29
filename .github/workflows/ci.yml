@@ -153,6 +153,9 @@ jobs:
           architecture: x64
           package-manager-cache: false
 
+      - name: Verify the tools payload verifier handles universal runtimes
+        run: macos/scripts/test-verify-tools-payload.sh
+
       - name: Stage universal embedded tools payload
         run: |
           export ASTROSHOTS_NODE_X64_BINARY="$(command -v node)"
