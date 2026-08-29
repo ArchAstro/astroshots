@@ -26,36 +26,40 @@ final class ReviewWindowController {
     }
 
     func open(_ shot: Shot) {
-        mode = .shot
-        currentShotID = shot.id
-        let root = ReviewTakeoverView(
-            shot: shot,
-            appState: appState,
-            onClose: { [weak self] in
-                self?.close()
-            },
-            onNavigate: { [weak self] delta in
-                self?.navigate(delta)
-            }
-        )
-        present(root)
+        PerformanceLog.interval(PerformanceLog.reviewOpen) {
+            mode = .shot
+            currentShotID = shot.id
+            let root = ReviewTakeoverView(
+                shot: shot,
+                appState: appState,
+                onClose: { [weak self] in
+                    self?.close()
+                },
+                onNavigate: { [weak self] delta in
+                    self?.navigate(delta)
+                }
+            )
+            present(root)
+        }
     }
 
     func openFrictionStep(_ step: FrictionLogStep) {
-        mode = .frictionStep
-        currentShotID = nil
-        appState.selectedFrictionStepID = step.id
-        let root = FrictionStepTakeoverView(
-            step: step,
-            appState: appState,
-            onClose: { [weak self] in
-                self?.close()
-            },
-            onNavigateStep: { [weak self] delta in
-                self?.navigateFrictionStep(delta)
-            }
-        )
-        present(root)
+        PerformanceLog.interval(PerformanceLog.reviewOpen) {
+            mode = .frictionStep
+            currentShotID = nil
+            appState.selectedFrictionStepID = step.id
+            let root = FrictionStepTakeoverView(
+                step: step,
+                appState: appState,
+                onClose: { [weak self] in
+                    self?.close()
+                },
+                onNavigateStep: { [weak self] delta in
+                    self?.navigateFrictionStep(delta)
+                }
+            )
+            present(root)
+        }
     }
 
     func close() {
@@ -97,7 +101,9 @@ final class ReviewWindowController {
             guard let currentShotID,
                   let shot = appState.reviewSibling(from: currentShotID, delta: delta)
             else { return }
-            open(shot)
+            PerformanceLog.interval(PerformanceLog.reviewNavigate) {
+                open(shot)
+            }
         case .frictionStep:
             navigateFrictionStep(delta)
         }
@@ -107,7 +113,9 @@ final class ReviewWindowController {
         guard appState.canStepFrictionStep(delta) else { return }
         appState.stepFrictionStep(delta)
         guard let step = appState.selectedFrictionStep else { return }
-        openFrictionStep(step)
+        PerformanceLog.interval(PerformanceLog.reviewNavigate) {
+            openFrictionStep(step)
+        }
     }
 
     private func makePanel() -> ReviewPanel {

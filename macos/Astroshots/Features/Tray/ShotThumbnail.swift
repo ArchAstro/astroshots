@@ -8,7 +8,10 @@ struct ShotThumbnail: View {
 
     var body: some View {
         Group {
-            if let image = NSImage(contentsOfFile: path) {
+            let image = PerformanceLog.interval(PerformanceLog.imageDecode) {
+                NSImage(contentsOfFile: path)
+            }
+            if let image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)

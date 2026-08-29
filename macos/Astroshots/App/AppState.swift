@@ -337,35 +337,43 @@ final class AppState {
     }
 
     func selectShot(_ shot: Shot) {
-        selectedShotID = shot.id
-        activeTab = .shots
-        pane = .detail
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            selectedShotID = shot.id
+            activeTab = .shots
+            pane = .detail
+        }
     }
 
     func openDetail(_ shot: Shot) {
-        selectedShotID = shot.id
-        activeTab = .shots
-        pane = .detail
-        NotificationCenter.default.post(name: .astroshotsOpenTray, object: nil)
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            selectedShotID = shot.id
+            activeTab = .shots
+            pane = .detail
+            NotificationCenter.default.post(name: .astroshotsOpenTray, object: nil)
+        }
     }
 
     func selectTab(_ tab: TrayTab) {
-        activeTab = tab
-        // Tab bar only appears on the list shell; any deep pane yields to stream.
-        if pane == .detail
-            || pane == .frictionLogDetail
-            || pane == .frictionStepDetail
-        {
-            pane = .stream
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            activeTab = tab
+            // Tab bar only appears on the list shell; any deep pane yields to stream.
+            if pane == .detail
+                || pane == .frictionLogDetail
+                || pane == .frictionStepDetail
+            {
+                pane = .stream
+            }
         }
     }
 
     func selectFrictionLog(_ log: FrictionLog) {
-        selectedFrictionLogID = log.id
-        selectedFrictionRunID = log.latestRun?.id
-        selectedFrictionStepID = log.latestRun?.steps.first?.id
-        activeTab = .frictionLogs
-        pane = .frictionLogDetail
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            selectedFrictionLogID = log.id
+            selectedFrictionRunID = log.latestRun?.id
+            selectedFrictionStepID = log.latestRun?.steps.first?.id
+            activeTab = .frictionLogs
+            pane = .frictionLogDetail
+        }
     }
 
     func hideFrictionLog(_ log: FrictionLog) {
@@ -403,19 +411,23 @@ final class AppState {
     }
 
     func selectFrictionRun(_ run: FrictionLogRun) {
-        selectedFrictionRunID = run.id
-        selectedFrictionStepID = run.steps.first?.id
-        // Stay on the log's step table when switching runs.
-        if pane == .frictionStepDetail {
-            pane = .frictionLogDetail
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            selectedFrictionRunID = run.id
+            selectedFrictionStepID = run.steps.first?.id
+            // Stay on the log's step table when switching runs.
+            if pane == .frictionStepDetail {
+                pane = .frictionLogDetail
+            }
         }
     }
 
     /// Open the compact tray step page (table row click).
     func selectFrictionStep(_ step: FrictionLogStep) {
-        selectedFrictionStepID = step.id
-        activeTab = .frictionLogs
-        pane = .frictionStepDetail
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            selectedFrictionStepID = step.id
+            activeTab = .frictionLogs
+            pane = .frictionStepDetail
+        }
     }
 
     func stepFrictionStep(_ delta: Int) {
@@ -445,13 +457,17 @@ final class AppState {
     }
 
     func backToFrictionLogs() {
-        pane = .stream
-        activeTab = .frictionLogs
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            pane = .stream
+            activeTab = .frictionLogs
+        }
     }
 
     func backToFrictionLogDetail() {
-        pane = .frictionLogDetail
-        activeTab = .frictionLogs
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            pane = .frictionLogDetail
+            activeTab = .frictionLogs
+        }
     }
 
     func requestReview(_ shot: Shot) {
@@ -668,12 +684,16 @@ final class AppState {
     }
 
     func backToStream() {
-        pane = .stream
-        activeTab = .shots
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            pane = .stream
+            activeTab = .shots
+        }
     }
 
     func openSettings() {
-        pane = pane == .settings ? .stream : .settings
+        PerformanceLog.interval(PerformanceLog.paneSwitch) {
+            pane = pane == .settings ? .stream : .settings
+        }
     }
 
     /// Page the tray detail view through the stream.
