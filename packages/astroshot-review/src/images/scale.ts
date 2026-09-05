@@ -8,11 +8,34 @@ import { fitInside, type ImageSize } from "./png.js";
 
 export type ScaledFormat = "png" | "rgb";
 
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ScaleRequest {
   bytes: Buffer;
   target: ImageSize;
   /** png keeps alpha; rgb returns packed 3-byte pixels for cell art. */
   format: ScaledFormat;
+  /** Optional source-pixel crop applied before scaling (for zoom). */
+  crop?: Rect;
+}
+
+/** Copy a sub-rectangle out of an RGBA buffer, clamped to the image bounds. */
+export function cropRgba(source: Buffer, size: ImageSize, rect: Rect): { data: Buffer; size: ImageSize } {
+  const x = Math.max(0, Math.min(size.width - 1, Math.round(rect.x)));
+  const y = Math.max(0, Math.min(size.height - 1, Math.round(rect.y)));
+  const width = Math.max(1, Math.min(size.width - x, Math.round(rect.width)));
+  const height = Math.max(1, Math.min(size.height - y, Math.round(rect.height)));
+  const out = Buffer.alloc(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const srcStart = ((y + row) * size.width + x) * 4;
+    source.copy(out, row * width * 4, srcStart, srcStart + width * 4);
+  }
+  return { data: out, size: { width, height } };
 }
 
 export interface ScaledImage {
@@ -83,12 +106,18 @@ export function rgbaToRgb(rgba: Buffer, pixelCount: number, background = [24, 24
 
 export function scaleImage(request: ScaleRequest): ScaledImage {
   const decoded = PNG.sync.read(request.bytes);
-  const sourceSize = { width: decoded.width, height: decoded.height };
+  let sourceData: Buffer = decoded.data;
+  let sourceSize: ImageSize = { width: decoded.width, height: decoded.height };
+  if (request.crop) {
+    const cropped = cropRgba(sourceData, sourceSize, request.crop);
+    sourceData = cropped.data;
+    sourceSize = cropped.size;
+  }
   const target = fitInside(sourceSize, request.target);
   const rgba =
     target.width === sourceSize.width && target.height === sourceSize.height
-      ? decoded.data
-      : resampleRgba(decoded.data, sourceSize, target);
+      ? sourceData
+      : resampleRgba(sourceData, sourceSize, target);
   if (request.format === "rgb") {
     return {
       width: target.width,

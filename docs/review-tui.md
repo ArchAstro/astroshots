@@ -81,7 +81,7 @@ herdr's own renderer, not the mosh image path.
 | Full-screen ← → over run siblings, oldest → newest | Same, `N / M` is the position within the run |
 | Send Feedback, Seen | `c` then type and `⏎`; `s`. Seen in detail returns to the stream; Seen in full-screen closes it. |
 | Play in tray / Open movie / chapters | `p`, `O`, and `space` play/pause, `,` `.` seek 5 s, `[` `]` previous/next chapter with markers on the progress bar |
-| Zoom the preview | Detail and full-screen review fill their area by default; `+` / `-` adjust, `0` resets |
+| Zoom & pan | Detail and full-screen review fill their area; `+` / `-` magnify (a true crop), `0` resets. When zoomed in, the arrows pan around the image instead of paging |
 | Copy Image, Show in Finder | `y`, `o` |
 | Desktop overlay for new frames | New captures insert at the top with a `N new` badge and a 5.5 s toast while the tray is open |
 | Friction log list, run picker, improve rollup, steps, step detail, step takeover | Same screens: `⏎` opens, `[` `]` switch runs (and images inside a step), `p` toggles the prompt, `← →` step, `f` full screen |

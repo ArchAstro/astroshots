@@ -8,6 +8,7 @@ import os from "node:os";
 import { Worker } from "node:worker_threads";
 
 import { fitInside, readPngSize, type ImageSize } from "./png.js";
+import type { Rect } from "./scale.js";
 import { scaleImage, type ScaledFormat } from "./scale.js";
 import type { WorkerRequest, WorkerResponse } from "./worker.js";
 
@@ -62,19 +63,20 @@ export class ImageService {
   }
 
   /** Identity + target size key. Callers can use it for placement bookkeeping. */
-  static cacheKey(filePath: string, stat: { mtimeMs: number; size: number }, target: ImageSize, format: ScaledFormat): string {
-    return `${filePath}|${Math.round(stat.mtimeMs)}|${stat.size}|${target.width}x${target.height}|${format}`;
+  static cacheKey(filePath: string, stat: { mtimeMs: number; size: number }, target: ImageSize, format: ScaledFormat, crop?: Rect): string {
+    const cropKey = crop ? `|${Math.round(crop.x)},${Math.round(crop.y)},${Math.round(crop.width)},${Math.round(crop.height)}` : "";
+    return `${filePath}|${Math.round(stat.mtimeMs)}|${stat.size}|${target.width}x${target.height}|${format}${cropKey}`;
   }
 
-  async prepare(filePath: string, target: ImageSize, format: ScaledFormat = "png"): Promise<PreparedImage> {
+  async prepare(filePath: string, target: ImageSize, format: ScaledFormat = "png", crop?: Rect): Promise<PreparedImage> {
     const stat = await fs.promises.stat(filePath);
-    const key = ImageService.cacheKey(filePath, stat, target, format);
+    const key = ImageService.cacheKey(filePath, stat, target, format, crop);
     const cached = this.cache.get(key);
     if (cached) {
       this.touch(key);
       return cached;
     }
-    const job = this.build(filePath, stat, target, format, key);
+    const job = this.build(filePath, stat, target, format, key, crop);
     this.cache.set(key, job);
     this.cacheOrder.push(key);
     job.then(
@@ -90,6 +92,7 @@ export class ImageService {
     target: ImageSize,
     format: ScaledFormat,
     key: string,
+    crop?: Rect,
   ): Promise<PreparedImage> {
     const bytes = await fs.promises.readFile(filePath);
     const source = readPngSize(bytes);
@@ -102,18 +105,20 @@ export class ImageService {
       mtimeMs: stat.mtimeMs,
       size: stat.size,
     };
-    const fitted = fitInside(source, target);
-    const ratio = Math.max(source.width / fitted.width, source.height / fitted.height);
-    if (format === "png" && ratio <= this.passthroughRatio) {
-      return { ...base, width: source.width, height: source.height, format: "png", data: bytes, isOriginal: true };
+    if (!crop) {
+      const fitted = fitInside(source, target);
+      const ratio = Math.max(source.width / fitted.width, source.height / fitted.height);
+      if (format === "png" && ratio <= this.passthroughRatio) {
+        return { ...base, width: source.width, height: source.height, format: "png", data: bytes, isOriginal: true };
+      }
     }
-    const scaled = await this.scale(bytes, target, format);
+    const scaled = await this.scale(bytes, target, format, crop);
     return { ...base, ...scaled, isOriginal: false };
   }
 
-  private async scale(bytes: Buffer, target: ImageSize, format: ScaledFormat) {
+  private async scale(bytes: Buffer, target: ImageSize, format: ScaledFormat, crop?: Rect) {
     if (this.workerCount === 0) {
-      const scaled = scaleImage({ bytes, target, format });
+      const scaled = scaleImage({ bytes, target, format, crop });
       return { width: scaled.width, height: scaled.height, format: scaled.format, data: scaled.data };
     }
     const worker = this.pickWorker();
@@ -127,6 +132,7 @@ export class ImageService {
         targetWidth: target.width,
         targetHeight: target.height,
         format,
+        crop,
       };
       worker.postMessage(request, [payload]);
     });

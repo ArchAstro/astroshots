@@ -1,6 +1,6 @@
 import { parentPort } from "node:worker_threads";
 
-import { scaleImage, type ScaledFormat } from "./scale.js";
+import { scaleImage, type Rect, type ScaledFormat } from "./scale.js";
 
 export interface WorkerRequest {
   id: number;
@@ -8,6 +8,7 @@ export interface WorkerRequest {
   targetWidth: number;
   targetHeight: number;
   format: ScaledFormat;
+  crop?: Rect;
 }
 
 export type WorkerResponse =
@@ -20,6 +21,7 @@ parentPort?.on("message", (request: WorkerRequest) => {
       bytes: Buffer.from(request.bytes),
       target: { width: request.targetWidth, height: request.targetHeight },
       format: request.format,
+      crop: request.crop,
     });
     const data = scaled.data.buffer.slice(
       scaled.data.byteOffset,

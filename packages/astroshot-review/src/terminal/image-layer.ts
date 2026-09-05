@@ -27,8 +27,8 @@ export interface ImageHandle {
   setNode(node: DOMElement | null): void;
   /** `version` (for example the file's mtime) forces a fresh decode when the bytes change. */
   setSource(src: string | null, version?: number): void;
-  /** `zoom` scales within [native..fill]; `maxUpscale` caps how far past native it may grow. */
-  setZoom(zoom: number, maxUpscale?: number): void;
+  /** Update the view: zoom (1 = whole image), pan center in [0,1], and the fill cap. */
+  setView(view: { zoom?: number; panX?: number; panY?: number; maxUpscale?: number }): void;
   unregister(): void;
 }
 
@@ -50,8 +50,11 @@ interface Entry {
   z: number;
   /** How far past native size the image may scale (1 = never upscale). */
   maxUpscale: number;
-  /** User zoom within the allowed range (1 = as large as allowed). */
+  /** Magnification: 1 shows the whole image; >1 crops in. */
   zoom: number;
+  /** Pan center as a fraction of the source image, [0,1]. */
+  panX: number;
+  panY: number;
   node: DOMElement | null;
   ready: PreparedImage | null;
   requestedKey: string | null;
@@ -146,6 +149,8 @@ export class ImageLayer {
       z: options.z ?? 0,
       maxUpscale: options.maxUpscale ?? 1,
       zoom: options.zoom ?? 1,
+      panX: 0.5,
+      panY: 0.5,
       node: null,
       ready: null,
       requestedKey: null,
@@ -169,11 +174,25 @@ export class ImageLayer {
         entry.failed = null;
         this.scheduleFlush();
       },
-      setZoom: (zoom, maxUpscale) => {
-        if (entry.zoom === zoom && (maxUpscale === undefined || entry.maxUpscale === maxUpscale)) return;
-        entry.zoom = zoom;
-        if (maxUpscale !== undefined) entry.maxUpscale = maxUpscale;
-        this.scheduleFlush();
+      setView: (view) => {
+        let changed = false;
+        if (view.zoom !== undefined && view.zoom !== entry.zoom) {
+          entry.zoom = view.zoom;
+          changed = true;
+        }
+        if (view.panX !== undefined && view.panX !== entry.panX) {
+          entry.panX = view.panX;
+          changed = true;
+        }
+        if (view.panY !== undefined && view.panY !== entry.panY) {
+          entry.panY = view.panY;
+          changed = true;
+        }
+        if (view.maxUpscale !== undefined && view.maxUpscale !== entry.maxUpscale) {
+          entry.maxUpscale = view.maxUpscale;
+          changed = true;
+        }
+        if (changed) this.scheduleFlush();
       },
       unregister: () => {
         this.entries.delete(id);
@@ -195,6 +214,8 @@ export class ImageLayer {
       z: options.z ?? 1,
       maxUpscale: 1,
       zoom: 1,
+      panX: 0.5,
+      panY: 0.5,
       node: null,
       ready: null,
       requestedKey: null,
@@ -377,11 +398,27 @@ export class ImageLayer {
       // more physical pixels than its reported cell size implies, so oversample.
       const supersample = this.herdr ? 2 : 1;
       const targetPx = { width: boxPx.width * supersample, height: boxPx.height * supersample };
-      const requestKey = `${entry.src}|${entry.version}|${targetPx.width}x${targetPx.height}`;
+      // Zoom > 1 shows a centered sub-rectangle of the source (a real crop, so
+      // it magnifies instead of squishing); pan slides that rectangle. The
+      // on-screen footprint stays fixed — only the visible region changes.
+      let crop: { x: number; y: number; width: number; height: number } | undefined;
+      if (entry.zoom > 1 && entry.ready) {
+        const sourceW = entry.ready.sourceWidth;
+        const sourceH = entry.ready.sourceHeight;
+        const cropW = sourceW / entry.zoom;
+        const cropH = sourceH / entry.zoom;
+        const centerX = Math.max(cropW / 2, Math.min(sourceW - cropW / 2, entry.panX * sourceW));
+        const centerY = Math.max(cropH / 2, Math.min(sourceH - cropH / 2, entry.panY * sourceH));
+        crop = { x: centerX - cropW / 2, y: centerY - cropH / 2, width: cropW, height: cropH };
+      }
+      const cropKey = crop
+        ? `|z${entry.zoom.toFixed(2)}|${Math.round(crop.x)},${Math.round(crop.y)},${Math.round(crop.width)},${Math.round(crop.height)}`
+        : "";
+      const requestKey = `${entry.src}|${entry.version}|${targetPx.width}x${targetPx.height}${cropKey}`;
       if (entry.requestedKey !== requestKey) {
         entry.requestedKey = requestKey;
         entry.failed = null;
-        void this.service.prepare(entry.src, targetPx).then(
+        void this.service.prepare(entry.src, targetPx, "png", crop).then(
           (prepared) => {
             if (entry.requestedKey !== requestKey) return;
             entry.ready = prepared;
@@ -400,13 +437,15 @@ export class ImageLayer {
       if (!ready) continue;
       readyByEntry.set(entry.id, ready);
 
-      // On-screen size: scale to fit the box, allowing upscale up to
-      // `maxUpscale`× native, then the user's zoom, capped at filling the box.
-      const containScale = Math.min(boxPx.width / ready.width, boxPx.height / ready.height);
-      const nativeCap = Math.min(containScale, Math.max(1, entry.maxUpscale));
-      const scale = Math.min(containScale, nativeCap * Math.max(0.1, entry.zoom));
-      const cols = Math.min(box.width, Math.max(1, Math.round((ready.width * scale) / cellWidth)));
-      const rows = Math.min(box.height, Math.max(1, Math.round((ready.height * scale) / cellHeight)));
+      // On-screen footprint from the FULL image aspect (constant across zoom, so
+      // zooming magnifies in place without moving the picture). Fits the box,
+      // upscaling small sources up to `maxUpscale`× to fill.
+      const fullWidth = ready.sourceWidth;
+      const fullHeight = ready.sourceHeight;
+      const containScale = Math.min(boxPx.width / fullWidth, boxPx.height / fullHeight);
+      const scale = Math.min(containScale, Math.max(1, entry.maxUpscale));
+      const cols = Math.min(box.width, Math.max(1, Math.round((fullWidth * scale) / cellWidth)));
+      const rows = Math.min(box.height, Math.max(1, Math.round((fullHeight * scale) / cellHeight)));
       const col = box.x + Math.floor((box.width - cols) / 2);
       const row = box.y + Math.floor((box.height - rows) / 2);
 
