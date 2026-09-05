@@ -11,6 +11,23 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **`astroshot review` — the Astroshots tray in your terminal:** a new
+  `@archastro/astroshot-review` package (bundled into `astroshot`) renders the
+  same newest-first Shots stream, detail, full-screen review, and Friction Logs
+  as the macOS app inside an Ink UI. Stills, posters, and friction screenshots
+  are drawn with the Kitty graphics protocol (Ghostty, kitty, WezTerm), movies
+  play through ffmpeg-decoded frames with chapter markers, and Seen / feedback
+  write the identical `review.json` shape (sorted keys, hash and run scoping,
+  run-id reset). Roots default to the app's watched folders; a durable index
+  makes startup instant and a shallow-then-deep walk keeps large worktree farms
+  from blocking the stream. See [`docs/review-tui.md`](docs/review-tui.md).
+- **`graphics: kitty` for PTY captures:** `astroshot pty` fixtures can emulate a
+  graphics-capable terminal. The harness answers the capability probe, records
+  transmitted images and placements, and paints them into the PNG, which is how
+  the review tray screenshots itself in tests.
+
 ## [0.2.1] (npm) - 2026-08-19
 
 ### Added

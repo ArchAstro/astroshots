@@ -81,6 +81,12 @@ npx astroshot pty ./fixtures/ratatui.yaml \
 ## Batch manifests
 
 React and Ink modes also accept `batch <manifest.yaml|json>`. Their fixture
+PTY fixtures can also emulate a graphics-capable terminal. Set `graphics: kitty`
+and the harness answers the Kitty graphics query and cell-size reports, records
+every transmitted image and placement, and paints the pictures into the PNG at
+their cell positions — so `astroshot pty` can screenshot `astroshot review` or
+any other TUI that draws images.
+
 APIs, PTY action contract, configuration, and manifest formats are documented in
 the package READMEs:
 

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { IPty } from "node-pty";
 import YAML from "yaml";
 
+import { KittyGraphicsTracker, overlaysToHtml } from "./kitty-graphics.js";
 import {
   captureTerminalHtml,
   queueTerminalShot,
@@ -180,6 +181,9 @@ function loadPtyFixture(fixturePath: string): PtyShotFixture {
   ) {
     throw fixtureError(absolute, "allowNonZeroExit must be a boolean");
   }
+  if (value.graphics !== undefined && value.graphics !== "kitty") {
+    throw fixtureError(absolute, 'graphics must be "kitty" when set');
+  }
   for (const field of ["background", "foreground", "fontFamily"] as const) {
     if (value[field] !== undefined && typeof value[field] !== "string") {
       throw fixtureError(absolute, `${field} must be a string`);
@@ -333,12 +337,18 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
   }
 
   const terminal = createHeadlessTerminal(cols, rows);
+  const graphics = fixture.graphics === "kitty";
   const childEnvironment: NodeJS.ProcessEnv = {
     ...process.env,
-    TERM: "xterm-256color",
+    TERM: graphics ? "xterm-kitty" : "xterm-256color",
     COLORTERM: "truecolor",
     ...fixture.env,
   };
+  // Cell metrics the emulated terminal reports; the HTML renderer positions
+  // overlays in ch/em units so the same ratios hold in the PNG.
+  const cellWidth = Math.max(1, Math.round(fontSize * 0.62));
+  const cellHeight = Math.max(1, Math.round(fontSize * lineHeight));
+  let tracker: KittyGraphicsTracker | null = null;
   const command = resolvePtyCommand(fixture.command, cwd, childEnvironment);
   const useExitWrapper =
     process.platform === "win32" ||
@@ -448,12 +458,22 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
       );
     }
     child = spawnPty(spawnedCommand, spawnedArgs, {
-      name: "xterm-256color",
+      name: graphics ? "xterm-kitty" : "xterm-256color",
       cols,
       rows,
       cwd,
       env: childEnvironment,
     });
+    if (graphics) {
+      const spawned = child;
+      const reply = (data: string) => {
+        if (!exited) spawned.write(data);
+      };
+      tracker = new KittyGraphicsTracker({ terminal, cols, rows, cellWidth, cellHeight, reply });
+      // A real terminal answers device attributes and similar queries; forward
+      // xterm's replies so the program can finish its capability probe.
+      terminal.onData(reply);
+    }
     child.onData((data) => {
       if (useExitWrapper && wrappedExitCode === null) {
         markerBuffer = (markerBuffer + data).slice(-4_096);
@@ -467,7 +487,9 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
           }
         }
       }
-      writes = writes.then(() => writeTerminal(terminal, data));
+      writes = writes.then(() =>
+        tracker ? tracker.write(data) : writeTerminal(terminal, data),
+      );
     });
     child.onExit((event) => {
       exited = event;
@@ -547,6 +569,7 @@ async function takeIsolatedPtyShot(request: PtyShotRequest): Promise<string> {
     });
     return await captureTerminalHtml({
       terminalRows,
+      overlays: tracker ? overlaysToHtml(tracker.overlays(), lineHeight) : "",
       outPath: request.outPath,
       headed: request.headed,
       cols,

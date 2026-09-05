@@ -38,6 +38,7 @@ for (const engineName of [
   "@archastro/react-shot",
   "@archastro/tui-shot",
   "@archastro/movie-harness",
+  "@archastro/astroshot-review",
 ]) {
   if (astroshotManifest.dependencies[engineName] !== packageVersion) {
     throw new Error(
@@ -217,6 +218,7 @@ function verifyUnscopedWrapper(unscopedTarball) {
     ["pty", "--help"],
     ["movie", "--help"],
     ["movie", "which-source", "ratatui tui"],
+    ["review", "--help"],
   ]) {
     const result = spawnSync(executable, modeArguments, {
       cwd: hijackDir,
@@ -329,10 +331,12 @@ try {
   run("npm", ["run", "build", "--workspace", "@archastro/react-shot"]);
   run("npm", ["run", "build", "--workspace", "@archastro/tui-shot"]);
   run("npm", ["run", "build", "--workspace", "@archastro/movie-harness"]);
+  run("npm", ["run", "build", "--workspace", "@archastro/astroshot-review"]);
 
   const reactTarball = pack("packages/react-shot");
   const tuiTarball = pack("packages/tui-shot");
   const movieTarball = pack("packages/movie-harness");
+  const reviewTarball = pack("packages/astroshot-review");
   const astroshotTarball = pack("packages/astroshot");
   // Packing the wrapper runs its prepack: build every engine, materialize the
   // local @archastro farm, and refuse to pack an unbuilt engine.
@@ -361,6 +365,7 @@ try {
       reactTarball,
       tuiTarball,
       movieTarball,
+      reviewTarball,
       astroshotTarball,
       "react@19",
       "react-dom@19",
@@ -404,6 +409,9 @@ try {
     cwd: consumerDir,
   });
   run("npx", ["--no-install", "astroshot", "movie", "which-source", "ratatui tui"], {
+    cwd: consumerDir,
+  });
+  run("npx", ["--no-install", "astroshot", "review", "--help"], {
     cwd: consumerDir,
   });
   run(
@@ -450,7 +458,7 @@ try {
     }
   }
 
-  for (const packageName of ["react-shot", "tui-shot", "movie-harness"]) {
+  for (const packageName of ["react-shot", "tui-shot", "movie-harness", "astroshot-review"]) {
     const packageRoot = path.join(
       consumerDir,
       "node_modules",
