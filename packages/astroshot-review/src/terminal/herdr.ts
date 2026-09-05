@@ -193,6 +193,8 @@ interface LayerStream {
  */
 export class HerdrSink {
   private readonly layers = new Map<string, LayerStream>();
+  /** Every socket opened and not yet closed, whether or not its layer is still mapped. */
+  private readonly connections = new Set<Socket>();
   private disposed = false;
   private generationCount = 0;
 
@@ -226,13 +228,22 @@ export class HerdrSink {
     if (!layer) return;
     this.layers.delete(layerId);
     layer.pending = null;
-    if (layer.socket) {
-      // Closing the connection makes herdr drop this layer.
-      try {
-        layer.socket.destroy();
-      } catch {
-        // already gone
-      }
+    layer.opening = false;
+    layer.ready = false;
+    const socket = layer.socket;
+    layer.socket = null;
+    // Closing the connection makes herdr drop this layer. This must happen
+    // even mid-handshake: a connection that outlives its layer keeps a ghost
+    // layer in herdr and keeps this process alive after the tray quits.
+    if (socket) this.close(socket);
+  }
+
+  private close(socket: Socket): void {
+    this.connections.delete(socket);
+    try {
+      socket.destroy();
+    } catch {
+      // already gone
     }
   }
 
@@ -241,10 +252,28 @@ export class HerdrSink {
   }
 
   private open(layerId: string, layer: LayerStream): void {
-    layer.opening = true;
     const client = createConnection(this.address.socket);
+    // The layer owns its socket from the first moment, not from the open ack:
+    // clear() and dispose() close whatever is here, handshake or not.
+    layer.opening = true;
+    layer.ready = false;
+    layer.socket = client;
+    this.connections.add(client);
     let text = "";
     let opened = false;
+    // Still the mapped layer's current socket, on a live sink.
+    const current = () => !this.disposed && this.layers.get(layerId) === layer && layer.socket === client;
+    const markOpen = () => {
+      if (opened) return;
+      opened = true;
+      if (!current()) {
+        this.close(client);
+        return;
+      }
+      layer.opening = false;
+      layer.ready = true;
+      this.flush(layerId, layer);
+    };
     client.on("connect", () => {
       client.write(JSON.stringify({ id: "astroshot-review", method: "pane.graphics.stream", params: { pane_id: this.address.pane, layer_id: layerId, z_index: layer.z } }) + "\n");
     });
@@ -264,41 +293,28 @@ export class HerdrSink {
           this.onError(new Error(`herdr stream ${layerId}: ${reply.error.code}`));
           continue;
         }
-        if (!opened) {
-          opened = true;
-          layer.opening = false;
-          layer.socket = client;
-          layer.ready = true;
-          this.flush(layerId, layer);
-        }
+        markOpen();
       }
     });
     const drop = (reason: string) => {
-      const current = this.layers.get(layerId);
+      clearTimeout(grace);
+      this.connections.delete(client);
+      // A socket that clear() already detached says nothing about the layer.
+      if (layer.socket !== client) return;
       layer.socket = null;
       layer.ready = false;
       layer.opening = false;
       // Unexpected drop (not from clear/dispose): let callers re-send everything.
-      if (current === layer && !this.disposed) {
+      if (this.layers.get(layerId) === layer && !this.disposed) {
         this.generationCount += 1;
         this.onError(new Error(`herdr stream ${layerId} ${reason}`));
       }
     };
     client.on("error", () => drop("error"));
-    client.on("close", () => {
-      if (this.layers.get(layerId) === layer) drop("closed");
-    });
+    client.on("close", () => drop("closed"));
     // If the open reply never comes, assume success after a short grace so a
     // silent-ack build still renders.
-    setTimeout(() => {
-      if (!opened && !this.disposed && layer.socket === null && layer.opening) {
-        opened = true;
-        layer.opening = false;
-        layer.socket = client;
-        layer.ready = true;
-        this.flush(layerId, layer);
-      }
-    }, 400);
+    const grace = setTimeout(markOpen, 400);
   }
 
   private flush(layerId: string, layer: LayerStream): void {
@@ -341,15 +357,7 @@ export class HerdrSink {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const layer of this.layers.values()) {
-      if (layer.socket) {
-        try {
-          layer.socket.destroy();
-        } catch {
-          // already gone
-        }
-      }
-    }
+    for (const socket of [...this.connections]) this.close(socket);
     this.layers.clear();
   }
 }

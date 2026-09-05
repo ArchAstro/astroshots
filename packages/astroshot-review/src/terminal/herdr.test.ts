@@ -23,8 +23,13 @@ function fakeHerdr(options: {
   const openedLayers: string[] = [];
   const frames: Array<{ layer: string; placement: Record<string, number>; bytes: number }> = [];
   const closedLayers: string[] = [];
+  let liveConnections = 0;
 
   const server = net.createServer((socket) => {
+    liveConnections += 1;
+    // The client may hang up mid-handshake (that's what the sink tests exercise);
+    // a late ack then fails with EPIPE, which is herdr's problem, not the test's.
+    socket.on("error", () => undefined);
     let layerId: string | null = null;
     let buf = Buffer.alloc(0);
     let expectBytes = 0;
@@ -71,6 +76,7 @@ function fakeHerdr(options: {
       }
     });
     socket.on("close", () => {
+      liveConnections -= 1;
       if (layerId) closedLayers.push(layerId);
     });
   });
@@ -80,6 +86,8 @@ function fakeHerdr(options: {
     openedLayers,
     frames,
     closedLayers,
+    /** Sockets herdr still holds open — each one would keep the client process alive. */
+    liveConnections: () => liveConnections,
     listen: () => new Promise<void>((resolve) => server.listen(socketPath, resolve)),
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
@@ -91,6 +99,8 @@ afterEach(async () => {
 });
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 120));
+/** Long enough for the sink's 400 ms silent-ack grace to elapse. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 600));
 
 describe("herdr address", () => {
   it("requires HERDR_ENV and the pane context", () => {
@@ -173,5 +183,55 @@ describe("HerdrSink (per-layer streams)", () => {
     sink.dispose();
     await flush();
     expect(server.closedLayers.sort()).toEqual(["astro-3", "astro-4"]);
+  });
+
+  // A stream is a live socket from the moment it starts connecting. Clearing
+  // or disposing before herdr acks the open must still close it: an orphaned
+  // connection keeps the tray process alive after `q` and leaves a ghost layer.
+  it("closes a stream that is cleared while still opening (silent ack)", async () => {
+    server = fakeHerdr({ ackStreamOpen: false });
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-5", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    sink.clear("astro-5");
+    await settle();
+    expect(server.liveConnections()).toBe(0);
+    sink.dispose();
+  });
+
+  it("closes a stream that is cleared before the open ack arrives", async () => {
+    server = fakeHerdr();
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-6", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    await new Promise((resolve) => setImmediate(resolve));
+    sink.clear("astro-6");
+    await settle();
+    expect(server.liveConnections()).toBe(0);
+    sink.dispose();
+  });
+
+  it("closes streams that are still opening on dispose", async () => {
+    server = fakeHerdr({ ackStreamOpen: false });
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-7", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    sink.set("astro-8", ONE_PX_PNG, 1, 1, { col: 0, row: 4, cols: 2, rows: 1, z: 0 });
+    sink.dispose();
+    await settle();
+    expect(server.liveConnections()).toBe(0);
+  });
+
+  it("does not resurrect a cleared layer when the open grace period elapses", async () => {
+    server = fakeHerdr({ ackStreamOpen: false });
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-9", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    await flush();
+    sink.clear("astro-9");
+    await settle();
+    expect(server.liveConnections()).toBe(0);
+    expect(server.frames.filter((f) => f.layer === "astro-9")).toEqual([]);
+    sink.dispose();
   });
 });
