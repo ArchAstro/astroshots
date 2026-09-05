@@ -33,7 +33,8 @@ The two tracks are versioned independently.
   so stills, posters, and movie playback are crisp — even reached over mosh,
   because the pixels travel through herdr's renderer. Each image owns a
   `pane.graphics.stream` layer, so herdr drops it the instant the stream
-  closes and quitting (even a hard kill) leaves no images behind. Needs
+  closes and quitting (even a hard kill) leaves no images behind. Images are
+  oversampled 2x so herdr only downscales, keeping them crisp on Retina panes. Needs
   `[experimental] kitty_graphics = true` and one client reattach; the tray
   detects when herdr can't yet report the cell size and says exactly what to do.
 - **Half-block image fallback for mosh, tmux, and plain terminals:** where no
