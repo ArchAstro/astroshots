@@ -3,74 +3,106 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { HerdrSink, discoverHerdr, herdrAddress, probeHerdrSet } from "./herdr.js";
 
-interface Recorded {
-  method: string;
-  params: Record<string, unknown>;
-}
+const ONE_PX_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
 
-/** A fake herdr socket that records requests and replies per a scripted plan. */
-function fakeHerdr(reply: (method: string, count: number) => unknown) {
+/** A fake herdr that answers info per a plan and records stream layers/frames. */
+function fakeHerdr(options: {
+  info?: (count: number) => unknown;
+  ackStreamOpen?: boolean;
+} = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-fake-"));
   const socketPath = path.join(dir, "api.sock");
-  const requests: Recorded[] = [];
-  const counts = new Map<string, number>();
+  let infoCount = 0;
+  const openedLayers: string[] = [];
+  const frames: Array<{ layer: string; placement: Record<string, number>; bytes: number }> = [];
+  const closedLayers: string[] = [];
+
   const server = net.createServer((socket) => {
-    let buf = "";
+    let layerId: string | null = null;
+    let buf = Buffer.alloc(0);
+    let expectBytes = 0;
+    let pendingPlacement: Record<string, number> | null = null;
+
+    const onLine = (line: string) => {
+      let message: { method?: string; params?: Record<string, unknown> } & Record<string, unknown>;
+      try {
+        message = JSON.parse(line);
+      } catch {
+        return;
+      }
+      if (message.method === "pane.graphics.info") {
+        infoCount += 1;
+        const reply = options.info ? options.info(infoCount) : { result: { type: "pane_graphics_info", cell_width_px: 8, cell_height_px: 16, max_layers_per_pane: 16 } };
+        socket.write(JSON.stringify(reply) + "\n");
+      } else if (message.method === "pane.graphics.stream") {
+        layerId = String((message.params as { layer_id?: string })?.layer_id ?? "");
+        openedLayers.push(layerId);
+        if (options.ackStreamOpen !== false) socket.write(JSON.stringify({ result: { type: "ok" } }) + "\n");
+      } else if (typeof message.format === "string" && typeof message.data_length === "number") {
+        // A stream frame header; the raw bytes follow.
+        expectBytes = message.data_length as number;
+        pendingPlacement = message.placement as Record<string, number>;
+      }
+    };
+
     socket.on("data", (chunk) => {
-      buf += chunk.toString();
-      let end: number;
-      while ((end = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, end);
-        buf = buf.slice(end + 1);
-        try {
-          const message = JSON.parse(line) as Recorded;
-          requests.push(message);
-          const count = (counts.get(message.method) ?? 0) + 1;
-          counts.set(message.method, count);
-          const body = reply(message.method, count);
-          if (body !== undefined) socket.write(JSON.stringify(body) + "\n");
-        } catch {
-          // ignore
+      buf = Buffer.concat([buf, chunk]);
+      for (;;) {
+        if (expectBytes > 0) {
+          if (buf.length < expectBytes) return;
+          buf = buf.subarray(expectBytes);
+          frames.push({ layer: layerId ?? "?", placement: pendingPlacement ?? {}, bytes: expectBytes });
+          expectBytes = 0;
+          pendingPlacement = null;
+          continue;
         }
+        const nl = buf.indexOf(0x0a);
+        if (nl < 0) return;
+        const line = buf.subarray(0, nl).toString();
+        buf = buf.subarray(nl + 1);
+        onLine(line);
       }
     });
+    socket.on("close", () => {
+      if (layerId) closedLayers.push(layerId);
+    });
   });
+
   return {
     socketPath,
-    requests,
+    openedLayers,
+    frames,
+    closedLayers,
     listen: () => new Promise<void>((resolve) => server.listen(socketPath, resolve)),
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
 
 let server: ReturnType<typeof fakeHerdr>;
-
 afterEach(async () => {
   if (server) await server.close();
 });
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 120));
 
 describe("herdr address", () => {
   it("requires HERDR_ENV and the pane context", () => {
     expect(herdrAddress({} as NodeJS.ProcessEnv)).toBeNull();
     expect(herdrAddress({ HERDR_ENV: "1" } as NodeJS.ProcessEnv)).toBeNull();
-    expect(herdrAddress({ HERDR_ENV: "1", HERDR_SOCKET_PATH: "/s", HERDR_PANE_ID: "w1:p2" } as NodeJS.ProcessEnv)).toEqual({
-      socket: "/s",
-      pane: "w1:p2",
-    });
+    expect(herdrAddress({ HERDR_ENV: "1", HERDR_SOCKET_PATH: "/s", HERDR_PANE_ID: "w1:p2" } as NodeJS.ProcessEnv)).toEqual({ socket: "/s", pane: "w1:p2" });
   });
 });
 
 describe("discoverHerdr", () => {
   it("retries while the cell size is negotiating, then returns it", async () => {
-    server = fakeHerdr((method, count) => {
-      if (method !== "pane.graphics.info") return { error: { code: "bad", message: "x" } };
-      if (count < 3) return { error: { code: "cell_size_unavailable", message: "negotiating" } };
-      return { result: { type: "pane_graphics_info", cell_width_px: 8, cell_height_px: 16, max_layers_per_pane: 16 } };
-    });
+    server = fakeHerdr({ info: (count) => (count < 3 ? { error: { code: "cell_size_unavailable", message: "negotiating" } } : { result: { type: "pane_graphics_info", cell_width_px: 8, cell_height_px: 16 } }) });
     await server.listen();
     const result = await discoverHerdr({ socket: server.socketPath, pane: "w1:p2" }, { retryMs: 5, timeoutMs: 2000 });
     expect(result.ok).toBe(true);
@@ -79,7 +111,7 @@ describe("discoverHerdr", () => {
   });
 
   it("reports an actionable reason when the feature is disabled", async () => {
-    server = fakeHerdr(() => ({ error: { code: "feature_disabled", message: "off" } }));
+    server = fakeHerdr({ info: () => ({ error: { code: "feature_disabled", message: "off" } }) });
     await server.listen();
     const result = await discoverHerdr({ socket: server.socketPath, pane: "w1:p2" }, { timeoutMs: 200 });
     expect(result.ok).toBe(false);
@@ -87,7 +119,7 @@ describe("discoverHerdr", () => {
   });
 
   it("reports the reattach hint when the cell size never arrives", async () => {
-    server = fakeHerdr(() => ({ error: { code: "cell_size_unavailable", message: "no size" } }));
+    server = fakeHerdr({ info: () => ({ error: { code: "cell_size_unavailable", message: "no size" } }) });
     await server.listen();
     const result = await discoverHerdr({ socket: server.socketPath, pane: "w1:p2" }, { retryMs: 5, timeoutMs: 60 });
     expect(result.ok).toBe(false);
@@ -96,45 +128,50 @@ describe("discoverHerdr", () => {
 });
 
 describe("probeHerdrSet", () => {
-  it("accepts a silent set (no ack) as supported", async () => {
-    server = fakeHerdr((method) => (method === "pane.graphics.set" ? undefined : { result: {} }));
+  it("accepts a stream that opens (silent ack included)", async () => {
+    server = fakeHerdr({ ackStreamOpen: false });
     await server.listen();
     const result = await probeHerdrSet({ socket: server.socketPath, pane: "w1:p2" });
     expect(result.ok).toBe(true);
   });
-
-  it("rejects an explicit error", async () => {
-    server = fakeHerdr((method) => (method === "pane.graphics.set" ? { error: { code: "unknown_method", message: "no" } } : { result: {} }));
-    await server.listen();
-    const result = await probeHerdrSet({ socket: server.socketPath, pane: "w1:p2" });
-    expect(result.ok).toBe(false);
-  });
 });
 
-describe("HerdrSink", () => {
-  it("emits pane.graphics.set with a 0-based cell placement and clears layers", async () => {
-    server = fakeHerdr(() => undefined);
+describe("HerdrSink (per-layer streams)", () => {
+  it("opens one stream per layer and pushes a raw frame with the placement", async () => {
+    server = fakeHerdr();
     await server.listen();
     const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
-    sink.set("astro-1", png, 40, 30, { col: 4, row: 7, cols: 10, rows: 5, z: 0 });
-    sink.clear("astro-1");
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const set = server.requests.find((request) => request.method === "pane.graphics.set");
-    expect(set).toBeTruthy();
-    expect(set!.params).toMatchObject({
-      pane_id: "w1:p2",
-      layer_id: "astro-1",
-      format: "png",
-      image_width: 40,
-      image_height: 30,
-      z_index: 0,
-      placement: { viewport_col: 4, viewport_row: 7, grid_cols: 10, grid_rows: 5 },
-    });
-    expect(Buffer.from(set!.params.data_base64 as string, "base64").equals(png)).toBe(true);
-    expect(server.requests.some((request) => request.method === "pane.graphics.clear" && request.params.layer_id === "astro-1")).toBe(true);
+    sink.set("astro-1", ONE_PX_PNG, 1, 1, { col: 4, row: 7, cols: 10, rows: 5, z: 0 });
+    await flush();
+    expect(server.openedLayers).toContain("astro-1");
+    const frame = server.frames.find((f) => f.layer === "astro-1");
+    expect(frame).toBeTruthy();
+    expect(frame!.bytes).toBe(ONE_PX_PNG.length);
+    expect(frame!.placement).toEqual({ viewport_col: 4, viewport_row: 7, grid_cols: 10, grid_rows: 5 });
     sink.dispose();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(server.requests.some((request) => request.method === "pane.graphics.clear" && request.params.layer_id === undefined)).toBe(true);
+    await flush();
+  });
+
+  it("removes a layer by closing its stream (herdr drops it)", async () => {
+    server = fakeHerdr();
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-2", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    await flush();
+    sink.clear("astro-2");
+    await flush();
+    expect(server.closedLayers).toContain("astro-2");
+  });
+
+  it("closes every stream on dispose", async () => {
+    server = fakeHerdr();
+    await server.listen();
+    const sink = new HerdrSink({ socket: server.socketPath, pane: "w1:p2" }, () => undefined);
+    sink.set("astro-3", ONE_PX_PNG, 1, 1, { col: 0, row: 0, cols: 2, rows: 1, z: 0 });
+    sink.set("astro-4", ONE_PX_PNG, 1, 1, { col: 0, row: 4, cols: 2, rows: 1, z: 0 });
+    await flush();
+    sink.dispose();
+    await flush();
+    expect(server.closedLayers.sort()).toEqual(["astro-3", "astro-4"]);
   });
 });
