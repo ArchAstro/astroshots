@@ -22,9 +22,13 @@ export interface PictureProps {
   label?: string;
   border?: boolean;
   z?: number;
+  /** Allow the image to scale up to this multiple of native to fill its box (default 1 = never upscale). */
+  maxUpscale?: number;
+  /** User zoom within the allowed range (1 = as large as allowed). */
+  zoom?: number;
 }
 
-export function Picture({ src, version = 0, width, height, label, border = false, z }: PictureProps) {
+export function Picture({ src, version = 0, width, height, label, border = false, z, maxUpscale = 1, zoom = 1 }: PictureProps) {
   const { layer, service, capabilities } = useServices();
   const ref = useRef<DOMElement>(null);
   const handleRef = useRef<ImageHandle | null>(null);
@@ -39,7 +43,7 @@ export function Picture({ src, version = 0, width, height, label, border = false
   // ---- Kitty: reserve the box and let the out-of-band layer paint it. ----
   useEffect(() => {
     if (!kitty) return;
-    const handle = layer.register({ src, version, z });
+    const handle = layer.register({ src, version, z, maxUpscale, zoom });
     handleRef.current = handle;
     handle.setNode(ref.current);
     // Ink already painted this commit before the effect ran; measure now so
@@ -58,6 +62,11 @@ export function Picture({ src, version = 0, width, height, label, border = false
     handleRef.current?.setSource(src, version);
     setFailure(null);
   }, [kitty, src, version]);
+
+  useEffect(() => {
+    if (!kitty) return;
+    handleRef.current?.setZoom(zoom, maxUpscale);
+  }, [kitty, zoom, maxUpscale]);
 
   useEffect(() => {
     if (!kitty || !handleRef.current) return;

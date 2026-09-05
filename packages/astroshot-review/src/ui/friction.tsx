@@ -308,7 +308,7 @@ export function FrictionStepDetail({ log, run, stepIndex, imageIndex, width, hei
         </Text>
       </Box>
       <Box flexShrink={0} width={inner} height={preview}>
-        <Picture src={screenshot} width={inner} height={preview} label="No screenshot for this step" />
+        <Picture src={screenshot} width={inner} height={preview} maxUpscale={8} label="No screenshot for this step" />
       </Box>
       {step.screenshots.length > 1 ? (
         <Text color={theme.muted}>
@@ -384,7 +384,7 @@ export function FrictionStepTakeover({ log, run, stepIndex, imageIndex, width, h
       </Box>
       <Box flexShrink={0} flexDirection="row" width={width} height={stageHeight}>
         <Box flexShrink={0} flexDirection="column" width={stageWidth} height={stageHeight} alignItems="center" justifyContent="center">
-          <Picture src={screenshot} width={stageWidth} height={step.screenshots.length > 1 ? stageHeight - 1 : stageHeight} label="No screenshot for this step" />
+          <Picture src={screenshot} width={stageWidth} height={step.screenshots.length > 1 ? stageHeight - 1 : stageHeight} maxUpscale={8} label="No screenshot for this step" />
           {step.screenshots.length > 1 ? (
             <Text color={theme.muted}>
               Image {imageIndex + 1} / {step.screenshots.length} · [ ] switch

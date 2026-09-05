@@ -28,10 +28,12 @@ export interface ReviewTakeoverProps {
   playing: boolean;
   busy: boolean;
   error: string | null;
+  /** 1 fills the stage; below shrinks toward native size. */
+  zoom: number;
 }
 
 export function ReviewTakeover(props: ReviewTakeoverProps) {
-  const { shot, position, width, height, composer, playback, onPlayback, playing, busy, error } = props;
+  const { shot, position, width, height, composer, playback, onPlayback, playing, busy, error, zoom } = props;
   const railWidth = width >= 100 ? RAIL_WIDTH : Math.max(28, Math.floor(width * 0.38));
   const stageWidth = Math.max(10, width - railWidth - 1);
   const headerHeight = 3;
@@ -82,7 +84,7 @@ export function ReviewTakeover(props: ReviewTakeoverProps) {
               onPlayback={onPlayback}
             />
           ) : (
-            <Picture src={shot.path} version={shot.mtimeMs} width={stageWidth} height={imageHeight} label={shot.isMovie ? "▶ movie poster" : "Screenshot unavailable"} />
+            <Picture src={shot.path} version={shot.mtimeMs} width={stageWidth} height={imageHeight} maxUpscale={8} zoom={zoom} label={shot.isMovie ? "▶ movie poster" : "Screenshot unavailable"} />
           )}
           {showPlayer ? (
             <ProgressBar
@@ -159,7 +161,7 @@ export function ReviewTakeover(props: ReviewTakeoverProps) {
               </Line>
               <Line width={railInner}>
                 <Text color={theme.muted} wrap="truncate">
-                  {canPlay ? "← → page · space play · , . seek · [ ] chapter" : "← → page  ·  c send  ·  s seen"}
+                  {canPlay ? "← → page · space play · +/- zoom · [ ] chapter" : "← → page · +/- zoom · c send · s seen"}
                 </Text>
               </Line>
             </Box>
