@@ -404,7 +404,7 @@ export function App({ onQuit }: AppProps) {
     [activeShot, patch],
   );
 
-  const canInlinePlay = capabilities.graphics === "kitty";
+  const canInlinePlay = capabilities.graphics === "kitty" || capabilities.graphics === "herdr";
   const togglePlay = useCallback(() => {
     if (!activeShot?.videoPath) {
       toast(activeShot?.isMovie ? "Video missing on disk" : "Not a movie");

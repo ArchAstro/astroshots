@@ -38,7 +38,7 @@ export function SettingsPane({ roots, width, height }: { roots: string[]; width:
       )}
       <Rule width={inner} />
       <SectionLabel>GRAPHICS</SectionLabel>
-      <MetaRow label="Images" value={capabilities.graphics === "kitty" ? "Kitty graphics (pixel-perfect)" : capabilities.graphics === "halfblocks" ? `half-block text · ${capabilities.reason ?? ""}`.trim() : `off · ${capabilities.reason ?? "unsupported"}`} width={inner} />
+      <MetaRow label="Images" value={capabilities.graphics === "kitty" ? "Kitty graphics (pixel-perfect)" : capabilities.graphics === "herdr" ? "herdr pane graphics (pixel-perfect)" : capabilities.graphics === "halfblocks" ? `half-block text · ${capabilities.reason ?? ""}`.trim() : `off · ${capabilities.reason ?? "unsupported"}`} width={inner} />
       <MetaRow label="Cell" value={`${capabilities.cellWidth}×${capabilities.cellHeight} px (${capabilities.cellSource})`} width={inner} />
       <MetaRow label="Transport" value={capabilities.fileMedium ? "file path (local)" : "inline bytes"} width={inner} />
       <MetaRow label="Session" value={[capabilities.insideSsh ? "ssh" : "local", capabilities.insideMosh ? "mosh" : null, capabilities.insideHerdr ? "herdr" : null, capabilities.insideTmux ? "tmux" : null].filter(Boolean).join(" · ") || "local"} width={inner} />

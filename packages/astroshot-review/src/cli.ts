@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { ReviewStore } from "./data/store.js";
 import { ImageService } from "./images/service.js";
 import { createGraphicsStdout } from "./terminal/graphics-stdout.js";
+import { HerdrSink, discoverHerdr, herdrAddress, probeHerdrSet } from "./terminal/herdr.js";
 import { ImageLayer } from "./terminal/image-layer.js";
 import { probeTerminal } from "./terminal/probe.js";
 import { App } from "./ui/app.js";
@@ -27,9 +28,11 @@ Options:
   -h, --help         Show this help
 
 Without roots, \`astroshot review\` uses the folders the Astroshots app
-watches (macOS) and otherwise the current directory. Pictures need a
-terminal with the Kitty graphics protocol (Ghostty, kitty, WezTerm);
-movies additionally need ffmpeg on PATH.
+watches (macOS) and otherwise the current directory. Images render pixel-
+perfect in Kitty-protocol terminals (Ghostty, kitty, WezTerm) and inside
+herdr (enable [experimental] kitty_graphics and reattach the client once);
+elsewhere — mosh, tmux, plain terminals — they render as truecolor
+half-block text. Movie playback needs ffmpeg on PATH.
 
 Keys: ↑↓ move · ⏎ open · f full screen · s seen · c feedback · u history ·
       m movies · 1/2 tabs · , settings · ? help · q quit`;
@@ -136,16 +139,47 @@ export async function main(argv: string[]): Promise<number> {
   const debugLog = process.env.ASTROSHOT_REVIEW_DEBUG
     ? (message: string) => fs.appendFileSync("astroshot-review.log", `${new Date().toISOString()} ${message}\n`)
     : null;
-  const capabilities = await probeTerminal(
+  let capabilities = await probeTerminal(
     { stdin: process.stdin, stdout: process.stdout },
     { env: args.graphics ? process.env : { ...process.env, ASTROSHOT_REVIEW_GRAPHICS: "none" } },
   );
+
+  // Inside herdr, raw Kitty escapes are dropped; render through its socket
+  // graphics API instead (pixel-perfect), falling back to half-blocks with an
+  // actionable reason when herdr can't yet report the host cell size.
+  let herdrSink: HerdrSink | undefined;
+  const herdr = args.graphics ? herdrAddress() : null;
+  if (herdr) {
+    const discovery = await discoverHerdr(herdr, {
+      onWaiting: () => debugLog?.("herdr: waiting for host cell size"),
+    });
+    if (discovery.ok && discovery.cellWidth && discovery.cellHeight) {
+      const setSupport = await probeHerdrSet(herdr);
+      if (setSupport.ok) {
+        herdrSink = new HerdrSink(herdr, (error) => debugLog?.(`herdr: ${error.message}`));
+        capabilities = {
+          ...capabilities,
+          graphics: "herdr",
+          cellWidth: discovery.cellWidth,
+          cellHeight: discovery.cellHeight,
+          cellSource: "query",
+          reason: undefined,
+        };
+      } else {
+        // herdr can size images but not place per-image layers; half-blocks it is.
+        capabilities = { ...capabilities, reason: setSupport.reason ?? "herdr pane.graphics.set unavailable" };
+      }
+    } else {
+      capabilities = { ...capabilities, reason: discovery.reason ?? capabilities.reason };
+    }
+  }
   debugLog?.(`capabilities ${JSON.stringify(capabilities)}`);
   const ffmpeg = detectFfmpeg();
   const service = new ImageService();
   const layer = new ImageLayer({
     capabilities,
     service,
+    herdr: herdrSink,
     write: (data) => {
       process.stdout.write(data);
     },
@@ -168,6 +202,7 @@ export async function main(argv: string[]): Promise<number> {
     cleared = true;
     const output = layer.clear();
     if (output) process.stdout.write(output);
+    herdrSink?.dispose();
   };
   const instance = render(createElement(ServicesContext.Provider, { value: services }, createElement(App, { onQuit: clearPictures })), {
     stdout,

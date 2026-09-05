@@ -27,13 +27,18 @@ The two tracks are versioned independently.
   graphics-capable terminal. The harness answers the capability probe, records
   transmitted images and placements, and paints them into the PNG, which is how
   the review tray screenshots itself in tests.
-- **Half-block image fallback for mosh, tmux, and herdr:** where the Kitty
-  graphics protocol can't reach the screen — inside mosh (no image protocol),
-  tmux, herdr, or a plain truecolor terminal — `astroshot review` now renders
-  every still, poster, and friction screenshot as truecolor half-block text
-  (two pixels per character) instead of showing an empty box. It detects those
-  transports and picks the mode automatically; `ASTROSHOT_REVIEW_GRAPHICS`
-  forces `kitty`, `halfblocks`, or `none`, and Settings shows the active mode.
+- **Pixel-perfect images inside herdr:** inside the herdr multiplexer (which
+  drops a program's raw Kitty escapes), `astroshot review` now renders through
+  herdr's own pane-graphics socket API (`pane.graphics.set` per image layer),
+  so stills, posters, and movie playback are crisp — even reached over mosh,
+  because the pixels travel through herdr's renderer. Needs
+  `[experimental] kitty_graphics = true` and one client reattach; the tray
+  detects when herdr can't yet report the cell size and says exactly what to do.
+- **Half-block image fallback for mosh, tmux, and plain terminals:** where no
+  pixel protocol is available, `astroshot review` renders every still, poster,
+  and friction screenshot as truecolor half-block text (two pixels per
+  character) instead of an empty box. `ASTROSHOT_REVIEW_GRAPHICS` forces
+  `kitty`, `halfblocks`, or `none`; Settings shows the active mode.
 
 ## [0.2.1] (npm) - 2026-08-19
 

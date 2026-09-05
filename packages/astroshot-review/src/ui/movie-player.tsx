@@ -40,7 +40,7 @@ export function MoviePlayer({ videoPath, posterPath, posterVersion = 0, width, h
   const playerRef = useRef<FramePlayer | null>(null);
   const [info, setInfo] = useState<VideoInfo | null>(null);
   const [hasFrame, setHasFrame] = useState(false);
-  const enabled = capabilities.graphics === "kitty";
+  const enabled = capabilities.graphics === "kitty" || capabilities.graphics === "herdr";
   const positionRef = useRef(playback.positionMs);
   positionRef.current = playback.positionMs;
 
