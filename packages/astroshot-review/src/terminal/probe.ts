@@ -11,7 +11,7 @@ import path from "node:path";
 
 import { encodeFileQuery, encodeQuery } from "./kitty.js";
 
-export type GraphicsProtocol = "kitty" | "halfblocks" | "none";
+export type GraphicsProtocol = "kitty" | "herdr" | "halfblocks" | "none";
 
 export interface TerminalCapabilities {
   graphics: GraphicsProtocol;

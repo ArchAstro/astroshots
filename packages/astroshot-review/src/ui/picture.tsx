@@ -30,7 +30,8 @@ export function Picture({ src, version = 0, width, height, label, border = false
   const handleRef = useRef<ImageHandle | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const mode = capabilities.graphics;
-  const kitty = mode === "kitty";
+  // Both Kitty and herdr paint through the out-of-band layer.
+  const kitty = mode === "kitty" || mode === "herdr";
 
   const innerWidth = Math.max(1, width - (border ? 2 : 0));
   const innerHeight = Math.max(1, height - (border ? 2 : 0));
@@ -105,7 +106,7 @@ export function Picture({ src, version = 0, width, height, label, border = false
       ? "No image"
       : mode === "halfblocks"
         ? "Rendering…"
-        : truncate(label ?? "Preview needs Kitty graphics", innerWidth);
+        : truncate(label ?? "Preview needs a graphics terminal", innerWidth);
 
   return (
     <Box

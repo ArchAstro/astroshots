@@ -19,6 +19,7 @@ import {
   encodePlace,
   encodeTransmit,
 } from "./kitty.js";
+import type { HerdrSink } from "./herdr.js";
 import type { TerminalCapabilities } from "./probe.js";
 
 export interface ImageHandle {
@@ -51,6 +52,8 @@ interface Entry {
   failed: string | null;
   /** Live frame state, for frame entries. */
   frame: { imageId: number; width: number; height: number } | null;
+  /** Last frame bytes, kept so herdr can re-place on a resize. */
+  frameData: Buffer | null;
   kind: "file" | "frames";
 }
 
@@ -74,6 +77,8 @@ export interface ImageLayerOptions {
   onError?: (src: string, error: Error) => void;
   /** Diagnostics sink (enabled by ASTROSHOT_REVIEW_DEBUG). */
   onDebug?: (message: string) => void;
+  /** When present, images are placed through herdr's socket API instead of Kitty escapes. */
+  herdr?: HerdrSink;
   maxTransmitted?: number;
 }
 
@@ -98,6 +103,9 @@ export class ImageLayer {
   private readonly onReady?: () => void;
   private readonly onError?: (src: string, error: Error) => void;
   private readonly onDebug?: (message: string) => void;
+  private readonly herdr?: HerdrSink;
+  private readonly herdrLayers = new Map<number, string>();
+  private herdrGeneration = -1;
   private readonly maxTransmitted: number;
   private lastSummary = "";
   /** Row offset of the live region's first line, 1-based screen row minus 1. */
@@ -111,11 +119,16 @@ export class ImageLayer {
     this.onReady = options.onReady;
     this.onError = options.onError;
     this.onDebug = options.onDebug;
+    this.herdr = options.herdr;
     this.maxTransmitted = options.maxTransmitted ?? 48;
   }
 
   get enabled(): boolean {
-    return this.capabilities.graphics === "kitty";
+    return this.capabilities.graphics === "kitty" || Boolean(this.herdr);
+  }
+
+  private herdrLayerId(entryId: number): string {
+    return `astro-${entryId}`;
   }
 
   register(options: { src: string | null; version?: number; z?: number }): ImageHandle {
@@ -130,6 +143,7 @@ export class ImageLayer {
       requestedKey: null,
       failed: null,
       frame: null,
+      frameData: null,
       kind: "file",
     };
     this.entries.set(id, entry);
@@ -149,6 +163,10 @@ export class ImageLayer {
       },
       unregister: () => {
         this.entries.delete(id);
+        if (this.herdr) {
+          this.herdr.clear(this.herdrLayerId(id));
+          this.herdrLayers.delete(id);
+        }
         this.scheduleFlush();
       },
     };
@@ -166,6 +184,7 @@ export class ImageLayer {
       requestedKey: null,
       failed: null,
       frame: null,
+      frameData: null,
       kind: "frames",
     };
     this.entries.set(id, entry);
@@ -182,24 +201,48 @@ export class ImageLayer {
       },
       pushFrame: (frame) => {
         if (!this.enabled) return;
-        const previous = entry.frame;
         const imageId = this.nextImageId++;
         entry.frame = { imageId, width: frame.width, height: frame.height };
+        entry.frameData = frame.png;
+        if (this.herdr) {
+          const placement = this.placementFor(entry);
+          if (placement) {
+            this.herdr.set(this.herdrLayerId(entry.id), frame.png, frame.width, frame.height, placement);
+            this.herdrLayers.set(entry.id, `frame-${imageId}`);
+          }
+          return;
+        }
+        const previous = { imageId: entry.frame.imageId };
         let output = encodeTransmit({ id: imageId, format: 100, data: frame.png });
         const placement = this.placementFor(entry);
         if (placement) {
           output += SAVE_CURSOR + this.placeCommand(placement) + RESTORE_CURSOR;
           this.lastPlacements.set(entry.id, placement);
         }
-        if (previous) output += encodeDelete({ kind: "image", id: previous.imageId });
+        void previous;
         this.write(`\x1b[?2026h${output}\x1b[?2026l`);
       },
       clearFrame: () => {
+        entry.frame = null;
+        entry.frameData = null;
+        if (this.herdr) {
+          this.herdr.clear(this.herdrLayerId(entry.id));
+          this.herdrLayers.delete(entry.id);
+          return;
+        }
         const output = dropFrame();
         this.lastPlacements.delete(entry.id);
         if (output) this.write(output);
       },
       unregister: () => {
+        entry.frame = null;
+        entry.frameData = null;
+        if (this.herdr) {
+          this.herdr.clear(this.herdrLayerId(entry.id));
+          this.herdrLayers.delete(entry.id);
+          this.entries.delete(id);
+          return;
+        }
         const output = dropFrame();
         this.entries.delete(id);
         this.lastPlacements.delete(entry.id);
@@ -255,6 +298,38 @@ export class ImageLayer {
   /** After a resize or screen clear, every placement must be re-sent. */
   invalidate(): void {
     this.resync = true;
+    // Force herdr layers to be re-set at their new positions.
+    this.herdrLayers.clear();
+  }
+
+  /**
+   * Reconcile the herdr layers with the current placement set: (re)place any
+   * image whose bytes or box changed, and clear layers no longer shown.
+   */
+  private syncHerdr(placements: Map<number, Placement>, readyByEntry: Map<number, PreparedImage>): void {
+    const sink = this.herdr;
+    if (!sink) return;
+    // A dropped-and-restored connection loses server-side layers; re-send all.
+    if (sink.generation !== this.herdrGeneration) {
+      this.herdrGeneration = sink.generation;
+      this.herdrLayers.clear();
+    }
+    for (const [entryId, placement] of placements) {
+      const ready = readyByEntry.get(entryId);
+      if (!ready) continue; // frame entries place themselves in pushFrame
+      const signature = `${ready.key}|${placement.col},${placement.row},${placement.cols},${placement.rows},${placement.z}`;
+      if (this.herdrLayers.get(entryId) === signature) continue;
+      sink.set(this.herdrLayerId(entryId), ready.data, ready.width, ready.height, placement);
+      this.herdrLayers.set(entryId, signature);
+    }
+    for (const entryId of [...this.herdrLayers.keys()]) {
+      const entry = this.entries.get(entryId);
+      // Keep active file placements and live frame entries; clear the rest.
+      if (placements.has(entryId)) continue;
+      if (entry?.kind === "frames" && entry.frame) continue;
+      sink.clear(this.herdrLayerId(entryId));
+      this.herdrLayers.delete(entryId);
+    }
   }
 
   /** Escape sequences that bring the terminal in line with the current layout. */
@@ -262,14 +337,19 @@ export class ImageLayer {
     if (!this.enabled) return "";
     this.tick += 1;
     const placements = new Map<number, Placement>();
+    const readyByEntry = new Map<number, PreparedImage>();
     let output = "";
     const cellWidth = this.capabilities.cellWidth;
     const cellHeight = this.capabilities.cellHeight;
 
     for (const entry of this.entries.values()) {
       if (entry.kind === "frames") {
-        const placement = this.placementFor(entry);
-        if (placement) placements.set(entry.id, placement);
+        // Frame entries place themselves in pushFrame; on herdr they re-place
+        // there too. Only the kitty escape path needs them re-emitted here.
+        if (!this.herdr) {
+          const placement = this.placementFor(entry);
+          if (placement) placements.set(entry.id, placement);
+        }
         continue;
       }
       if (!entry.src || !entry.node) continue;
@@ -297,6 +377,7 @@ export class ImageLayer {
       }
       const ready = entry.ready;
       if (!ready) continue;
+      readyByEntry.set(entry.id, ready);
 
       const fitted = fitInside({ width: ready.width, height: ready.height }, targetPx);
       const cols = Math.min(box.width, Math.max(1, Math.round(fitted.width / cellWidth)));
@@ -304,27 +385,38 @@ export class ImageLayer {
       const col = box.x + Math.floor((box.width - cols) / 2);
       const row = box.y + Math.floor((box.height - rows) / 2);
 
-      let image = this.transmitted.get(ready.key);
-      if (!image) {
-        image = { id: this.nextImageId++, key: ready.key, lastUsed: this.tick };
-        this.transmitted.set(ready.key, image);
-        output += encodeTransmit({
-          id: image.id,
-          format: 100,
-          data: ready.data,
-          filePath: this.capabilities.fileMedium && ready.isOriginal ? ready.path : undefined,
-        });
+      let imageId = 0;
+      if (!this.herdr) {
+        let image = this.transmitted.get(ready.key);
+        if (!image) {
+          image = { id: this.nextImageId++, key: ready.key, lastUsed: this.tick };
+          this.transmitted.set(ready.key, image);
+          output += encodeTransmit({
+            id: image.id,
+            format: 100,
+            data: ready.data,
+            filePath: this.capabilities.fileMedium && ready.isOriginal ? ready.path : undefined,
+          });
+        }
+        image.lastUsed = this.tick;
+        imageId = image.id;
       }
-      image.lastUsed = this.tick;
-      placements.set(entry.id, {
-        placementId: entry.id,
-        imageId: image.id,
-        col,
-        row,
-        cols,
-        rows,
-        z: entry.z,
-      });
+      placements.set(entry.id, { placementId: entry.id, imageId, col, row, cols, rows, z: entry.z });
+    }
+
+    // herdr composits images on named layers over the pane's text; drive its
+    // socket API instead of writing Kitty escapes the multiplexer would drop.
+    if (this.herdr) {
+      this.syncHerdr(placements, readyByEntry);
+      this.lastPlacements = placements;
+      if (this.onDebug) {
+        const summary = `herdr layers=${this.herdrLayers.size} placed=${placements.size}`;
+        if (summary !== this.lastSummary) {
+          this.lastSummary = summary;
+          this.onDebug(summary);
+        }
+      }
+      return "";
     }
 
     if (this.resync) {
@@ -394,6 +486,11 @@ export class ImageLayer {
     this.lastPlacements = new Map();
     this.transmitted.clear();
     this.resync = true;
+    if (this.herdr) {
+      this.herdr.clearAll();
+      this.herdrLayers.clear();
+      return "";
+    }
     return this.enabled ? encodeDelete({ kind: "all" }) : "";
   }
 }

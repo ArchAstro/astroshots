@@ -59,7 +59,8 @@ test("review documents the terminal tray and refuses to run without a TTY", () =
   const help = run("review", "--help");
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /Astroshots tray in your terminal/);
-  assert.match(help.stdout, /Kitty graphics/);
+  assert.match(help.stdout, /Kitty/);
+  assert.match(help.stdout, /herdr/);
   assert.match(help.stdout, /--root <dir>/);
 
   const bareHelp = run("review", "help");

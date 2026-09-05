@@ -26,17 +26,34 @@ The tray always shows pictures; the fidelity depends on the terminal.
 
 | Environment | What you get |
 |-------------|--------------|
-| **Kitty graphics protocol** — Ghostty, kitty, WezTerm, directly attached | Pixel-perfect images and in-tray movie playback |
-| **Anything else with truecolor** — plain xterm-256color, and crucially **mosh, tmux, or herdr** | Truecolor **half-block** rendering: each picture is drawn as colored text (two pixels per character), so it survives transports that strip pixel graphics. Movies show their poster; `O` opens the file. |
-| No truecolor, or not a TTY | Labeled placeholders, everything else works |
+| **Kitty graphics protocol** — Ghostty, kitty, WezTerm, attached directly | Pixel-perfect images and in-tray movie playback via the Kitty protocol |
+| **herdr** (the agent multiplexer) | Pixel-perfect images and playback through herdr's own pane-graphics socket API — see the setup note below |
+| **Anything else with truecolor** — plain xterm-256color, tmux, or **mosh** | Truecolor **half-block** rendering: each picture is drawn as colored text (two pixels per character), so it survives transports that strip pixel graphics. Movies show their poster; `O` opens the file. |
+| No truecolor, or not a TTY | Labeled placeholders; everything else works |
 
-The tray detects mosh, tmux, and herdr and goes straight to half-block text,
-because those emulate the terminal themselves and never forward another
-program's pixel escapes. To force a mode: `ASTROSHOT_REVIEW_GRAPHICS=kitty`,
-`=halfblocks`, or `=none`. Settings (`,`) shows which mode is active and why.
+The tray detects the environment and picks the mode. Inside herdr it renders
+through `pane.graphics.set` (raw Kitty escapes are dropped by herdr). mosh has
+no image protocol and tmux needs passthrough, so both fall back to half-block
+text. Force a mode with `ASTROSHOT_REVIEW_GRAPHICS=kitty|halfblocks|none`;
+Settings (`,`) shows the active mode and, when it isn't pixel-perfect, why.
 
-For pixel-perfect images and movie playback, attach a Kitty-capable terminal
-directly — not through mosh or a multiplexer.
+### Enabling images inside herdr
+
+herdr renders images only when its experimental graphics are on **and** the
+client was started with them on. Once:
+
+```toml
+# ~/.config/herdr/config.toml
+[experimental]
+kitty_graphics = true
+```
+
+Then `herdr server reload-config` and **detach and reattach the herdr client
+once** — herdr 0.8.2 latches the client's graphics setting at startup, so a
+client started with it off keeps reporting the host cell size as unavailable
+until it reattaches. After that, `astroshot review` shows pixel-perfect images
+in the pane. Reaching herdr over mosh is fine; the pixels travel through
+herdr's own renderer, not the mosh image path.
 
 ## Requirements
 
