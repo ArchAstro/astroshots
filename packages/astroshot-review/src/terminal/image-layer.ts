@@ -355,7 +355,12 @@ export class ImageLayer {
       if (!entry.src || !entry.node) continue;
       const box = measureElement(entry.node);
       if (box.width <= 0 || box.height <= 0) continue;
-      const targetPx = { width: box.width * cellWidth, height: box.height * cellHeight };
+      const boxPx = { width: box.width * cellWidth, height: box.height * cellHeight };
+      // Prepare above the cell box so the compositor only ever downscales
+      // (downscaling stays sharp; upscaling blurs). herdr may render the box at
+      // more physical pixels than its reported cell size implies, so oversample.
+      const supersample = this.herdr ? 2 : 1;
+      const targetPx = { width: boxPx.width * supersample, height: boxPx.height * supersample };
       const requestKey = `${entry.src}|${entry.version}|${targetPx.width}x${targetPx.height}`;
       if (entry.requestedKey !== requestKey) {
         entry.requestedKey = requestKey;
@@ -379,7 +384,9 @@ export class ImageLayer {
       if (!ready) continue;
       readyByEntry.set(entry.id, ready);
 
-      const fitted = fitInside({ width: ready.width, height: ready.height }, targetPx);
+      // The on-screen cell footprint is fitted to the actual box, not the
+      // oversampled prepare target.
+      const fitted = fitInside({ width: ready.width, height: ready.height }, boxPx);
       const cols = Math.min(box.width, Math.max(1, Math.round(fitted.width / cellWidth)));
       const rows = Math.min(box.height, Math.max(1, Math.round(fitted.height / cellHeight)));
       const col = box.x + Math.floor((box.width - cols) / 2);
