@@ -75,6 +75,8 @@ interface UiState {
   inlinePlayer: boolean;
   playback: PlaybackState;
   zoom: number;
+  panX: number;
+  panY: number;
 }
 
 const SPLIT_BREAKPOINT = 120;
@@ -113,6 +115,8 @@ const initialState: UiState = {
   inlinePlayer: false,
   playback: initialPlayback(),
   zoom: 1,
+  panX: 0.5,
+  panY: 0.5,
 };
 
 export interface AppProps {
@@ -216,7 +220,7 @@ export function App({ onQuit }: AppProps) {
     const current = activeShot?.path ?? null;
     if (current !== activePathRef.current) {
       activePathRef.current = current;
-      patch({ inlinePlayer: false, playback: initialPlayback(), composer: false, error: null, zoom: 1 });
+      patch({ inlinePlayer: false, playback: initialPlayback(), composer: false, error: null, zoom: 1, panX: 0.5, panY: 0.5 });
     }
   }, [activeShot?.path, patch]);
 
@@ -408,7 +412,25 @@ export function App({ onQuit }: AppProps) {
 
   const canInlinePlay = capabilities.graphics === "kitty" || capabilities.graphics === "herdr";
   const zoomBy = useCallback(
-    (delta: number) => patch((previous) => ({ zoom: Math.max(0.3, Math.min(3, Math.round((previous.zoom + delta) * 100) / 100)) })),
+    (delta: number) =>
+      patch((previous) => {
+        const zoom = Math.max(1, Math.min(6, Math.round((previous.zoom + delta) * 100) / 100));
+        // Snapping back to 1 recenters so the next zoom-in starts from the middle.
+        return zoom === 1 ? { zoom, panX: 0.5, panY: 0.5 } : { zoom };
+      }),
+    [patch],
+  );
+
+  const panBy = useCallback(
+    (dx: number, dy: number) =>
+      patch((previous) => {
+        if (previous.zoom <= 1) return {};
+        const step = 0.18 / previous.zoom;
+        return {
+          panX: Math.max(0, Math.min(1, previous.panX + dx * step)),
+          panY: Math.max(0, Math.min(1, previous.panY + dy * step)),
+        };
+      }),
     [patch],
   );
 
@@ -452,8 +474,12 @@ export function App({ onQuit }: AppProps) {
           patch({ takeover: null, composer: false });
           return;
         }
-        if (key.leftArrow || input === "h") return stepTakeover(-1);
-        if (key.rightArrow || input === "l") return stepTakeover(1);
+        // When zoomed in, the arrows pan the image; otherwise they page.
+        const zoomed = state.zoom > 1;
+        if (key.leftArrow || input === "h") return zoomed ? panBy(-1, 0) : stepTakeover(-1);
+        if (key.rightArrow || input === "l") return zoomed ? panBy(1, 0) : stepTakeover(1);
+        if (key.upArrow || input === "k") return zoomed ? panBy(0, -1) : undefined;
+        if (key.downArrow || input === "j") return zoomed ? panBy(0, 1) : undefined;
         if (input === "c") return patch({ composer: true, error: null });
         if (input === "s") return void markSeen(activeShot);
         if (input === " ") return togglePlay();
@@ -461,9 +487,9 @@ export function App({ onQuit }: AppProps) {
         if (input === ".") return seekBy(SEEK_STEP_MS);
         if (input === "[") return seekChapter(-1);
         if (input === "]") return seekChapter(1);
-        if (input === "+" || input === "=") return zoomBy(0.25);
-        if (input === "-" || input === "_") return zoomBy(-0.25);
-        if (input === "0") return patch({ zoom: 1 });
+        if (input === "+" || input === "=") return zoomBy(0.5);
+        if (input === "-" || input === "_") return zoomBy(-0.5);
+        if (input === "0") return patch({ zoom: 1, panX: 0.5, panY: 0.5 });
         if (input === "y") return void desktop(copyImageToClipboard(activeShot.path), "Copied image", "Couldn’t copy image");
         if (input === "o") return void desktop(revealInFileManager(activeShot.path), "", "Couldn’t reveal file");
         if (input === "O" && activeShot.videoPath) return void desktop(openWithDefaultApp(activeShot.videoPath), "", "Couldn’t open movie");
@@ -524,9 +550,9 @@ export function App({ onQuit }: AppProps) {
           if (input === ".") return seekBy(SEEK_STEP_MS);
           if (input === "[") return seekChapter(-1);
           if (input === "]") return seekChapter(1);
-          if (input === "+" || input === "=") return zoomBy(0.25);
-          if (input === "-" || input === "_") return zoomBy(-0.25);
-          if (input === "0") return patch({ zoom: 1 });
+          if (input === "+" || input === "=") return zoomBy(0.5);
+          if (input === "-" || input === "_") return zoomBy(-0.5);
+          if (input === "0") return patch({ zoom: 1, panX: 0.5, panY: 0.5 });
           if (input === "o") return void desktop(revealInFileManager(activeShot.path), "", "Couldn’t reveal file");
           if (input === "O" && activeShot.videoPath) return void desktop(openWithDefaultApp(activeShot.videoPath), "", "Couldn’t open movie");
           if (input === "y") return void desktop(copyImageToClipboard(activeShot.path), "Copied image", "Couldn’t copy image");
@@ -682,6 +708,8 @@ export function App({ onQuit }: AppProps) {
         busy={ui.busy}
         error={ui.error}
         zoom={ui.zoom}
+        panX={ui.panX}
+        panY={ui.panY}
       />
     );
   } else if (ui.takeover?.kind === "step" && selectedLog && selectedRun && selectedRun.steps.length > 0) {
@@ -715,6 +743,8 @@ export function App({ onQuit }: AppProps) {
         busy={ui.busy}
         error={ui.error}
         zoom={ui.zoom}
+        panX={ui.panX}
+        panY={ui.panY}
       />
     ) : (
       <Box flexShrink={0} width={paneWidth} height={bodyHeight} alignItems="center" justifyContent="center">

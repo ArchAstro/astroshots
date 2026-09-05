@@ -135,12 +135,13 @@ function ShotRow({ shot, selected, width, thumbCols, inGroup }: { shot: Shot; se
   const rowHeight = SHOT_ROW_HEIGHT - 1;
   return (
     <Box flexShrink={0} width={width} height={SHOT_ROW_HEIGHT} flexDirection="column">
-      <Box flexShrink={0} width={width} height={rowHeight} flexDirection="row" backgroundColor={selected ? theme.selection : undefined}>
-        <Box flexShrink={0} width={1}>
-          <Text color={theme.brand}>{selected ? "▎" : " "}</Text>
-        </Box>
+      <Box flexShrink={0} width={width} height={rowHeight} flexDirection="row">
+        {/* Full-height selection bar. The highlight stays off the thumbnail
+            cells so selecting a row never repaints under the image (which made
+            the herdr layer flicker). */}
+        <Box flexShrink={0} width={1} height={rowHeight} backgroundColor={selected ? theme.green : undefined} />
         <Picture src={shot.path} version={shot.mtimeMs} width={thumbCols} height={rowHeight} label={shot.isMovie ? "▶ movie" : "still"} />
-        <Box flexDirection="column" width={textWidth} marginLeft={1} height={rowHeight} overflow="hidden" flexShrink={0}>
+        <Box flexDirection="column" width={textWidth} marginLeft={1} height={rowHeight} overflow="hidden" flexShrink={0} backgroundColor={selected ? theme.selection : undefined}>
           <Box flexShrink={0} width={textWidth} height={1} justifyContent="space-between">
             <Text wrap="truncate">
               {inGroup ? null : <WorktreeChip label={shot.worktreeShort} />}

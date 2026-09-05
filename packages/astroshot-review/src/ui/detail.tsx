@@ -31,8 +31,11 @@ export interface DetailPaneProps {
   onPlayback: (patch: Partial<PlaybackState>) => void;
   busy: boolean;
   error: string | null;
-  /** 1 fills the preview; below shrinks toward native size. */
+  /** 1 shows the whole image; above magnifies. */
   zoom: number;
+  /** Pan center as a fraction of the image, [0,1]. */
+  panX: number;
+  panY: number;
 }
 
 export function previewHeight(height: number): number {
@@ -117,7 +120,7 @@ export function DetailPane(props: DetailPaneProps) {
             onPlayback={onPlayback}
           />
         ) : (
-          <Picture src={shot.path} version={shot.mtimeMs} width={inner} height={preview} maxUpscale={8} zoom={props.zoom} label={shot.isMovie ? "▶ movie poster" : "still"} />
+          <Picture src={shot.path} version={shot.mtimeMs} width={inner} height={preview} maxUpscale={8} zoom={props.zoom} panX={props.panX} panY={props.panY} label={shot.isMovie ? "▶ movie poster" : "still"} />
         )}
       </Box>
       {inlinePlayer && canPlay ? (

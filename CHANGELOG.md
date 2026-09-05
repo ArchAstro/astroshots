@@ -36,7 +36,10 @@ The two tracks are versioned independently.
   closes and quitting (even a hard kill) leaves no images behind. Images are
   oversampled 2x so herdr only downscales, keeping them crisp on Retina panes.
   Detail and full-screen previews now scale small captures up to fill their area
-  (they used to sit tiny in the middle); `+` / `-` zoom and `0` resets. Needs
+  (they used to sit tiny in the middle). `+` / `-` magnify by cropping into
+  the image (not stretching), `0` resets, and while zoomed the arrow keys pan
+  around it. The stream cursor is now a full-height bar and no longer sits
+  behind the thumbnail, so selecting a row stops making its image flicker. Needs
   `[experimental] kitty_graphics = true` and one client reattach; the tray
   detects when herdr can't yet report the cell size and says exactly what to do.
 - **Half-block image fallback for mosh, tmux, and plain terminals:** where no

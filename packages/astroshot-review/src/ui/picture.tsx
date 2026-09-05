@@ -24,11 +24,14 @@ export interface PictureProps {
   z?: number;
   /** Allow the image to scale up to this multiple of native to fill its box (default 1 = never upscale). */
   maxUpscale?: number;
-  /** User zoom within the allowed range (1 = as large as allowed). */
+  /** Magnification: 1 shows the whole image; >1 crops in. */
   zoom?: number;
+  /** Pan center as a fraction of the image, [0,1]. */
+  panX?: number;
+  panY?: number;
 }
 
-export function Picture({ src, version = 0, width, height, label, border = false, z, maxUpscale = 1, zoom = 1 }: PictureProps) {
+export function Picture({ src, version = 0, width, height, label, border = false, z, maxUpscale = 1, zoom = 1, panX = 0.5, panY = 0.5 }: PictureProps) {
   const { layer, service, capabilities } = useServices();
   const ref = useRef<DOMElement>(null);
   const handleRef = useRef<ImageHandle | null>(null);
@@ -65,8 +68,8 @@ export function Picture({ src, version = 0, width, height, label, border = false
 
   useEffect(() => {
     if (!kitty) return;
-    handleRef.current?.setZoom(zoom, maxUpscale);
-  }, [kitty, zoom, maxUpscale]);
+    handleRef.current?.setView({ zoom, panX, panY, maxUpscale });
+  }, [kitty, zoom, panX, panY, maxUpscale]);
 
   useEffect(() => {
     if (!kitty || !handleRef.current) return;
