@@ -38,15 +38,15 @@ export function SettingsPane({ roots, width, height }: { roots: string[]; width:
       )}
       <Rule width={inner} />
       <SectionLabel>GRAPHICS</SectionLabel>
-      <MetaRow label="Protocol" value={capabilities.graphics === "kitty" ? "Kitty graphics" : `none · ${capabilities.reason ?? "unsupported"}`} width={inner} />
+      <MetaRow label="Images" value={capabilities.graphics === "kitty" ? "Kitty graphics (pixel-perfect)" : capabilities.graphics === "halfblocks" ? `half-block text · ${capabilities.reason ?? ""}`.trim() : `off · ${capabilities.reason ?? "unsupported"}`} width={inner} />
       <MetaRow label="Cell" value={`${capabilities.cellWidth}×${capabilities.cellHeight} px (${capabilities.cellSource})`} width={inner} />
       <MetaRow label="Transport" value={capabilities.fileMedium ? "file path (local)" : "inline bytes"} width={inner} />
-      <MetaRow label="Session" value={[capabilities.insideSsh ? "ssh" : "local", capabilities.insideTmux ? "tmux" : null].filter(Boolean).join(" · ")} width={inner} />
+      <MetaRow label="Session" value={[capabilities.insideSsh ? "ssh" : "local", capabilities.insideMosh ? "mosh" : null, capabilities.insideHerdr ? "herdr" : null, capabilities.insideTmux ? "tmux" : null].filter(Boolean).join(" · ") || "local"} width={inner} />
       <Rule width={inner} />
       <SectionLabel>MOVIES</SectionLabel>
       <MetaRow label="ffmpeg" value={ffmpeg.ffmpeg ? `${ffmpeg.ffmpeg}${ffmpeg.version ? ` (${ffmpeg.version})` : ""}` : "not found · brew install ffmpeg"} width={inner} />
       <Text color={theme.muted} wrap="wrap">
-        Movies decode through ffmpeg into frames drawn with the graphics protocol. Without ffmpeg, O opens the file in your default player.
+        Movies play in the tray only with Kitty graphics. Otherwise the poster shows and O opens the file in your default player.
       </Text>
       <Rule width={inner} />
       <SectionLabel>HARNESS LAYOUT</SectionLabel>

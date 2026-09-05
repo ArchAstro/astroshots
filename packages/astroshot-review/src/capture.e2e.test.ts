@@ -32,6 +32,7 @@ describe("astroshot pty captures the review tray with pictures", () => {
           "settleMs: 1500",
           "env:",
           `  ASTROSHOT_REVIEW_CACHE_DIR: ${JSON.stringify(path.join(temp, "cache"))}`,
+          "  ASTROSHOT_REVIEW_GRAPHICS: kitty",
           "actions:",
           "  - waitFor: Unseen (1)",
           "  - pauseMs: 2000",

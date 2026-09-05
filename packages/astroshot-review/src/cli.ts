@@ -161,7 +161,7 @@ export async function main(argv: string[]): Promise<number> {
   void store.start();
 
   const stdout = createGraphicsStdout(process.stdout, layer);
-  const services = { store, layer, capabilities, ffmpeg, rootsSource: args.rootsSource, version: readVersion() };
+  const services = { store, layer, service, capabilities, ffmpeg, rootsSource: args.rootsSource, version: readVersion() };
   let cleared = false;
   const clearPictures = () => {
     if (cleared) return;

@@ -27,6 +27,13 @@ The two tracks are versioned independently.
   graphics-capable terminal. The harness answers the capability probe, records
   transmitted images and placements, and paints them into the PNG, which is how
   the review tray screenshots itself in tests.
+- **Half-block image fallback for mosh, tmux, and herdr:** where the Kitty
+  graphics protocol can't reach the screen — inside mosh (no image protocol),
+  tmux, herdr, or a plain truecolor terminal — `astroshot review` now renders
+  every still, poster, and friction screenshot as truecolor half-block text
+  (two pixels per character) instead of showing an empty box. It detects those
+  transports and picks the mode automatically; `ASTROSHOT_REVIEW_GRAPHICS`
+  forces `kitty`, `halfblocks`, or `none`, and Settings shows the active mode.
 
 ## [0.2.1] (npm) - 2026-08-19
 

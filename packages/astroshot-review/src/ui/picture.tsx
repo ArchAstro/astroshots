@@ -1,10 +1,13 @@
 /**
- * Reserves a cell box for an image and hands it to the graphics layer. When
- * graphics are unavailable it shows a labeled placeholder instead.
+ * Shows an image in a reserved cell box. With the Kitty protocol the graphics
+ * layer paints real pixels; otherwise (mosh, tmux, herdr, or a plain terminal)
+ * it renders the picture as truecolor half-block text, which survives any
+ * transport. Falls back to a labeled placeholder when nothing can be drawn.
  */
 import { Box, Text, type DOMElement } from "ink";
 import { useEffect, useRef, useState } from "react";
 
+import { rgbToHalfBlockLines } from "../images/halfblocks.js";
 import type { ImageHandle } from "../terminal/image-layer.js";
 import { useServices } from "./context.js";
 import { theme, truncate } from "./theme.js";
@@ -22,14 +25,19 @@ export interface PictureProps {
 }
 
 export function Picture({ src, version = 0, width, height, label, border = false, z }: PictureProps) {
-  const { layer, capabilities } = useServices();
+  const { layer, service, capabilities } = useServices();
   const ref = useRef<DOMElement>(null);
   const handleRef = useRef<ImageHandle | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const enabled = capabilities.graphics === "kitty";
+  const mode = capabilities.graphics;
+  const kitty = mode === "kitty";
 
+  const innerWidth = Math.max(1, width - (border ? 2 : 0));
+  const innerHeight = Math.max(1, height - (border ? 2 : 0));
+
+  // ---- Kitty: reserve the box and let the out-of-band layer paint it. ----
   useEffect(() => {
-    if (!enabled) return;
+    if (!kitty) return;
     const handle = layer.register({ src, version, z });
     handleRef.current = handle;
     handle.setNode(ref.current);
@@ -42,15 +50,16 @@ export function Picture({ src, version = 0, width, height, label, border = false
     };
     // The layer handle lives for the component; src changes go through setSource.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, layer]);
+  }, [kitty, layer]);
 
   useEffect(() => {
+    if (!kitty) return;
     handleRef.current?.setSource(src, version);
     setFailure(null);
-  }, [src, version]);
+  }, [kitty, src, version]);
 
   useEffect(() => {
-    if (!enabled || !handleRef.current) return;
+    if (!kitty || !handleRef.current) return;
     const id = handleRef.current.id;
     const timer = setInterval(() => {
       const problem = layer.failure(id);
@@ -58,16 +67,45 @@ export function Picture({ src, version = 0, width, height, label, border = false
     }, 400);
     timer.unref();
     return () => clearInterval(timer);
-  }, [enabled, layer, failure]);
+  }, [kitty, layer, failure]);
 
-  const innerWidth = Math.max(1, width - (border ? 2 : 0));
-  const innerHeight = Math.max(1, height - (border ? 2 : 0));
-  const placeholder = !enabled || !src || failure;
+  // ---- Half-blocks: decode to a tiny RGB buffer and draw two pixels per cell. ----
+  const [lines, setLines] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (mode !== "halfblocks") return;
+    let cancelled = false;
+    setFailure(null);
+    if (!src) {
+      setLines(null);
+      return;
+    }
+    // One cell is one pixel wide and two pixels tall.
+    const target = { width: innerWidth, height: innerHeight * 2 };
+    void service.prepare(src, target, "rgb").then(
+      (prepared) => {
+        if (cancelled) return;
+        setLines(rgbToHalfBlockLines({ width: prepared.width, height: prepared.height, rgb: prepared.data }));
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        setLines(null);
+        setFailure(error instanceof Error ? error.message : String(error));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, service, src, version, innerWidth, innerHeight]);
+
+  const art = mode === "halfblocks" && src && lines && lines.length > 0 && !failure;
+  const placeholder = !art && (!kitty || !src || failure);
   const caption = failure
     ? truncate(`Preview unavailable · ${failure}`, innerWidth)
     : !src
       ? "No image"
-      : truncate(label ?? "Preview needs Kitty graphics", innerWidth);
+      : mode === "halfblocks"
+        ? "Rendering…"
+        : truncate(label ?? "Preview needs Kitty graphics", innerWidth);
 
   return (
     <Box
@@ -81,7 +119,15 @@ export function Picture({ src, version = 0, width, height, label, border = false
       justifyContent="center"
       overflow="hidden"
     >
-      {placeholder ? (
+      {art ? (
+        <Box flexDirection="column" flexShrink={0} alignItems="center">
+          {lines!.slice(0, innerHeight).map((line, index) => (
+            <Text key={index} wrap="truncate-end">
+              {line}
+            </Text>
+          ))}
+        </Box>
+      ) : placeholder ? (
         <Box flexShrink={0} width={innerWidth} height={innerHeight} alignItems="center" justifyContent="center">
           <Text color={theme.muted}>{caption}</Text>
         </Box>

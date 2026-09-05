@@ -118,7 +118,7 @@ export interface AppProps {
 }
 
 export function App({ onQuit }: AppProps) {
-  const { store, layer } = useServices();
+  const { store, layer, capabilities } = useServices();
   const { exit } = useApp();
   const storeState = useStoreState();
   const { columns, rows } = useTerminalSize();
@@ -404,9 +404,14 @@ export function App({ onQuit }: AppProps) {
     [activeShot, patch],
   );
 
+  const canInlinePlay = capabilities.graphics === "kitty";
   const togglePlay = useCallback(() => {
     if (!activeShot?.videoPath) {
       toast(activeShot?.isMovie ? "Video missing on disk" : "Not a movie");
+      return;
+    }
+    if (!canInlinePlay) {
+      toast("In-tray playback needs Kitty graphics — press O to open the movie");
       return;
     }
     patch((previous) => ({
@@ -415,7 +420,7 @@ export function App({ onQuit }: AppProps) {
         ? { ...previous.playback, playing: true, positionMs: 0, seekToken: previous.playback.seekToken + 1, ended: false, error: null }
         : { ...previous.playback, playing: !previous.playback.playing, error: null },
     }));
-  }, [activeShot, patch, toast]);
+  }, [activeShot, canInlinePlay, patch, toast]);
 
   // ---- Keymap -------------------------------------------------------------------
   useInput(
@@ -498,6 +503,7 @@ export function App({ onQuit }: AppProps) {
           if (input === "s") return void markSeen(activeShot);
           if (input === "p") {
             if (!activeShot.videoPath) return toast(activeShot.isMovie ? "Video missing on disk" : "Not a movie");
+            if (!canInlinePlay) return toast("In-tray playback needs Kitty graphics — press O to open the movie");
             return patch((previous) => ({
               inlinePlayer: !previous.inlinePlayer,
               playback: { ...previous.playback, playing: !previous.inlinePlayer, error: null },
@@ -558,6 +564,11 @@ export function App({ onQuit }: AppProps) {
         if (input === "c") return patch({ selectedShot: cursorShot.path, composer: true, error: null, ...(split ? {} : { pane: "detail" as Pane }) });
         if (input === "p") {
           if (!cursorShot.videoPath) return toast(cursorShot.isMovie ? "Video missing on disk" : "Not a movie");
+          if (!canInlinePlay) {
+            patch({ selectedShot: cursorShot.path, ...(split ? {} : { pane: "detail" as Pane }) });
+            toast("In-tray playback needs Kitty graphics — press O to open the movie");
+            return;
+          }
           return patch(split ? { selectedShot: cursorShot.path, inlinePlayer: true, playback: { ...initialPlayback(), playing: true } } : { selectedShot: cursorShot.path, pane: "detail", inlinePlayer: true, playback: { ...initialPlayback(), playing: true } });
         }
         if (input === "o") return void desktop(revealInFileManager(cursorShot.path), "", "Couldn’t reveal file");

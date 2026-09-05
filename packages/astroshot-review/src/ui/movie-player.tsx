@@ -117,7 +117,7 @@ export function MoviePlayer({ videoPath, posterPath, posterVersion = 0, width, h
       {!hasFrame ? <Picture src={posterPath} version={posterVersion} width={width} height={height} label="▶ movie" /> : null}
       {!enabled ? (
         <Box position="absolute">
-          <Text color={theme.muted}>Playback needs Kitty graphics</Text>
+          <Text color={theme.muted}>Poster shown · press O to open the movie</Text>
         </Box>
       ) : null}
     </Box>
