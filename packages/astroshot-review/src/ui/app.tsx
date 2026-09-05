@@ -74,6 +74,7 @@ interface UiState {
   error: string | null;
   inlinePlayer: boolean;
   playback: PlaybackState;
+  zoom: number;
 }
 
 const SPLIT_BREAKPOINT = 120;
@@ -111,6 +112,7 @@ const initialState: UiState = {
   error: null,
   inlinePlayer: false,
   playback: initialPlayback(),
+  zoom: 1,
 };
 
 export interface AppProps {
@@ -214,7 +216,7 @@ export function App({ onQuit }: AppProps) {
     const current = activeShot?.path ?? null;
     if (current !== activePathRef.current) {
       activePathRef.current = current;
-      patch({ inlinePlayer: false, playback: initialPlayback(), composer: false, error: null });
+      patch({ inlinePlayer: false, playback: initialPlayback(), composer: false, error: null, zoom: 1 });
     }
   }, [activeShot?.path, patch]);
 
@@ -405,6 +407,11 @@ export function App({ onQuit }: AppProps) {
   );
 
   const canInlinePlay = capabilities.graphics === "kitty" || capabilities.graphics === "herdr";
+  const zoomBy = useCallback(
+    (delta: number) => patch((previous) => ({ zoom: Math.max(0.3, Math.min(3, Math.round((previous.zoom + delta) * 100) / 100)) })),
+    [patch],
+  );
+
   const togglePlay = useCallback(() => {
     if (!activeShot?.videoPath) {
       toast(activeShot?.isMovie ? "Video missing on disk" : "Not a movie");
@@ -454,6 +461,9 @@ export function App({ onQuit }: AppProps) {
         if (input === ".") return seekBy(SEEK_STEP_MS);
         if (input === "[") return seekChapter(-1);
         if (input === "]") return seekChapter(1);
+        if (input === "+" || input === "=") return zoomBy(0.25);
+        if (input === "-" || input === "_") return zoomBy(-0.25);
+        if (input === "0") return patch({ zoom: 1 });
         if (input === "y") return void desktop(copyImageToClipboard(activeShot.path), "Copied image", "Couldn’t copy image");
         if (input === "o") return void desktop(revealInFileManager(activeShot.path), "", "Couldn’t reveal file");
         if (input === "O" && activeShot.videoPath) return void desktop(openWithDefaultApp(activeShot.videoPath), "", "Couldn’t open movie");
@@ -514,6 +524,9 @@ export function App({ onQuit }: AppProps) {
           if (input === ".") return seekBy(SEEK_STEP_MS);
           if (input === "[") return seekChapter(-1);
           if (input === "]") return seekChapter(1);
+          if (input === "+" || input === "=") return zoomBy(0.25);
+          if (input === "-" || input === "_") return zoomBy(-0.25);
+          if (input === "0") return patch({ zoom: 1 });
           if (input === "o") return void desktop(revealInFileManager(activeShot.path), "", "Couldn’t reveal file");
           if (input === "O" && activeShot.videoPath) return void desktop(openWithDefaultApp(activeShot.videoPath), "", "Couldn’t open movie");
           if (input === "y") return void desktop(copyImageToClipboard(activeShot.path), "Copied image", "Couldn’t copy image");
@@ -668,6 +681,7 @@ export function App({ onQuit }: AppProps) {
         playing={ui.inlinePlayer}
         busy={ui.busy}
         error={ui.error}
+        zoom={ui.zoom}
       />
     );
   } else if (ui.takeover?.kind === "step" && selectedLog && selectedRun && selectedRun.steps.length > 0) {
@@ -700,6 +714,7 @@ export function App({ onQuit }: AppProps) {
         onPlayback={updatePlayback}
         busy={ui.busy}
         error={ui.error}
+        zoom={ui.zoom}
       />
     ) : (
       <Box flexShrink={0} width={paneWidth} height={bodyHeight} alignItems="center" justifyContent="center">

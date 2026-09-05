@@ -27,6 +27,8 @@ export interface ImageHandle {
   setNode(node: DOMElement | null): void;
   /** `version` (for example the file's mtime) forces a fresh decode when the bytes change. */
   setSource(src: string | null, version?: number): void;
+  /** `zoom` scales within [native..fill]; `maxUpscale` caps how far past native it may grow. */
+  setZoom(zoom: number, maxUpscale?: number): void;
   unregister(): void;
 }
 
@@ -46,6 +48,10 @@ interface Entry {
   src: string | null;
   version: number;
   z: number;
+  /** How far past native size the image may scale (1 = never upscale). */
+  maxUpscale: number;
+  /** User zoom within the allowed range (1 = as large as allowed). */
+  zoom: number;
   node: DOMElement | null;
   ready: PreparedImage | null;
   requestedKey: string | null;
@@ -131,13 +137,15 @@ export class ImageLayer {
     return `astro-${entryId}`;
   }
 
-  register(options: { src: string | null; version?: number; z?: number }): ImageHandle {
+  register(options: { src: string | null; version?: number; z?: number; maxUpscale?: number; zoom?: number }): ImageHandle {
     const id = this.nextEntryId++;
     const entry: Entry = {
       id,
       src: options.src,
       version: options.version ?? 0,
       z: options.z ?? 0,
+      maxUpscale: options.maxUpscale ?? 1,
+      zoom: options.zoom ?? 1,
       node: null,
       ready: null,
       requestedKey: null,
@@ -161,6 +169,12 @@ export class ImageLayer {
         entry.failed = null;
         this.scheduleFlush();
       },
+      setZoom: (zoom, maxUpscale) => {
+        if (entry.zoom === zoom && (maxUpscale === undefined || entry.maxUpscale === maxUpscale)) return;
+        entry.zoom = zoom;
+        if (maxUpscale !== undefined) entry.maxUpscale = maxUpscale;
+        this.scheduleFlush();
+      },
       unregister: () => {
         this.entries.delete(id);
         if (this.herdr) {
@@ -179,6 +193,8 @@ export class ImageLayer {
       src: null,
       version: 0,
       z: options.z ?? 1,
+      maxUpscale: 1,
+      zoom: 1,
       node: null,
       ready: null,
       requestedKey: null,
@@ -384,11 +400,13 @@ export class ImageLayer {
       if (!ready) continue;
       readyByEntry.set(entry.id, ready);
 
-      // The on-screen cell footprint is fitted to the actual box, not the
-      // oversampled prepare target.
-      const fitted = fitInside({ width: ready.width, height: ready.height }, boxPx);
-      const cols = Math.min(box.width, Math.max(1, Math.round(fitted.width / cellWidth)));
-      const rows = Math.min(box.height, Math.max(1, Math.round(fitted.height / cellHeight)));
+      // On-screen size: scale to fit the box, allowing upscale up to
+      // `maxUpscale`× native, then the user's zoom, capped at filling the box.
+      const containScale = Math.min(boxPx.width / ready.width, boxPx.height / ready.height);
+      const nativeCap = Math.min(containScale, Math.max(1, entry.maxUpscale));
+      const scale = Math.min(containScale, nativeCap * Math.max(0.1, entry.zoom));
+      const cols = Math.min(box.width, Math.max(1, Math.round((ready.width * scale) / cellWidth)));
+      const rows = Math.min(box.height, Math.max(1, Math.round((ready.height * scale) / cellHeight)));
       const col = box.x + Math.floor((box.width - cols) / 2);
       const row = box.y + Math.floor((box.height - rows) / 2);
 

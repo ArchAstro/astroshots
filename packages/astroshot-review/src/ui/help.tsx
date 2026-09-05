@@ -36,6 +36,8 @@ const SECTIONS: Array<{ title: string; keys: Array<[string, string]> }> = [
     title: "Detail / Review",
     keys: [
       ["← →", "older · newer"],
+      ["+ / -", "zoom in / out"],
+      ["0", "reset zoom"],
       ["p", "play in tray"],
       ["space", "play / pause"],
       [", .", "seek −5s / +5s"],
