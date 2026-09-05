@@ -73,33 +73,39 @@ const PROBE_PNG = Buffer.from(
 );
 
 /**
- * Confirm herdr accepts `pane.graphics.set` (react-kitty only exercises the
- * whole-pane stream API). A missing ack is treated as success — some builds
- * ack, some stay silent — so only an explicit error reply rejects it.
+ * Confirm herdr accepts a `pane.graphics.stream` layer. A missing ack is
+ * treated as success — the open reply may be silent — so only an explicit
+ * error reply rejects it. The probe stream is closed immediately, which makes
+ * herdr drop its layer.
  */
 export async function probeHerdrSet(address: HerdrAddress): Promise<{ ok: boolean; reason?: string }> {
-  try {
-    const reply = await Promise.race([
-      request(address.socket, "pane.graphics.set", {
-        pane_id: address.pane,
-        layer_id: "astroshot-review-probe",
-        format: "png",
-        image_width: 1,
-        image_height: 1,
-        data_base64: PROBE_PNG.toString("base64"),
-        z_index: -1,
-        placement: { viewport_col: 0, viewport_row: 0, grid_cols: 1, grid_rows: 1 },
-      }),
-      delay(600).then(() => ({ result: { type: "assumed-ok" } }) as Reply),
-    ]);
-    if (reply.error) return { ok: false, reason: reasonFor(reply) };
-    // Best-effort cleanup; ignore the result.
-    void request(address.socket, "pane.graphics.clear", { pane_id: address.pane, layer_id: "astroshot-review-probe" }).catch(() => undefined);
-    return { ok: true };
-  } catch {
-    // A transport hiccup shouldn't downgrade a working setup.
-    return { ok: true };
-  }
+  return new Promise((resolve) => {
+    const client = createConnection(address.socket);
+    let text = "";
+    let settled = false;
+    const finish = (result: { ok: boolean; reason?: string }) => {
+      if (settled) return;
+      settled = true;
+      client.destroy();
+      resolve(result);
+    };
+    client.on("connect", () =>
+      client.write(JSON.stringify({ id: "astroshot-review", method: "pane.graphics.stream", params: { pane_id: address.pane, layer_id: "astroshot-review-probe", z_index: -1 } }) + "\n"),
+    );
+    client.on("data", (chunk) => {
+      text += chunk.toString();
+      const end = text.indexOf("\n");
+      if (end < 0) return;
+      try {
+        const reply = JSON.parse(text.slice(0, end)) as Reply;
+        finish(reply.error ? { ok: false, reason: reasonFor(reply) } : { ok: true });
+      } catch {
+        finish({ ok: true });
+      }
+    });
+    client.on("error", () => finish({ ok: true }));
+    setTimeout(() => finish({ ok: true }), 600);
+  });
 }
 
 export interface HerdrDiscovery {
@@ -156,139 +162,194 @@ export async function discoverHerdr(
   }
 }
 
-interface QueuedOp {
-  method: string;
-  params: Record<string, unknown>;
+/** Extract PNG pixel dimensions from the IHDR chunk. */
+function pngSize(png: Buffer): { width: number; height: number } {
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+export interface HerdrPlacement {
+  col: number;
+  row: number;
+  cols: number;
+  rows: number;
+  z: number;
+}
+
+interface LayerStream {
+  socket: Socket | null;
+  opening: boolean;
+  ready: boolean;
+  z: number;
+  /** Latest frame to send once the stream is ready or drained. */
+  pending: { png: Buffer; placement: HerdrPlacement } | null;
+  draining: boolean;
 }
 
 /**
- * Places images on herdr layers over the pane. Uses one persistent connection
- * with newline-delimited requests; layers persist server-side, so a dropped
- * connection is reconnected on the next op without losing placements.
+ * Places images on herdr via one `pane.graphics.stream` connection PER layer.
+ * herdr removes a stream's layer the moment its socket closes, so closing a
+ * layer's connection — or the whole process dying — cleans up automatically,
+ * with no persistent server-side state to leak (the trap of pane.graphics.set).
  */
 export class HerdrSink {
-  private client: Socket | null = null;
-  private connecting = false;
-  private queue: QueuedOp[] = [];
+  private readonly layers = new Map<string, LayerStream>();
   private disposed = false;
-  private readBuffer = "";
-  private hasConnected = false;
   private generationCount = 0;
-
-  /** Bumps whenever a NEW connection replaces a dropped one, so callers re-send layers. */
-  get generation(): number {
-    return this.generationCount;
-  }
 
   constructor(
     private readonly address: HerdrAddress,
     private readonly onError: (error: Error) => void,
   ) {}
 
-  private ensureClient(): void {
-    if (this.client || this.connecting || this.disposed) return;
-    this.connecting = true;
-    const client = createConnection(this.address.socket);
-    client.on("connect", () => {
-      this.connecting = false;
-      this.client = client;
-      if (this.hasConnected) this.generationCount += 1;
-      this.hasConnected = true;
-      const pending = this.queue;
-      this.queue = [];
-      for (const op of pending) this.send(op);
-    });
-    client.on("data", (chunk) => {
-      this.readBuffer += chunk.toString();
-      let end: number;
-      while ((end = this.readBuffer.indexOf("\n")) >= 0) {
-        const line = this.readBuffer.slice(0, end);
-        this.readBuffer = this.readBuffer.slice(end + 1);
-        try {
-          const reply = JSON.parse(line) as Reply;
-          if (reply.error) this.onError(new Error(`herdr graphics: ${reply.error.code}`));
-        } catch {
-          // Ignore unparseable lines; herdr may interleave acks.
-        }
-      }
-    });
-    const drop = () => {
-      if (this.client === client) this.client = null;
-      this.connecting = false;
-    };
-    client.on("error", (error) => {
-      drop();
-      if (!this.disposed) this.onError(error);
-    });
-    client.on("close", drop);
+  /** Bumps when a layer stream drops unexpectedly, so callers re-send. */
+  get generation(): number {
+    return this.generationCount;
   }
 
-  private send(op: QueuedOp): void {
+  set(layerId: string, png: Buffer, _imageWidth: number, _imageHeight: number, placement: HerdrPlacement): void {
     if (this.disposed) return;
-    if (!this.client) {
-      this.queue.push(op);
-      this.ensureClient();
-      return;
+    let layer = this.layers.get(layerId);
+    if (!layer) {
+      layer = { socket: null, opening: false, ready: false, z: placement.z, pending: null, draining: false };
+      this.layers.set(layerId, layer);
     }
-    try {
-      this.client.write(JSON.stringify({ id: "astroshot-review", method: op.method, params: op.params }) + "\n");
-    } catch (error) {
-      this.queue.push(op);
-      this.client = null;
-      this.ensureClient();
-      if (!this.disposed) this.onError(error instanceof Error ? error : new Error(String(error)));
+    layer.pending = { png, placement };
+    if (layer.ready && !layer.draining) {
+      this.flush(layerId, layer);
+    } else if (!layer.opening && !layer.socket) {
+      this.open(layerId, layer);
     }
-  }
-
-  /** Place a PNG on `layerId` at a 0-based cell box within the pane. */
-  set(
-    layerId: string,
-    png: Buffer,
-    imageWidth: number,
-    imageHeight: number,
-    placement: { col: number; row: number; cols: number; rows: number; z: number },
-  ): void {
-    this.send({
-      method: "pane.graphics.set",
-      params: {
-        pane_id: this.address.pane,
-        layer_id: layerId,
-        format: "png",
-        image_width: imageWidth,
-        image_height: imageHeight,
-        data_base64: png.toString("base64"),
-        z_index: placement.z,
-        placement: {
-          viewport_col: placement.col,
-          viewport_row: placement.row,
-          grid_cols: placement.cols,
-          grid_rows: placement.rows,
-        },
-      },
-    });
   }
 
   clear(layerId: string): void {
-    this.send({ method: "pane.graphics.clear", params: { pane_id: this.address.pane, layer_id: layerId } });
+    const layer = this.layers.get(layerId);
+    if (!layer) return;
+    this.layers.delete(layerId);
+    layer.pending = null;
+    if (layer.socket) {
+      // Closing the connection makes herdr drop this layer.
+      try {
+        layer.socket.destroy();
+      } catch {
+        // already gone
+      }
+    }
   }
 
   clearAll(): void {
-    this.send({ method: "pane.graphics.clear", params: { pane_id: this.address.pane } });
+    for (const layerId of [...this.layers.keys()]) this.clear(layerId);
+  }
+
+  private open(layerId: string, layer: LayerStream): void {
+    layer.opening = true;
+    const client = createConnection(this.address.socket);
+    let text = "";
+    let opened = false;
+    client.on("connect", () => {
+      client.write(JSON.stringify({ id: "astroshot-review", method: "pane.graphics.stream", params: { pane_id: this.address.pane, layer_id: layerId, z_index: layer.z } }) + "\n");
+    });
+    client.on("data", (chunk) => {
+      text += chunk.toString();
+      let end: number;
+      while ((end = text.indexOf("\n")) >= 0) {
+        const line = text.slice(0, end);
+        text = text.slice(end + 1);
+        let reply: Reply;
+        try {
+          reply = JSON.parse(line) as Reply;
+        } catch {
+          continue;
+        }
+        if (reply.error) {
+          this.onError(new Error(`herdr stream ${layerId}: ${reply.error.code}`));
+          continue;
+        }
+        if (!opened) {
+          opened = true;
+          layer.opening = false;
+          layer.socket = client;
+          layer.ready = true;
+          this.flush(layerId, layer);
+        }
+      }
+    });
+    const drop = (reason: string) => {
+      const current = this.layers.get(layerId);
+      layer.socket = null;
+      layer.ready = false;
+      layer.opening = false;
+      // Unexpected drop (not from clear/dispose): let callers re-send everything.
+      if (current === layer && !this.disposed) {
+        this.generationCount += 1;
+        this.onError(new Error(`herdr stream ${layerId} ${reason}`));
+      }
+    };
+    client.on("error", () => drop("error"));
+    client.on("close", () => {
+      if (this.layers.get(layerId) === layer) drop("closed");
+    });
+    // If the open reply never comes, assume success after a short grace so a
+    // silent-ack build still renders.
+    setTimeout(() => {
+      if (!opened && !this.disposed && layer.socket === null && layer.opening) {
+        opened = true;
+        layer.opening = false;
+        layer.socket = client;
+        layer.ready = true;
+        this.flush(layerId, layer);
+      }
+    }, 400);
+  }
+
+  private flush(layerId: string, layer: LayerStream): void {
+    const socket = layer.socket;
+    const frame = layer.pending;
+    if (!socket || !frame) return;
+    layer.pending = null;
+    const size = pngSize(frame.png);
+    const header = {
+      format: "png",
+      image_width: size.width,
+      image_height: size.height,
+      data_length: frame.png.length,
+      placement: {
+        viewport_col: frame.placement.col,
+        viewport_row: frame.placement.row,
+        grid_cols: frame.placement.cols,
+        grid_rows: frame.placement.rows,
+      },
+    };
+    let ok = false;
+    try {
+      ok = socket.write(Buffer.concat([Buffer.from(JSON.stringify(header) + "\n"), frame.png]));
+    } catch (error) {
+      this.onError(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
+    if (!ok) {
+      // Backpressure: wait for drain, then send only the newest pending frame.
+      layer.draining = true;
+      socket.once("drain", () => {
+        layer.draining = false;
+        if (layer.pending) this.flush(layerId, layer);
+      });
+    } else if (layer.pending) {
+      this.flush(layerId, layer);
+    }
   }
 
   dispose(): void {
     if (this.disposed) return;
-    this.clearAll();
     this.disposed = true;
-    // Flush the clear before closing.
-    const client = this.client;
-    if (client) {
-      try {
-        client.end();
-      } catch {
-        client.destroy();
+    for (const layer of this.layers.values()) {
+      if (layer.socket) {
+        try {
+          layer.socket.destroy();
+        } catch {
+          // already gone
+        }
       }
     }
-    this.client = null;
+    this.layers.clear();
   }
 }

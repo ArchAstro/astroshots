@@ -32,7 +32,9 @@ The tray always shows pictures; the fidelity depends on the terminal.
 | No truecolor, or not a TTY | Labeled placeholders; everything else works |
 
 The tray detects the environment and picks the mode. Inside herdr it renders
-through `pane.graphics.set` (raw Kitty escapes are dropped by herdr). mosh has
+through per-image `pane.graphics.stream` layers (raw Kitty escapes are
+dropped by herdr); herdr removes each layer the instant its stream closes, so
+quitting — even a hard kill — leaves nothing behind. mosh has
 no image protocol and tmux needs passthrough, so both fall back to half-block
 text. Force a mode with `ASTROSHOT_REVIEW_GRAPHICS=kitty|halfblocks|none`;
 Settings (`,`) shows the active mode and, when it isn't pixel-perfect, why.

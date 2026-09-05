@@ -226,6 +226,11 @@ export async function main(argv: string[]): Promise<number> {
   };
   process.once("SIGTERM", onSignal);
   process.once("SIGHUP", onSignal);
+  process.once("SIGQUIT", onSignal);
+  process.once("SIGINT", onSignal);
+  // Last-ditch: closing the herdr sockets makes herdr drop the layers even if
+  // we never got to run a signal handler.
+  process.once("exit", () => herdrSink?.dispose());
   try {
     await instance.waitUntilExit();
   } finally {

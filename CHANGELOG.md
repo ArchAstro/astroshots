@@ -31,7 +31,9 @@ The two tracks are versioned independently.
   drops a program's raw Kitty escapes), `astroshot review` now renders through
   herdr's own pane-graphics socket API (`pane.graphics.set` per image layer),
   so stills, posters, and movie playback are crisp — even reached over mosh,
-  because the pixels travel through herdr's renderer. Needs
+  because the pixels travel through herdr's renderer. Each image owns a
+  `pane.graphics.stream` layer, so herdr drops it the instant the stream
+  closes and quitting (even a hard kill) leaves no images behind. Needs
   `[experimental] kitty_graphics = true` and one client reattach; the tray
   detects when herdr can't yet report the cell size and says exactly what to do.
 - **Half-block image fallback for mosh, tmux, and plain terminals:** where no
