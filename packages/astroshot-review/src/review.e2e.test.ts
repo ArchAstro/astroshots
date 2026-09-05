@@ -58,7 +58,21 @@ async function launch(root: string, cacheDir: string, cols = 140, rows = 40): Pr
     cols,
     rows,
     cwd: root,
-    env: { ...process.env, TERM: "xterm-kitty", ASTROSHOT_REVIEW_CACHE_DIR: cacheDir, ASTROSHOT_REVIEW_FFMPEG: "" },
+    // This suite emulates a Kitty terminal via the tracker, so force kitty and
+    // drop any mosh/tmux/herdr vars the outer session may carry (they would
+    // otherwise route the tray to half-block text).
+    env: {
+      ...process.env,
+      TERM: "xterm-kitty",
+      ASTROSHOT_REVIEW_GRAPHICS: "kitty",
+      ASTROSHOT_REVIEW_CACHE_DIR: cacheDir,
+      ASTROSHOT_REVIEW_FFMPEG: "",
+      TMUX: undefined,
+      MOSH_SERVER_NETWORK_TMOUT: undefined,
+      MOSH_CONNECTION: undefined,
+      HERDR_PANE_ID: undefined,
+      HERDR_SOCKET_PATH: undefined,
+    } as NodeJS.ProcessEnv,
   });
   let exited: number | null = null;
   const reply = (data: string) => {
@@ -182,6 +196,7 @@ describe("astroshot review in a kitty-capable PTY", () => {
       await session.waitFor(() => /1 \/ 3/.test(session.screen()), "the older sibling");
       expect(session.screen()).toContain("Welcome");
       session.write("\x1b[C");
+      await session.waitFor(() => /2 \/ 3/.test(session.screen()), "the middle sibling");
       session.write("\x1b[C");
       await session.waitFor(() => /3 \/ 3/.test(session.screen()), "the newest sibling");
       expect(session.screen()).toContain("Journey");

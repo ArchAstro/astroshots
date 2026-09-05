@@ -20,17 +20,32 @@ npx astroshot review --no-graphics   # text only
 
 ---
 
+## Where pictures render
+
+The tray always shows pictures; the fidelity depends on the terminal.
+
+| Environment | What you get |
+|-------------|--------------|
+| **Kitty graphics protocol** — Ghostty, kitty, WezTerm, directly attached | Pixel-perfect images and in-tray movie playback |
+| **Anything else with truecolor** — plain xterm-256color, and crucially **mosh, tmux, or herdr** | Truecolor **half-block** rendering: each picture is drawn as colored text (two pixels per character), so it survives transports that strip pixel graphics. Movies show their poster; `O` opens the file. |
+| No truecolor, or not a TTY | Labeled placeholders, everything else works |
+
+The tray detects mosh, tmux, and herdr and goes straight to half-block text,
+because those emulate the terminal themselves and never forward another
+program's pixel escapes. To force a mode: `ASTROSHOT_REVIEW_GRAPHICS=kitty`,
+`=halfblocks`, or `=none`. Settings (`,`) shows which mode is active and why.
+
+For pixel-perfect images and movie playback, attach a Kitty-capable terminal
+directly — not through mosh or a multiplexer.
+
 ## Requirements
 
 | Need | Why |
 |------|-----|
-| A terminal that speaks the **Kitty graphics protocol** — Ghostty, kitty, WezTerm | Stills, posters, and movie frames are drawn as real pictures. Without it the tray still works, with labeled placeholders. |
-| **ffmpeg** on `PATH` (`brew install ffmpeg`) | Movies play in the tray: ffmpeg decodes frames at the stage size and the tray streams them through the graphics protocol. Without it, `O` opens the file in your default player. |
+| A truecolor terminal | Half-block rendering needs 24-bit color (`COLORTERM=truecolor` or an `xterm-256color`-class `TERM`). |
+| A **Kitty graphics** terminal, attached directly | Only needed for pixel-perfect images and in-tray movie playback. |
+| **ffmpeg** on `PATH` (`brew install ffmpeg`) | In-tray movie playback (Kitty mode). Without it, `O` opens the file in your default player. |
 | Node.js 22.14+ | Same as the capture CLI. |
-
-Works over SSH: pictures are transmitted inline, downsampled to the cell box
-they occupy, so a thumbnail costs a few kilobytes. tmux does not pass graphics
-through by default; run outside tmux or enable `allow-passthrough`.
 
 ---
 
@@ -99,7 +114,7 @@ The tray is a second writer of the on-disk contract, never a second contract:
 
 | Variable | Effect |
 |----------|--------|
-| `ASTROSHOT_REVIEW_GRAPHICS=none` / `kitty` | Skip the terminal probe and force a mode |
+| `ASTROSHOT_REVIEW_GRAPHICS=kitty` / `halfblocks` / `none` | Skip the terminal probe and force the image mode |
 | `ASTROSHOT_REVIEW_CELL_PX=9x20` | Override the reported cell size in pixels |
 | `ASTROSHOT_REVIEW_CACHE_DIR` | Where the index lives (tests use a temp dir) |
 | `ASTROSHOT_REVIEW_FFMPEG` | Path to the ffmpeg binary |

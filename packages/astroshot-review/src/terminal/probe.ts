@@ -11,7 +11,7 @@ import path from "node:path";
 
 import { encodeFileQuery, encodeQuery } from "./kitty.js";
 
-export type GraphicsProtocol = "kitty" | "none";
+export type GraphicsProtocol = "kitty" | "halfblocks" | "none";
 
 export interface TerminalCapabilities {
   graphics: GraphicsProtocol;
@@ -25,9 +25,21 @@ export interface TerminalCapabilities {
   reason?: string;
   insideTmux: boolean;
   insideSsh: boolean;
+  insideMosh: boolean;
+  insideHerdr: boolean;
+  /** A multiplexer/transport is intercepting output, so pixel graphics can't reach the screen. */
+  intercepted: string | null;
 }
 
 export const FALLBACK_CELL = { width: 10, height: 20 };
+
+/** Whether the terminal can show 24-bit color, which half-block art needs. */
+export function supportsTrueColor(env: NodeJS.ProcessEnv): boolean {
+  const colorterm = (env.COLORTERM ?? "").toLowerCase();
+  if (colorterm.includes("truecolor") || colorterm.includes("24bit")) return true;
+  const term = (env.TERM ?? "").toLowerCase();
+  return term.includes("256color") || term.includes("kitty") || term.includes("direct");
+}
 
 const QUERY_ID = 31;
 const FILE_QUERY_ID = 32;
@@ -132,8 +144,21 @@ export async function probeTerminal(
   const timeoutMs = options.timeoutMs ?? 600;
   const insideTmux = Boolean(env.TMUX);
   const insideSsh = Boolean(env.SSH_CONNECTION || env.SSH_TTY || env.SSH_CLIENT);
+  const insideMosh = Boolean(env.MOSH_SERVER_NETWORK_TMOUT || env.MOSH_CONNECTION || env.MOSH_KEY);
+  const insideHerdr = Boolean(env.HERDR_PANE_ID || env.HERDR_SOCKET_PATH);
   const envCell = parseCellSizeEnv(env.ASTROSHOT_REVIEW_CELL_PX);
   const forced = env.ASTROSHOT_REVIEW_GRAPHICS;
+  const trueColor = supportsTrueColor(env);
+  // A multiplexer or transport that emulates the terminal itself never forwards
+  // another program's pixel escapes: mosh has no image support at all, tmux
+  // needs explicit passthrough, and herdr renders only through its own socket.
+  const intercepted = insideMosh
+    ? "mosh (no image protocol)"
+    : insideHerdr
+      ? "herdr"
+      : insideTmux
+        ? "tmux"
+        : null;
 
   const base: TerminalCapabilities = {
     graphics: "none",
@@ -143,7 +168,17 @@ export async function probeTerminal(
     cellSource: envCell ? "env" : "fallback",
     insideTmux,
     insideSsh,
+    insideMosh,
+    insideHerdr,
+    intercepted,
   };
+
+  // Colored half-block text renders as ordinary output, so it survives mosh,
+  // tmux, and herdr where pixel protocols do not.
+  const halfblocks = (reason: string): TerminalCapabilities =>
+    trueColor
+      ? { ...base, graphics: "halfblocks", reason }
+      : { ...base, reason: `${reason}; and no truecolor for half-block art` };
 
   if (forced === "none") {
     return { ...base, reason: "ASTROSHOT_REVIEW_GRAPHICS=none" };
@@ -151,14 +186,16 @@ export async function probeTerminal(
   if (forced === "kitty") {
     return { ...base, graphics: "kitty", fileMedium: env.ASTROSHOT_REVIEW_FILE_MEDIUM === "1" };
   }
+  if (forced === "halfblocks" || forced === "half-blocks" || forced === "text") {
+    return halfblocks("ASTROSHOT_REVIEW_GRAPHICS=halfblocks");
+  }
   if (!streams.stdout.isTTY || !streams.stdin.isTTY) {
     return { ...base, reason: "stdin/stdout is not a terminal" };
   }
-  if (insideTmux) {
-    return {
-      ...base,
-      reason: "tmux does not pass graphics through by default; run outside tmux",
-    };
+  // Inside an interceptor, don't even probe for kitty (the emulator may answer
+  // OK yet never paint); go straight to half-block text.
+  if (intercepted) {
+    return halfblocks(`${intercepted} intercepts pixel graphics; using half-block text`);
   }
 
   let probeFile: string | null = null;
@@ -206,15 +243,10 @@ export async function probeTerminal(
   }
 
   if (!report.kittyOk) {
-    return {
-      ...base,
-      cellWidth,
-      cellHeight,
-      cellSource,
-      reason: report.sawDeviceAttributes
-        ? "terminal did not answer the kitty graphics query (try Ghostty, kitty, or WezTerm)"
-        : "terminal did not answer the capability probe",
-    };
+    const why = report.sawDeviceAttributes
+      ? "no kitty graphics protocol (try Ghostty, kitty, or WezTerm for pixel-perfect images)"
+      : "terminal did not answer the capability probe";
+    return { ...halfblocks(why), cellWidth, cellHeight, cellSource };
   }
   return {
     graphics: "kitty",
@@ -224,5 +256,8 @@ export async function probeTerminal(
     cellSource,
     insideTmux,
     insideSsh,
+    insideMosh,
+    insideHerdr,
+    intercepted,
   };
 }
