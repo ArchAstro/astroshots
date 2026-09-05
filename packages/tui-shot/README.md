@@ -143,3 +143,12 @@ await closeSharedBrowser();
 ```
 
 Ink fixtures support Ink 7 and React 19 as peer dependencies.
+
+## Graphics-aware PTY captures
+
+Add `graphics: kitty` to a PTY fixture to emulate a terminal that supports the
+Kitty graphics protocol. The harness answers the capability query and cell-size
+reports, records transmitted images and their placements at the cursor, strips
+the escape sequences from the text, and paints the pictures into the PNG in
+cell units. `KittyGraphicsTracker` is exported for harnesses that drive a PTY
+themselves.

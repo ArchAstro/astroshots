@@ -1,0 +1,71 @@
+{
+  "name": "@archastro/astroshot-review",
+  "version": "0.2.1",
+  "description": "Terminal review tray for Astroshots: stream, review, and play .astroshot captures with Kitty graphics",
+  "keywords": [
+    "astroshots",
+    "ink",
+    "kitty",
+    "graphics",
+    "terminal",
+    "tui",
+    "screenshot",
+    "review"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchAstro/astroshots.git",
+    "directory": "packages/astroshot-review"
+  },
+  "homepage": "https://github.com/ArchAstro/astroshots#readme",
+  "bugs": "https://github.com/ArchAstro/astroshots/issues",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "astroshot-review": "bin/astroshot-review.mjs"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node scripts/clean.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run clean && npm run build",
+    "pretest": "npm run build --workspace @archastro/tui-shot"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "ink": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@archastro/tui-shot": "0.2.1",
+    "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.0"
+  }
+}

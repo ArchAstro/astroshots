@@ -29,6 +29,7 @@ Your feedback goes back to disk beside the capture, so the agent that took the
 screenshot can read what you said about it.
 
 - **No project picker, no account, no cloud** — just files on disk and one icon in the menu bar.
+- **A terminal tray too** — `npx astroshot review` opens the same stream in Ghostty, kitty, or WezTerm with real thumbnails, movie playback through ffmpeg, and the same `review.json` writes.
 - **Every worktree in one stream** — stills and movies from every project under your watched folders, newest first.
 - **Movies, not just stills** — WebM/MP4/MOV playback with scrubbing, chapters, and duration metadata; **Make narrated video** turns a walkthrough into an on-device MP4.
 - **Friction Logs** — agentic UX walkthroughs with per-step evidence, transcript, and good/improve notes, plus switchable run history.
@@ -45,6 +46,7 @@ open -a Astroshots
 npx skills add ArchAstro/astroshots --skill '*' -g -y
 npx astroshot demo                               # proof of life, no assets needed
 npx astroshot doctor                             # if nothing shows up
+npx astroshot review                             # the same tray, in your terminal
 ```
 
 `astroshot demo` writes real stills and a movie into `.astroshot/astroshot-demo/`
@@ -121,6 +123,7 @@ journeys. Details in [`docs/capture.md`](docs/capture.md).
 | [`docs/install.md`](docs/install.md) | Homebrew, DMG, source builds, first launch, `demo` / `doctor` |
 | [`docs/contract.md`](docs/contract.md) | Write layout, `manifest.json`, `review.json`, hash + run-id scoping, agent obligations |
 | [`docs/capture.md`](docs/capture.md) | The four capture modes, fixtures, batch manifests, movie sources, `astroshot-capture` |
+| [`docs/review-tui.md`](docs/review-tui.md) | `astroshot review`: the terminal tray, Kitty graphics, ffmpeg playback, key map |
 | [`docs/friction-logs.md`](docs/friction-logs.md) | Friction-log tree and the JSONL step schema |
 | [`docs/skills.md`](docs/skills.md) | All six agent skills and the full install matrix |
 | [`docs/product-tour.md`](docs/product-tour.md) | Every surface, the full review loop, requirements |

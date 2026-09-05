@@ -172,6 +172,11 @@ cd macos
 open Astroshots.xcodeproj
 ```
 
+`npx astroshot review` opens the same stream in a terminal (Ghostty, kitty, or
+WezTerm draw the pictures; ffmpeg plays movies). It reads and writes the same
+`review.json`, so a human can review from a shell session and agents read the
+feedback the same way. See `docs/review-tui.md`.
+
 The app is menu-bar only. Configure watched folders and overlay visibility
 from its gear menu.
 

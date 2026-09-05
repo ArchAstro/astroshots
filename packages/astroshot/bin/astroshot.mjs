@@ -8,11 +8,13 @@ import path from "node:path";
 import { writeFixtureTemplate } from "./templates.mjs";
 import { demoHelp, runDemo } from "./demo.mjs";
 import { doctorHelp, runDoctor } from "./doctor.mjs";
+import { readWatchConfiguration } from "./mac-preferences.mjs";
 
 function help() {
   console.log(`astroshot — one CLI for React, Ink, PTY stills, and movies
 
 Usage:
+  astroshot review [<dir>...] [--root <dir>] [--no-graphics]
   astroshot demo [--feature <name>] [--root <dir>] [--dry-run] [--clean]
   astroshot doctor [--root <dir>] [--json]
   astroshot init react [fixture.tsx] [--force]
@@ -28,6 +30,7 @@ Usage:
   astroshot install-browser [--with-deps]
 
 Start here:
+  review             Review the .astroshot/ stream in your terminal (Kitty graphics)
   demo               Write a complete .astroshot/ example set (no prerequisites)
   doctor             Check Node, watched folders, app, Chromium, permissions
 
@@ -104,6 +107,11 @@ Options:
 }
 
 function engineBin(mode) {
+  if (mode === "review") {
+    const entry = fileURLToPath(import.meta.resolve("@archastro/astroshot-review"));
+    const packageRoot = path.dirname(path.dirname(entry));
+    return path.join(packageRoot, "bin", "astroshot-review.mjs");
+  }
   if (mode === "movie") {
     const entry = fileURLToPath(import.meta.resolve("@archastro/movie-harness"));
     // package exports "." → dist/index.js → package root is two levels up from dist
@@ -189,6 +197,49 @@ function runInit(arguments_) {
   console.log(`Created ${result.label} fixture: ${result.absolutePath}`);
 }
 
+/**
+ * `astroshot review`: the terminal tray. Without explicit roots it watches
+ * the same folders as the Astroshots app so both surfaces show one stream.
+ */
+function runReview(arguments_) {
+  // `astroshot review help` mirrors the other modes; anything else is
+  // forwarded verbatim so a folder literally named "help" still works.
+  const wantsHelp =
+    arguments_[0] === "help" ||
+    arguments_.includes("-h") ||
+    arguments_.includes("--help");
+  const forwarded = wantsHelp ? ["--help"] : [...arguments_];
+  const hasRoots =
+    forwarded.includes("--root") ||
+    forwarded.some((value) => !value.startsWith("-"));
+  if (!hasRoots && !wantsHelp) {
+    const configuration = readWatchConfiguration();
+    if (configuration.available && configuration.roots.length > 0) {
+      for (const root of configuration.roots) forwarded.push("--root", root);
+      forwarded.push("--roots-source", "app");
+    }
+  }
+  let engine;
+  try {
+    engine = engineBin("review");
+  } catch (error) {
+    console.error(
+      `astroshot could not find the review tray engine (@archastro/astroshot-review): ${error instanceof Error ? error.message : error}`,
+    );
+    console.error("Reinstall @archastro/astroshot (or the unscoped astroshot package) and retry.");
+    process.exit(1);
+  }
+  const result = spawnSync(process.execPath, [engine, ...forwarded], {
+    stdio: "inherit",
+  });
+  if (result.error) {
+    console.error(`astroshot could not start the review tray: ${result.error.message}`);
+    process.exit(1);
+  }
+  if (result.signal) process.kill(process.pid, result.signal);
+  process.exit(result.status ?? 1);
+}
+
 const [command, ...arguments_] = process.argv.slice(2);
 
 if (command === "-v" || command === "--version") {
@@ -252,6 +303,10 @@ if (command === "react" || command === "ink" || command === "tui" || command ===
     process.exit(arguments_.length === 0 ? 1 : 0);
   }
   runEngine(canonicalMode, arguments_);
+}
+
+if (command === "review" || command === "tray") {
+  runReview(arguments_);
 }
 
 if (command === "movie") {

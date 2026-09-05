@@ -32,6 +32,11 @@ export const BUNDLED_ENGINES = [
     directory: "packages/movie-harness",
     builtFiles: ["dist/index.js", "dist/index.d.ts"],
   },
+  {
+    name: "@archastro/astroshot-review",
+    directory: "packages/astroshot-review",
+    builtFiles: ["dist/index.js", "dist/cli.js", "dist/images/worker.js"],
+  },
 ];
 
 /** The unified CLI is bundled too, but it is plain .mjs with no build step. */
@@ -131,6 +136,16 @@ export function assertBundledDependencyUnion() {
   }
 
   const failures = [];
+  // Unscoped modules some bundled package needs at runtime (not as a peer).
+  const requiredAtRuntime = new Set();
+  for (const bundled of BUNDLED_PACKAGES) {
+    const manifest = readManifest(bundled.directory);
+    for (const field of ["dependencies", "optionalDependencies"]) {
+      for (const name of Object.keys(manifest[field] ?? {})) {
+        if (!isScoped(name)) requiredAtRuntime.add(name);
+      }
+    }
+  }
   for (const bundled of BUNDLED_PACKAGES) {
     const manifest = readManifest(bundled.directory);
     for (const field of ["dependencies", "optionalDependencies"]) {
@@ -169,9 +184,12 @@ export function assertBundledDependencyUnion() {
     }
 
     // Peers must stay peers. Fail loudly if someone absorbs them, because that
-    // would pin a framework version for every consumer.
+    // would pin a framework version for every consumer. The exception is a
+    // package that needs the same module as a real runtime dependency (the
+    // review tray is an Ink app, so ink/react ship with the wrapper); fixtures
+    // still resolve their own copy because npm dedupes compatible ranges.
     for (const name of Object.keys(manifest.peerDependencies ?? {})) {
-      if (declared.has(name)) {
+      if (declared.has(name) && !requiredAtRuntime.has(name)) {
         failures.push(
           `${bundled.name} declares "${name}" as a peerDependency, but the ` +
             "unscoped astroshot wrapper declares it as its own dependency. " +
