@@ -210,6 +210,11 @@ export async function main(argv: string[]): Promise<number> {
     alternateScreen: true,
     exitOnCtrlC: true,
     patchConsole: true,
+    // Ink treats CI=true as "not interactive": no alternate screen, no key
+    // handling, frames appended instead of redrawn. The tray already refuses
+    // to run without a TTY on both ends, so a TTY is the only signal that
+    // matters — CI-flavoured shells and CI pty harnesses get the real UI.
+    interactive: true,
   });
   // `kill <pid>` or a closing terminal must not leave pictures or the
   // alternate screen behind; Ink only handles Ctrl+C itself.
