@@ -31,6 +31,7 @@ test("documents React, Ink, PTY, and movie modes from one executable", () => {
   assert.match(result.stdout, /astroshot init/);
   assert.match(result.stdout, /astroshot demo/);
   assert.match(result.stdout, /astroshot doctor/);
+  assert.match(result.stdout, /astroshot review/);
   assert.match(result.stdout, /alias for "astroshot ink"/);
   assert.match(result.stdout, /install-browser/);
 });
@@ -52,6 +53,23 @@ test("movie which-source steers agents to the right capture path", () => {
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /Which --source should I use/);
   assert.match(help.stdout, /NEVER screenshot Terminal/);
+});
+
+test("review documents the terminal tray and refuses to run without a TTY", () => {
+  const help = run("review", "--help");
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Astroshots tray in your terminal/);
+  assert.match(help.stdout, /Kitty/);
+  assert.match(help.stdout, /herdr/);
+  assert.match(help.stdout, /--root <dir>/);
+
+  const bareHelp = run("review", "help");
+  assert.equal(bareHelp.status, 0, bareHelp.stderr);
+  assert.match(bareHelp.stdout, /astroshot review/);
+
+  const piped = run("review", "--root", packageRoot);
+  assert.equal(piped.status, 1);
+  assert.match(piped.stderr, /interactive terminal/);
 });
 
 test("reports the unified package version", () => {

@@ -72,6 +72,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
+    "@archastro/astroshot-review": "0.2.1",
     "@archastro/movie-harness": "0.2.1",
     "@archastro/react-shot": "0.2.1",
     "@archastro/tui-shot": "0.2.1"

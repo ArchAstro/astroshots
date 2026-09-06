@@ -13,6 +13,10 @@ npx astroshot demo
 # Check Node, watched folders, app install/run state, Chromium, and macOS
 # Screen Recording. Each failure prints the exact fix command. Read-only.
 npx astroshot doctor
+
+# Review the stream in your terminal (Ghostty, kitty, or WezTerm draw the
+# pictures; ffmpeg plays movies). Same review.json as the macOS app.
+npx astroshot review
 ```
 
 `demo` accepts `--feature <name>`, `--root <dir>`, and `--json`. `doctor`

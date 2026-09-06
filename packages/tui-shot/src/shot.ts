@@ -128,6 +128,8 @@ export function validPositive(
 
 export interface TerminalCaptureRequest {
   terminalRows: string;
+  /** Absolutely positioned pictures painted over the rows (kitty graphics). */
+  overlays?: string;
   outPath: string;
   headed?: boolean;
   cols: number;
@@ -204,15 +206,17 @@ export async function captureTerminalHtml(
               line-height: ${lineHeight};
               text-rendering: geometricPrecision;
             }
+            .tui-screen { position: relative; }
             .tui-row {
               height: ${lineHeight}em;
               overflow: hidden;
               white-space: pre;
             }
+            .tui-graphic { position: absolute; display: block; object-fit: fill; }
           </style>
         </head>
         <body>
-          <div data-tui-shot role="img" aria-label="Terminal screenshot">${terminalRows}</div>
+          <div data-tui-shot role="img" aria-label="Terminal screenshot"><div class="tui-screen">${terminalRows}${request.overlays ?? ""}</div></div>
         </body>
       </html>`,
       { waitUntil: "load" },

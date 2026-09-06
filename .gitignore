@@ -22,6 +22,8 @@ Package.resolved
 
 # Node.js workspaces
 node_modules/
+# astroshot review debug diagnostics (ASTROSHOT_REVIEW_DEBUG=1)
+astroshot-review.log
 coverage/
 test-results/
 playwright-report/

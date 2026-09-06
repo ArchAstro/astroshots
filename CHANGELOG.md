@@ -11,6 +11,43 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **`astroshot review` — the Astroshots tray in your terminal:** a new
+  `@archastro/astroshot-review` package (bundled into `astroshot`) renders the
+  same newest-first Shots stream, detail, full-screen review, and Friction Logs
+  as the macOS app inside an Ink UI. Stills, posters, and friction screenshots
+  are drawn with the Kitty graphics protocol (Ghostty, kitty, WezTerm), movies
+  play through ffmpeg-decoded frames with chapter markers, and Seen / feedback
+  write the identical `review.json` shape (sorted keys, hash and run scoping,
+  run-id reset). Roots default to the app's watched folders; a durable index
+  makes startup instant and a shallow-then-deep walk keeps large worktree farms
+  from blocking the stream. See [`docs/review-tui.md`](docs/review-tui.md).
+- **`graphics: kitty` for PTY captures:** `astroshot pty` fixtures can emulate a
+  graphics-capable terminal. The harness answers the capability probe, records
+  transmitted images and placements, and paints them into the PNG, which is how
+  the review tray screenshots itself in tests.
+- **Pixel-perfect images inside herdr:** inside the herdr multiplexer (which
+  drops a program's raw Kitty escapes), `astroshot review` now renders through
+  herdr's own pane-graphics socket API (`pane.graphics.set` per image layer),
+  so stills, posters, and movie playback are crisp — even reached over mosh,
+  because the pixels travel through herdr's renderer. Each image owns a
+  `pane.graphics.stream` layer, so herdr drops it the instant the stream
+  closes and quitting (even a hard kill) leaves no images behind. Images are
+  oversampled 2x so herdr only downscales, keeping them crisp on Retina panes.
+  Detail and full-screen previews now scale small captures up to fill their area
+  (they used to sit tiny in the middle). `+` / `-` magnify by cropping into
+  the image (not stretching), `0` resets, and while zoomed the arrow keys pan
+  around it. The stream cursor is now a full-height bar and no longer sits
+  behind the thumbnail, so selecting a row stops making its image flicker. Needs
+  `[experimental] kitty_graphics = true` and one client reattach; the tray
+  detects when herdr can't yet report the cell size and says exactly what to do.
+- **Half-block image fallback for mosh, tmux, and plain terminals:** where no
+  pixel protocol is available, `astroshot review` renders every still, poster,
+  and friction screenshot as truecolor half-block text (two pixels per
+  character) instead of an empty box. `ASTROSHOT_REVIEW_GRAPHICS` forces
+  `kitty`, `halfblocks`, or `none`; Settings shows the active mode.
+
 ## [0.2.1] (npm) - 2026-08-19
 
 ### Added

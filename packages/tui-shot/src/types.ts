@@ -62,6 +62,12 @@ export interface PtyShotFixture {
   settleMs?: number;
   /** Permit a child that exits nonzero before capture. Defaults to false. */
   allowNonZeroExit?: boolean;
+  /**
+   * Emulate a graphics-capable terminal: answer the kitty graphics query and
+   * cell-size reports, record transmitted images, and paint them into the
+   * PNG at their placements.
+   */
+  graphics?: "kitty";
   actions?: PtyAction[];
   expectText?: string[];
   background?: string;
