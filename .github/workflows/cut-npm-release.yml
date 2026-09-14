@@ -1,8 +1,8 @@
 name: Cut npm release
 
 # Manually trigger from the Actions tab to:
-#   1. Bump all five public packages to the same version
-#      (react-shot, tui-shot, movie-harness, @archastro/astroshot, and the
+#   1. Bump all six public packages to the same version
+#      (react-shot, tui-shot, movie-harness, astroshot-review, @archastro/astroshot, and the
 #      unscoped astroshot wrapper)
 #   2. Roll CHANGELOG.md Unreleased → ## [X.Y.Z] (npm)
 #   3. Open a PR back to main and rebase-merge it, so main carries the bump
@@ -82,6 +82,7 @@ jobs:
             packages/react-shot \
             packages/tui-shot \
             packages/movie-harness \
+            packages/astroshot-review \
             packages/astroshot \
             packages/astroshot-unscoped
           do
@@ -155,6 +156,7 @@ jobs:
             packages/react-shot/package.json \
             packages/tui-shot/package.json \
             packages/movie-harness/package.json \
+            packages/astroshot-review/package.json \
             packages/astroshot/package.json \
             packages/astroshot-unscoped/package.json \
             package-lock.json \
@@ -183,7 +185,7 @@ jobs:
           |--|--|
           | Version | \`$CUR\` → \`$NEXT\` |
           | Tag | \`$TAG\` (pushed after this PR merges) |
-          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/movie-harness\`, \`@archastro/astroshot\`, \`astroshot\` |
+          | Packages | \`@archastro/react-shot\`, \`@archastro/tui-shot\`, \`@archastro/movie-harness\`, \`@archastro/astroshot-review\`, \`@archastro/astroshot\`, \`astroshot\` |
           | Publish | **Publish npm package** (dispatched once the tag is on main) |
           | Changelog | \`## [$NEXT] (npm)\` rolled from Unreleased |
 
@@ -229,6 +231,7 @@ jobs:
             packages/react-shot \
             packages/tui-shot \
             packages/movie-harness \
+            packages/astroshot-review \
             packages/astroshot \
             packages/astroshot-unscoped
           do

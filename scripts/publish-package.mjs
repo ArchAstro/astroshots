@@ -10,9 +10,10 @@ const allowedPackages = new Map([
   ["@archastro/react-shot", "packages/react-shot/package.json"],
   ["@archastro/tui-shot", "packages/tui-shot/package.json"],
   ["@archastro/movie-harness", "packages/movie-harness/package.json"],
+  ["@archastro/astroshot-review", "packages/astroshot-review/package.json"],
   ["@archastro/astroshot", "packages/astroshot/package.json"],
   // Unscoped wrapper. Publish LAST: it bundles the unified CLI, which depends
-  // on the three engines.
+  // on the capture engines and review tray.
   ["astroshot", "packages/astroshot-unscoped/package.json"],
 ]);
 

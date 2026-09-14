@@ -11,7 +11,7 @@ macOS app and npm package versions are independent tracks
 | Maintainer action | What it does |
 |-------------------|--------------|
 | **Actions → Cut release** | Bump macOS marketing version + build, roll changelog, tag `vX.Y.Z`, **dispatch Release DMG**, PR to main |
-| **Actions → Cut npm release** | Bump all four `@archastro/*` packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
+| **Actions → Cut npm release** | Bump all six public npm packages, roll changelog, tag `astroshot-vX.Y.Z`, **dispatch Publish npm package**, PR to main |
 | [GitHub Releases](https://github.com/ArchAstro/astroshots/releases) | Signed DMG (macOS) and npm release notes |
 | [ArchAstro/homebrew-tools](https://github.com/ArchAstro/homebrew-tools) | `Casks/astroshots.rb`, bumped automatically by **Release DMG** after the DMG is published |
 
@@ -52,8 +52,8 @@ as the package built from the tagged commit.
 Tag `astroshot-vX.Y.Z` (or **Cut npm release**) starts
 `.github/workflows/publish-npm.yml`. The
 workflow rejects a tag unless every package has the same version, reruns
-verification, publishes both still-image engines and the movie harness, then
-publishes the unified CLI last through npm trusted publishing.
+verification, publishes the capture engines and `@archastro/astroshot-review`,
+then the unified CLI and unscoped wrapper through npm trusted publishing.
 
 The workflow explicitly targets `https://registry.npmjs.org`. Trusted
 publishing automatically attaches provenance after this repository and the

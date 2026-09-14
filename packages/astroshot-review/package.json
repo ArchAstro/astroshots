@@ -1,6 +1,6 @@
 {
   "name": "@archastro/astroshot-review",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Terminal review tray for Astroshots: stream, review, and play .astroshot captures with Kitty graphics",
   "keywords": [
     "astroshots",
@@ -61,7 +61,7 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "@archastro/tui-shot": "0.2.1",
+    "@archastro/tui-shot": "0.2.2",
     "@types/node": "^22.0.0",
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.0.0",
