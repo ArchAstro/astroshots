@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.2] (npm) - 2026-09-14
+
 ### Added
 
 - **`astroshot review` — the Astroshots tray in your terminal:** a new

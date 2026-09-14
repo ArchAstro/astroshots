@@ -94,6 +94,7 @@ jobs:
             packages/react-shot \
             packages/tui-shot \
             packages/movie-harness \
+            packages/astroshot-review \
             packages/astroshot \
             packages/astroshot-unscoped
           do
@@ -113,6 +114,7 @@ jobs:
             "@archastro/react-shot",
             "@archastro/tui-shot",
             "@archastro/movie-harness",
+            "@archastro/astroshot-review",
           ]) {
             assert.equal(
               astroshot.dependencies[dep],
@@ -122,13 +124,14 @@ jobs:
           }
 
           // The unscoped `astroshot` wrapper bundles the CLI and all three
-          // engines. Each must be pinned to the release version AND listed in
-          // bundleDependencies, or npm resolves it through the consumer's
+          // engines plus the review tray. Each must be pinned to the release
+          // version AND listed in bundleDependencies, or npm resolves it through the consumer's
           // (hijackable) @archastro scope registry at install time.
           for (const dep of [
             "@archastro/react-shot",
             "@archastro/tui-shot",
             "@archastro/movie-harness",
+            "@archastro/astroshot-review",
             "@archastro/astroshot",
           ]) {
             assert.equal(
@@ -159,6 +162,9 @@ jobs:
           node scripts/publish-package.mjs @archastro/tui-shot
           node scripts/publish-package.mjs @archastro/movie-harness
 
+      - name: Publish review tray
+        run: node scripts/publish-package.mjs @archastro/astroshot-review
+
       - name: Publish unified CLI
         run: node scripts/publish-package.mjs @archastro/astroshot
 
@@ -181,6 +187,7 @@ jobs:
           - https://www.npmjs.com/package/@archastro/react-shot/v/$VERSION
           - https://www.npmjs.com/package/@archastro/tui-shot/v/$VERSION
           - https://www.npmjs.com/package/@archastro/movie-harness/v/$VERSION
+          - https://www.npmjs.com/package/@archastro/astroshot-review/v/$VERSION
           - https://www.npmjs.com/package/@archastro/astroshot/v/$VERSION
           - https://www.npmjs.com/package/astroshot/v/$VERSION
 

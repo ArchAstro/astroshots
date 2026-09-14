@@ -1,6 +1,6 @@
 {
   "name": "@archastro/react-shot",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Capture deterministic PNG screenshots from React and TSX fixtures",
   "keywords": [
     "react",
