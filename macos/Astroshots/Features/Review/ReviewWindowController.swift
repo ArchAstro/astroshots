@@ -15,8 +15,8 @@ final class ReviewWindowController {
     }
 
     private let appState: AppState
-    private var panel: ReviewPanel?
-    private var currentShotID: String?
+    private(set) var panel: ReviewPanel?
+    private(set) var currentShotID: String?
     private var mode: Mode = .shot
     /// Invoked after the takeover is ordered out (close button, Escape, Seen).
     var onClosed: (() -> Void)?
@@ -29,17 +29,7 @@ final class ReviewWindowController {
         PerformanceLog.interval(PerformanceLog.reviewOpen) {
             mode = .shot
             currentShotID = shot.id
-            let root = ReviewTakeoverView(
-                shot: shot,
-                appState: appState,
-                onClose: { [weak self] in
-                    self?.close()
-                },
-                onNavigate: { [weak self] delta in
-                    self?.navigate(delta)
-                }
-            )
-            present(root)
+            present(shotView(shot))
         }
     }
 
@@ -48,17 +38,7 @@ final class ReviewWindowController {
             mode = .frictionStep
             currentShotID = nil
             appState.selectedFrictionStepID = step.id
-            let root = FrictionStepTakeoverView(
-                step: step,
-                appState: appState,
-                onClose: { [weak self] in
-                    self?.close()
-                },
-                onNavigateStep: { [weak self] delta in
-                    self?.navigateFrictionStep(delta)
-                }
-            )
-            present(root)
+            present(frictionStepView(step))
         }
     }
 
@@ -70,6 +50,25 @@ final class ReviewWindowController {
         if wasVisible {
             onClosed?()
         }
+    }
+
+    // Item identity resets drafts/focus without replacing the AppKit hosting tree.
+    private func shotView(_ shot: Shot) -> some View {
+        ReviewTakeoverView(
+            shot: shot,
+            appState: appState,
+            onClose: { [weak self] in self?.close() },
+            onNavigate: { [weak self] in self?.navigate($0) }
+        ).id(shot.id)
+    }
+
+    private func frictionStepView(_ step: FrictionLogStep) -> some View {
+        FrictionStepTakeoverView(
+            step: step,
+            appState: appState,
+            onClose: { [weak self] in self?.close() },
+            onNavigateStep: { [weak self] in self?.navigateFrictionStep($0) }
+        ).id(step.id)
     }
 
     private func present<Content: View>(_ root: Content) {
@@ -102,7 +101,8 @@ final class ReviewWindowController {
                   let shot = appState.reviewSibling(from: currentShotID, delta: delta)
             else { return }
             PerformanceLog.interval(PerformanceLog.reviewNavigate) {
-                open(shot)
+                self.currentShotID = shot.id
+                updateHostedView(shotView(shot))
             }
         case .frictionStep:
             navigateFrictionStep(delta)
@@ -114,8 +114,14 @@ final class ReviewWindowController {
         appState.stepFrictionStep(delta)
         guard let step = appState.selectedFrictionStep else { return }
         PerformanceLog.interval(PerformanceLog.reviewNavigate) {
-            openFrictionStep(step)
+            updateHostedView(frictionStepView(step))
         }
+    }
+
+    private func updateHostedView<Content: View>(_ root: Content) {
+        guard let hosting = panel?.contentViewController as? NSHostingController<Content> else { return }
+        hosting.rootView = root
+        panel?.makeFirstResponder(panel)
     }
 
     private func makePanel() -> ReviewPanel {

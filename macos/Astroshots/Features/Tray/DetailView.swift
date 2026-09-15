@@ -502,16 +502,32 @@ private struct FittedDetailPreview: View {
     let maxHeight: CGFloat
 
     var body: some View {
+        let image = PerformanceLog.interval(PerformanceLog.imageDecode) {
+            NSImage(contentsOfFile: path)
+        }
         AspectFitPreviewLayout(
-            aspectRatio: imageAspectRatio,
+            aspectRatio: imageAspectRatio(image),
             maxHeight: maxHeight
         ) {
-            ShotThumbnail(path: path, contentMode: .fit)
+            Group {
+                if let image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    ZStack {
+                        Color(hex: 0x1C1B19)
+                        Image(systemName: "photo")
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+            .background(Color(hex: 0x1C1B19))
         }
     }
 
-    private var imageAspectRatio: CGFloat {
-        guard let image = NSImage(contentsOfFile: path) else {
+    private func imageAspectRatio(_ image: NSImage?) -> CGFloat {
+        guard let image else {
             return 16 / 10
         }
         if let representation = image.representations.first(where: {
