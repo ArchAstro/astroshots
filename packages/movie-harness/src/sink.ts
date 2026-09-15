@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { collectProvenance, newStableId, type CaptureProvenance } from "./identity.js";
 import {
   assertKebabCase,
   assertSlug,
@@ -24,14 +25,20 @@ interface ManifestShot {
   duration_ms: number;
   source: string;
   chapters: { slug: string; t_ms: number; note?: string }[];
+  entry_id: string;
+  asset_id: string;
+  video_asset_id: string;
 }
 
 interface Manifest {
   version: 1;
+  schema_version: 1;
   feature: string;
+  scenario_id: string;
   run_id: string;
   status: string;
   description?: string;
+  provenance?: CaptureProvenance;
   shots: ManifestShot[];
 }
 
@@ -107,21 +114,32 @@ export function sinkMovie(request: SinkMovieRequest): SinkMovieResult {
       t_ms: Math.round(chapter.tMs),
       note: chapter.note,
     })),
+    entry_id: newStableId(),
+    asset_id: newStableId(),
+    video_asset_id: newStableId(),
   };
 
+  const provenance = collectProvenance(dir);
+  const scenarioId = existing?.scenario_id ?? newStableId();
   const manifest: Manifest = continueRun
     ? {
         ...existing,
+        schema_version: 1,
+        scenario_id: scenarioId,
         status: request.status ?? existing.status,
         description: request.description ?? existing.description,
+        provenance: existing.provenance ?? provenance,
         shots: [...existing.shots, shot],
       }
     : {
         version: 1,
+        schema_version: 1,
         feature: request.feature,
+        scenario_id: scenarioId,
         run_id: request.runId,
         status: request.status ?? "running",
         description: request.description,
+        provenance,
         shots: [shot],
       };
 
@@ -152,9 +170,12 @@ export function finalizeManifest(
       `${JSON.stringify(
         {
           version: 1,
+          schema_version: 1,
           feature,
+          scenario_id: newStableId(),
           run_id: runId,
           status,
+          provenance: collectProvenance(dir),
           shots: [],
         },
         null,

@@ -9,7 +9,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { HashCache } from "./hash-cache.js";
-import type { FrictionLog, FrictionRun, FrictionStep, ReviewSnapshot } from "./model.js";
+import type {
+  FrictionLog,
+  FrictionRun,
+  FrictionStep,
+  ImportDiagnostic,
+  ReviewSnapshot,
+} from "./model.js";
 import { frictionLogsDir, humanize, storiesDir, worktreeShort } from "./paths.js";
 import {
   entryNeedsHash,
@@ -73,29 +79,72 @@ async function mtimeOf(filePath: string): Promise<number | null> {
   }
 }
 
-/** Parse JSONL text into ordered steps; screenshots are resolved against `runDir`. */
-export async function parseJsonl(text: string, runDir: string): Promise<FrictionStep[]> {
-  const steps: FrictionStep[] = [];
+export interface ParsedFrictionStep extends FrictionStep {
+  entryId: string | null;
+  referencedScreenshots: string[];
+  assetIds: Record<string, string>;
+}
+
+export interface JsonlParseResult {
+  steps: ParsedFrictionStep[];
+  diagnostics: ImportDiagnostic[];
+  referenced: string[];
+}
+
+/** Parse JSONL with diagnostics. The tray still uses `parseJsonl` and skips bad lines. */
+export async function parseJsonlDetailed(text: string, runDir: string): Promise<JsonlParseResult> {
+  const steps: ParsedFrictionStep[] = [];
+  const diagnostics: ImportDiagnostic[] = [];
+  const referenced: string[] = [];
   let index = 0;
+  let lineNumber = 0;
   for (const rawLine of text.split(/\r?\n/)) {
+    lineNumber += 1;
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
     } catch {
+      diagnostics.push({
+        kind: "malformed-line",
+        message: `malformed JSONL at line ${lineNumber}`,
+        line: lineNumber,
+      });
       continue;
     }
-    if (!isRecord(parsed)) continue;
+    if (!isRecord(parsed)) {
+      diagnostics.push({
+        kind: "malformed-line",
+        message: `non-object JSONL at line ${lineNumber}`,
+        line: lineNumber,
+      });
+      continue;
+    }
     index += 1;
     const step = typeof parsed.step === "number" ? parsed.step : index;
     const stepId = firstString(parsed, "id") ?? `step-${step}`;
+    const names = stringList(parsed.screenshots ?? parsed.screenshot);
     const screenshots: string[] = [];
-    for (const name of stringList(parsed.screenshots ?? parsed.screenshot)) {
+    const assetIds: Record<string, string> = {};
+    const storedAssetIds = isRecord(parsed.asset_ids) ? parsed.asset_ids : {};
+    for (const name of names) {
+      referenced.push(name);
       const byBasename = path.join(runDir, path.basename(name));
       const asWritten = path.resolve(runDir, name);
       if (await exists(byBasename)) screenshots.push(byBasename);
       else if (await exists(asWritten)) screenshots.push(asWritten);
+      else {
+        diagnostics.push({
+          kind: "missing-asset",
+          message: `missing screenshot ${name}`,
+          line: lineNumber,
+          fileName: name,
+          path: byBasename,
+        });
+      }
+      const stored = storedAssetIds[name] ?? storedAssetIds[path.basename(name)];
+      if (typeof stored === "string" && stored) assetIds[name] = stored;
     }
     steps.push({
       id: `${step}-${stepId}`,
@@ -109,9 +158,22 @@ export async function parseJsonl(text: string, runDir: string): Promise<Friction
       improve: stringList(parsed.improve ?? parsed.can_improve ?? parsed.improvements),
       url: firstString(parsed, "url"),
       capturedAt: firstString(parsed, "captured_at"),
+      entryId: firstString(parsed, "entry_id"),
+      referencedScreenshots: names,
+      assetIds,
     });
   }
-  return steps.sort((a, b) => a.step - b.step);
+  return {
+    steps: steps.sort((a, b) => a.step - b.step),
+    diagnostics,
+    referenced,
+  };
+}
+
+/** Parse JSONL text into ordered steps; screenshots are resolved against `runDir`. */
+export async function parseJsonl(text: string, runDir: string): Promise<FrictionStep[]> {
+  const parsed = await parseJsonlDetailed(text, runDir);
+  return parsed.steps.map(({ entryId: _entryId, referencedScreenshots: _names, assetIds: _ids, ...step }) => step);
 }
 
 async function runReview(runDir: string, runId: string, hashes: HashCache): Promise<ReviewSnapshot | null> {

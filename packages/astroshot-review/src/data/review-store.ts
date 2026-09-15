@@ -18,6 +18,8 @@ export interface ReviewEntry {
   decision?: string;
   reviewed_at?: string;
   image_sha256?: string;
+  /** Optional content-revision claim; never substitutes for image_sha256. */
+  content_revision?: string;
   comments?: ReviewComment[];
 }
 
@@ -38,6 +40,7 @@ interface StoredEntry {
   decision?: string;
   reviewed_at?: string;
   image_sha256?: string;
+  content_revision?: string;
   comments?: StoredComment[];
 }
 
@@ -91,6 +94,7 @@ export function parseReviewDocument(raw: string): ReviewDocument | null {
         decision: typeof entry.decision === "string" ? entry.decision : undefined,
         reviewed_at: typeof entry.reviewed_at === "string" ? entry.reviewed_at : undefined,
         image_sha256: typeof entry.image_sha256 === "string" ? entry.image_sha256 : undefined,
+        content_revision: typeof entry.content_revision === "string" ? entry.content_revision : undefined,
         comments,
       };
     }

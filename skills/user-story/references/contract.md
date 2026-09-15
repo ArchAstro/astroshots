@@ -10,6 +10,7 @@ change; only the directory name did.
   prompt.md
   meta.json                 # optional
   runs/<run-id>/
+    prompt.md               # frozen snapshot of the scenario prompt
     log.jsonl
     meta.json               # optional per-run status
     NNNN-slug.png
@@ -72,11 +73,14 @@ these commands operate on the layout above:
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `version` | number | no | Use `1` |
+| `schema_version` | number | no | Portable record contract; currently `1` |
+| `scenario_id` | string | recommended | Stable scenario identity. Copies of this directory keep the same id. Distinct attempts never merge. |
 | `slug` | string | no | Should match directory name |
 | `title` | string | no | Tray title; default humanized slug |
 | `description` | string | no | One-line summary |
 | `status` | string | no | `draft` \| `ready` \| `running` \| `complete` \| `failed` |
 | `updated_at` | string | no | ISO-8601 UTC |
+| `provenance` | object | no | Capture-time `source_path`, `worktree`, `repo`, `commit`, `branch`, `dirty`. Never global identity. |
 
 ## log.jsonl
 
@@ -102,10 +106,12 @@ One UTF-8 JSON object per line. Order by `step` ascending. Blank lines and
 |-------|------|----------|-------|
 | `step` | number | recommended | 1-based; defaults to line order |
 | `id` | string | recommended | Stable kebab-case step id |
+| `entry_id` | string | recommended | Stable identity for this step; copies keep it |
 | `title` | string | recommended | Short label |
 | `description` | string | recommended | What was done / seen (short factual note) |
 | `transcript` | string | **required** (new runs) | Spoken-word narrative for this step; see skill for voice + transition rules. Older logs may omit it. |
 | `screenshots` | string[] | recommended | Basenames relative to the run directory |
+| `asset_ids` | object | no | Map of screenshot basename → stable asset id |
 | `screenshot` | string | no | Singular alias if only one image |
 | `good` | string[] | recommended | Empty array allowed |
 | `improve` | string[] | recommended | Empty array allowed; aliases: `can_improve`, `improvements` |
@@ -123,7 +129,9 @@ One UTF-8 JSON object per line. Order by `step` ascending. Blank lines and
 - The app loads missing `transcript` as empty for backward compatibility.
 
 Screenshots are resolved by basename under the run directory. Missing files are
-dropped from the loaded path list; the step still appears.
+dropped from the loaded path list; the step still appears. Portable import
+reports those missing files and malformed JSONL lines instead of inventing
+media or success.
 
 ## App behavior
 

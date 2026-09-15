@@ -10,6 +10,7 @@ export {
 } from "./paths.js";
 export { MovieSession } from "./session.js";
 export { finalizeManifest, sinkMovie } from "./sink.js";
+export { collectProvenance, newStableId } from "./identity.js";
 export {
   formatSourceCatalog,
   recommendSource,

@@ -11,6 +11,17 @@ export interface ManifestChapter {
   tMs?: number;
 }
 
+export interface ManifestProvenance {
+  source_path?: string;
+  worktree?: string;
+  repo?: string;
+  commit?: string;
+  branch?: string;
+  dirty?: boolean;
+  task_id?: string;
+  pr?: string;
+}
+
 export interface ManifestShot {
   id?: string;
   file?: string;
@@ -26,14 +37,20 @@ export interface ManifestShot {
   duration_ms?: number;
   source?: string;
   chapters?: ManifestChapter[];
+  entry_id?: string;
+  asset_id?: string;
+  video_asset_id?: string;
 }
 
 export interface FeatureManifest {
   version?: number;
+  schema_version?: number;
   feature?: string;
+  scenario_id?: string;
   run_id?: string;
   status?: string;
   description?: string;
+  provenance?: ManifestProvenance;
   shots?: ManifestShot[];
 }
 
