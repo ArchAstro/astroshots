@@ -5,6 +5,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Packaging must consume a prebuilt payload and must never install dependencies.
+if grep -E '^[[:space:]]*("\$ROOT/scripts/build-tools-payload\.sh"|\$ROOT/scripts/build-tools-payload\.sh|npm[[:space:]]|npx[[:space:]])' \
+  "$ROOT/scripts/package-dmg.sh"; then
+  echo 'FAIL: package installs dependencies' >&2
+  exit 1
+fi
+echo 'PASS: package does not install dependencies'
+
 PROOF_DIR="$(mktemp -d "${TMPDIR:-/tmp}/astroshots-dmg-proof.XXXXXX")"
 DMG="$PROOF_DIR/Astroshots.dmg"
 MOUNT="$PROOF_DIR/mount"
@@ -43,5 +52,11 @@ cmp \
   "$ROOT/Design/Generated/astroshots-dmg-background.png" \
   "$MOUNT/.background/Astroshots.png"
 codesign --verify --deep --strict "$MOUNT/Astroshots.app"
+
+# Simulate installation into a path with spaces, independent of the build tree.
+ditto "$MOUNT/Astroshots.app" "$PROOF_DIR/Installed Apps/Astroshots.app"
+"$ROOT/scripts/verify-tools-payload.sh" \
+  "$PROOF_DIR/Installed Apps/Astroshots.app/Contents/Resources/Tools" --reject-cases
+echo 'PASS: installed offline tools payload'
 
 echo "Branded DMG end-to-end proof passed"

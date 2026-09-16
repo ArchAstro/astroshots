@@ -83,6 +83,14 @@ EOF
   exit 1
 fi
 
+TOOLS_SRC="$ROOT/build/Tools"
+if [[ ! -d "$TOOLS_SRC/bin" ]]; then
+  echo "error: prebuilt Tools payload missing at $TOOLS_SRC" >&2
+  echo "Build it first with macos/scripts/build-tools-payload.sh (credential-free)." >&2
+  exit 1
+fi
+# Packaging never installs dependencies; it only validates a prebuilt payload.
+"$ROOT/scripts/verify-tools-payload.sh" "$TOOLS_SRC"
 echo "==> Generating Xcode project"
 xcodegen generate
 
@@ -140,6 +148,29 @@ APP="$STAGE/Astroshots.app"
 echo "==> Staging app"
 ditto "$APP_SRC" "$APP"
 ln -s /Applications "$STAGE/Applications"
+TOOLS="$APP/Contents/Resources/Tools"
+# Fail before signing anything in the staged application.
+"$ROOT/scripts/verify-tools-payload.sh" "$TOOLS"
+# Sign all Mach-O payload objects, including extensionless helpers and addons.
+TOOL_IDENTITY="$IDENTITY"
+[[ "$ADHOC" != 1 ]] || TOOL_IDENTITY=-
+while IFS= read -r -d '' native; do
+  if /usr/bin/file -b "$native" | grep -q 'Mach-O'; then
+    SIGN_NATIVE=(
+      codesign --force --sign "$TOOL_IDENTITY" --options runtime
+      --entitlements "$ROOT/Astroshots/Tools.entitlements"
+    )
+    if [[ "$ADHOC" == 1 ]]; then
+      SIGN_NATIVE+=(--timestamp=none)
+    else
+      SIGN_NATIVE+=(--timestamp)
+    fi
+    "${SIGN_NATIVE[@]}" "$native"
+  fi
+done < <(find "$TOOLS" -type f -print0)
+# Signing changes native bytes. Seal those bytes before the outer app signature.
+python3 "$ROOT/scripts/tools-payload.py" seal "$TOOLS"
+"$ROOT/scripts/verify-tools-payload.sh" "$TOOLS"
 
 DMG_BACKGROUND="$ROOT/Design/Generated/astroshots-dmg-background.png"
 if [[ ! -f "$DMG_BACKGROUND" ]]; then
@@ -175,7 +206,7 @@ sign_app() {
       --sign "$IDENTITY" \
       "$nested"
   done < <(
-    find "$app/Contents" -depth ! -type l \( \
+    find "$app/Contents" -depth ! -type l ! -path "$TOOLS/*" \( \
       -name "*.dylib" -o \
       -name "*.so" -o \
       -name "*.xpc" -o \
@@ -202,7 +233,8 @@ sign_app() {
 
 if [[ "$ADHOC" == "1" ]]; then
   echo "==> Ad-hoc signing (not Gatekeeper-clean)"
-  codesign --force --sign - --options runtime "$APP" || true
+  codesign --force --sign - --options runtime "$APP"
+  codesign --verify --deep --strict "$APP"
 else
   sign_app "$APP"
 fi
@@ -330,12 +362,31 @@ tell application "Finder"
     set the bounds of container window to {100, 100, 820, 550}
     update without registering applications
     delay 3
+    close container window
   end tell
 end tell
 EOF
 
 sync
-hdiutil detach "$DEVICE"
+# Close only this volume's Finder window. Do not force-detach unrelated volumes.
+osascript <<EOF
+tell application "Finder"
+  set mountPOSIX to "$MOUNT_POINT"
+  if mountPOSIX does not end with "/" then set mountPOSIX to mountPOSIX & "/"
+  repeat with w in (get windows)
+    try
+      set targetPOSIX to POSIX path of (target of w as alias)
+      if targetPOSIX starts with mountPOSIX or targetPOSIX is mountPOSIX then close w
+    end try
+  end repeat
+end tell
+EOF
+if ! hdiutil detach "$DEVICE"; then
+  echo "error: could not detach $DEVICE ($MOUNT_POINT)" >&2
+  lsof +D "$MOUNT_POINT" >&2 || true
+  hdiutil info >&2 || true
+  exit 1
+fi
 DEVICE=""
 MOUNT_POINT=""
 rm -f "$ATTACH_PLIST"

@@ -157,6 +157,18 @@ jobs:
           source scripts/xcode-env.sh
           ensure_mlx_build_prereqs
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.16.0'
+          package-manager-cache: false
+
+      - name: Build and verify offline tools
+        run: |
+          npm install --global npm@11.17.0
+          npm ci
+          macos/scripts/build-tools-payload.sh
+          macos/scripts/verify-tools-payload.sh "$PWD/macos/build/Tools" --reject-cases
+
       - name: Generate project
         working-directory: macos
         run: xcodegen generate
