@@ -88,13 +88,13 @@ final class ReviewFlowUITests: XCTestCase {
         XCTAssertTrue(overlay.waitForExistence(timeout: 8))
         let overlayScreenshot = overlay.screenshot()
         XCTAssertTrue(
-            screenshot(overlayScreenshot, contains: { red, green, blue in
+            png(overlayScreenshot.pngRepresentation, contains: { red, green, blue in
                 red > 0.8 && green < 0.2 && blue < 0.2
             }),
             "The overlay cropped the red left-edge marker from the panoramic fixture."
         )
         XCTAssertTrue(
-            screenshot(overlayScreenshot, contains: { red, green, blue in
+            png(overlayScreenshot.pngRepresentation, contains: { red, green, blue in
                 red < 0.2 && green > 0.8 && blue < 0.2
             }),
             "The overlay cropped the green right-edge marker from the panoramic fixture."
@@ -748,12 +748,40 @@ final class ReviewFlowUITests: XCTestCase {
         return false
     }
 
+    func testEdgeMarkersSurviveColorProfileConversionAndRejectCrops() throws {
+        let data = try fixturePNG(width: 1_200, height: 400, showsEdgeMarkers: true)
+        let source = try XCTUnwrap(NSBitmapImageRep(data: data))
+        let red: (CGFloat, CGFloat, CGFloat) -> Bool = { red, green, blue in
+            red > 0.8 && green < 0.2 && blue < 0.2
+        }
+        let green: (CGFloat, CGFloat, CGFloat) -> Bool = { red, green, blue in
+            red < 0.2 && green > 0.8 && blue < 0.2
+        }
+        // Display P3 encodes sRGB primaries with mixed channels, so interpreting
+        // those bytes without the PNG's ICC profile must not pass this control.
+        for space in [NSColorSpace.sRGB, NSColorSpace.displayP3] {
+            let converted = try XCTUnwrap(source.converting(to: space, renderingIntent: .default))
+            let image = try XCTUnwrap(converted.cgImage)
+            for (name, rect, expectsRed, expectsGreen) in [
+                ("intact", CGRect(x: 0, y: 0, width: 1_200, height: 400), true, true),
+                ("missing left", CGRect(x: 100, y: 0, width: 1_100, height: 400), false, true),
+                ("missing right", CGRect(x: 0, y: 0, width: 1_100, height: 400), true, false)
+            ] {
+                let cropped = try XCTUnwrap(image.cropping(to: rect))
+                let encoded = try XCTUnwrap(NSBitmapImageRep(cgImage: cropped)
+                    .representation(using: .png, properties: [:]))
+                XCTAssertEqual(png(encoded, contains: red), expectsRed, "\(space): \(name), red")
+                XCTAssertEqual(png(encoded, contains: green), expectsGreen, "\(space): \(name), green")
+            }
+        }
+    }
+
     private func fixturePNG(
         width: Int,
         height: Int,
         showsEdgeMarkers: Bool = false
     ) throws -> Data {
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let colorSpace = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try XCTUnwrap(
             CGContext(
                 data: nil,
@@ -779,19 +807,21 @@ final class ReviewFlowUITests: XCTestCase {
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 
-    @MainActor
-    private func screenshot(
-        _ screenshot: XCUIScreenshot,
+    private func png(
+        _ data: Data,
         contains predicate: (_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> Bool
     ) -> Bool {
-        guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+        // Convert the bitmap while its embedded ICC profile is still available.
+        // Converting individual colorAt values loses that source-profile context.
+        guard let source = NSBitmapImageRep(data: data),
+              let bitmap = source.converting(to: .sRGB, renderingIntent: .default) else {
             return false
         }
 
         for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
             for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
                 guard let color = bitmap.colorAt(x: x, y: y)?
-                    .usingColorSpace(.deviceRGB)
+                    .usingColorSpace(.sRGB)
                 else { continue }
                 if predicate(color.redComponent, color.greenComponent, color.blueComponent) {
                     return true
