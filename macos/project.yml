@@ -39,6 +39,9 @@ targets:
         buildPhase: resources
       - path: Design/Generated/astroshots-app-icon-master.png
         buildPhase: resources
+      - path: build/Tools
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: mlx-audio-swift
         product: MLXAudioCore

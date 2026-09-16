@@ -62,6 +62,17 @@ jobs:
             exit 1
           fi
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.16.0'
+          package-manager-cache: false
+
+      - name: Install tools build dependencies
+        run: |
+          npm install --global npm@11.17.0
+          npm ci
+          macos/scripts/build-tools-payload.sh
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

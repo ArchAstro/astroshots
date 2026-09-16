@@ -15,7 +15,9 @@
 
 # Build
 build/
+# Includes generated Tools payload and tools-downloads; never commit either.
 macos/build/
+__pycache__/
 dist/
 .swiftpm/
 Package.resolved

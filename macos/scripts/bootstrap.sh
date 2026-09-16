@@ -9,6 +9,8 @@ cd "$ROOT"
 source "$ROOT/scripts/xcode-env.sh"
 ensure_mlx_build_prereqs
 
+# Builder provisions pinned Node/npm and lockfile-installs the workspace when missing.
+"$ROOT/scripts/build-tools-payload.sh"
 xcodegen generate
 echo "Open Astroshots.xcodeproj"
 echo "CLI builds need: xcodebuild ... ${ASTROSHOTS_XCODEBUILD_FLAGS[*]}"
