@@ -6,7 +6,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$ROOT/macos/build/Tools"
 CACHE="$ROOT/macos/build/tools-downloads"
 NODE_VERSION=22.16.0
-NPM_VERSION=11.17.0
+# npm bundled inside the SHA-pinned Node tarball below. This is deliberately
+# not the repo's packageManager version: the build prefix comes from the
+# tarball, so it must assert what the tarball actually ships.
+NPM_VERSION=10.9.2
 case "$(uname -m)" in
   arm64) ARCH=arm64; SHA=1d7f34ec4c03e12d8b33481e5c4560432d7dc31a0ef3ff5a4d9a8ada7cf6ecc9 ;;
   x86_64) ARCH=x64; SHA=838d400f7e66c804e5d11e2ecb61d6e9e878611146baff69d6a2def3cc23f4ac ;;
@@ -26,8 +29,16 @@ rm -rf "$BUILD_NODE"
 mkdir -p "$BUILD_NODE"
 tar -xzf "$CACHE/$ARCHIVE" -C "$BUILD_NODE" --strip-components=1
 export PATH="$BUILD_NODE/bin:$PATH"
-test "$(node -p process.versions.node)" = "$NODE_VERSION"
-test "$(npm -v)" = "$NPM_VERSION"
+BUILD_NODE_VERSION="$(node -p process.versions.node)"
+if [[ "$BUILD_NODE_VERSION" != "$NODE_VERSION" ]]; then
+  echo "Expected bundled node $NODE_VERSION, got $BUILD_NODE_VERSION" >&2
+  exit 1
+fi
+BUILD_NPM_VERSION="$(npm -v)"
+if [[ "$BUILD_NPM_VERSION" != "$NPM_VERSION" ]]; then
+  echo "Expected bundled npm $NPM_VERSION, got $BUILD_NPM_VERSION" >&2
+  exit 1
+fi
 
 cd "$ROOT"
 # Always lockfile-install. prepack/pack need the reviewed workspace tree.
