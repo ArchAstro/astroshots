@@ -53,9 +53,14 @@ tar -xzf "$CACHE/$ARCHIVE" -C "$OUT/node" --strip-components=1 \
   "node-v${NODE_VERSION}-darwin-$ARCH/LICENSE"
 VERSION="$(node -p "require('./packages/astroshot-unscoped/package.json').version")"
 printf '{"private":true}\n' > "$CACHE/consumer/package.json"
-# Scripts stay off. Optional native packages come from the lockfile-backed cache.
+# Scripts stay off. Cached tarballs are reused when present.
+# Not --offline: `npm ci` caches tarballs by resolved URL and never stores a
+# packument, so resolving this tarball's own dependency ranges (e.g. ^5.2.0)
+# has no cached metadata on a clean machine and fails ENOTCACHED. Build-time
+# fetches are allowed here; the payload's offline guarantee is proven by
+# verify-tools-payload.sh, which runs the installed CLI with networking denied.
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$CACHE/consumer" \
-  --omit=dev --ignore-scripts --offline --no-audit --no-fund \
+  --omit=dev --ignore-scripts --prefer-offline --no-audit --no-fund \
   "$CACHE/astroshot-$VERSION.tgz"
 cp -RL "$CACHE/consumer" "$OUT/cli"
 cp -RL "$ROOT/skills" "$OUT/skills"
