@@ -271,7 +271,23 @@ splitPngStream = "astroshot::astroshot_review::video::ffmpeg::split_png_stream"
 
 [[module]]
 ts = "packages/astroshot/bin/demo.mjs"
-status = "in_progress"
+status = "ported"
+rust = "bin/demo.rs"
+module = "astroshot::bin::demo"
+ported_at = "2026-10-06T21:44:01Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "fixture bytes embedded via include_bytes! from packages/astroshot/fixtures/demo; run_demo(argv, log) -> Result<i32>; PlanOptions struct replaces JS defaults"
+
+[module.ts_blobs]
+"packages/astroshot/bin/demo.mjs" = "d17652fa28dd27a0febd7447276aa9e17217577b"
+
+[module.symbols]
+DEFAULT_DEMO_FEATURE = "astroshot::bin::demo::DEFAULT_DEMO_FEATURE"
+demoHelp = "astroshot::bin::demo::demo_help"
+loadDemoFixtures = "astroshot::bin::demo::load_demo_fixtures"
+planDemo = "astroshot::bin::demo::plan_demo"
+runDemo = "astroshot::bin::demo::run_demo"
+writeDemo = "astroshot::bin::demo::write_demo"
 
 [[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
