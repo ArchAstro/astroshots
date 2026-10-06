@@ -168,7 +168,10 @@ fn render_friction_row(buf: &mut Buffer, area: Rect, log: &FrictionLog, selected
     if column.is_empty() {
         return;
     }
-    let row = |n: u16| column.y + n;
+    // An empty `<Text>` has no height in Ink: without a description the two
+    // rows below it move up.
+    let description_rows = u16::from(!log.description.is_empty());
+    let row = |n: u16| column.y + if n >= 2 { n - 1 + description_rows } else { n };
 
     let pill: Vec<Span<'static>> = status_pill(status.as_deref()).into_iter().collect();
     space_between(
@@ -185,14 +188,16 @@ fn render_friction_row(buf: &mut Buffer, area: Rect, log: &FrictionLog, selected
         )],
         &pill,
     );
-    put_truncated(
-        buf,
-        column,
-        column.x,
-        row(1),
-        &[span(truncate(&log.description, inner), fg(THEME.muted))],
-        inner,
-    );
+    if description_rows > 0 {
+        put_truncated(
+            buf,
+            column,
+            column.x,
+            row(1),
+            &[span(truncate(&log.description, inner), fg(THEME.muted))],
+            inner,
+        );
+    }
     space_between(
         buf,
         column,
@@ -421,15 +426,18 @@ impl Widget for FrictionLogDetail<'_> {
             &pill,
         );
         y += 1;
-        put_truncated(
-            buf,
-            inner_area,
-            inner_area.x,
-            y,
-            &[span(truncate(&log.description, inner), fg(THEME.muted))],
-            inner,
-        );
-        y += 1;
+        // An empty `<Text>` has no height in Ink.
+        if !log.description.is_empty() {
+            put_truncated(
+                buf,
+                inner_area,
+                inner_area.x,
+                y,
+                &[span(truncate(&log.description, inner), fg(THEME.muted))],
+                inner,
+            );
+            y += 1;
+        }
         let mut slug = vec![
             worktree_chip(&log.worktree_short),
             span(format!(" {}", log.slug), fg(THEME.muted)),

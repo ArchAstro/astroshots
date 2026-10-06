@@ -82,25 +82,35 @@ impl Widget for HelpOverlay {
         let left = area.x + 2;
         let mut y = area.y + 1;
         let bold = Style::new().add_modifier(Modifier::BOLD);
-        put_spans(buf, area, left, y, &[Span::styled("Keyboard", bold)]);
-        put_spans(
-            buf,
-            area,
-            left,
-            y + 1,
-            &[Span::styled(
-                "Press ? or esc to close",
-                Style::new().fg(THEME.muted),
-            )],
-        );
-        y += 3; // two text rows + marginTop 1
-
         let width = area.width as usize;
         let columns = if width >= 100 { 2 } else { 1 };
         let column_width = width.saturating_sub(4) / columns;
 
         // Each section is `title + keys` tall plus marginBottom 1; a row of
         // sections is as tall as its tallest member.
+        let sections_height: usize = SECTIONS
+            .chunks(columns)
+            .map(|row| row.iter().map(|s| s.keys.len() + 2).max().unwrap_or(0))
+            .sum();
+        // Two text rows + marginTop 1 + the sections.
+        let content = 3 + sections_height;
+        let inner = usize::from(area.height).saturating_sub(2);
+        let subtitle = Span::styled("Press ? or esc to close", Style::new().fg(THEME.muted));
+        if content <= inner {
+            put_spans(buf, area, left, y, &[Span::styled("Keyboard", bold)]);
+            put_spans(buf, area, left, y + 1, &[subtitle]);
+            y += 3;
+        } else {
+            // The column overflows, so Yoga shrinks its three children in
+            // proportion to their heights. Both text rows end up shorter than
+            // one row and are floored onto the first row (the subtitle paints
+            // over the title); the sections keep their own layout and start
+            // at the rounded sum of what is left above them.
+            let text_height = 1.0 - (content - inner) as f64 / (2 + sections_height) as f64;
+            put_spans(buf, area, left, y, &[subtitle]);
+            y += (2.0 * text_height + 1.0 + 0.5).floor() as u16;
+        }
+
         for row in SECTIONS.chunks(columns) {
             let mut row_height = 0;
             for (index, section) in row.iter().enumerate() {
@@ -151,7 +161,7 @@ mod tests {
 
     #[test]
     fn single_column_stacks_every_section_with_padded_keys() {
-        let buf = render(HelpOverlay, 60, 42);
+        let buf = render(HelpOverlay, 60, 44);
         let lines = rows(&buf);
         assert_eq!(lines[0], "");
         assert_eq!(lines[1], "  Keyboard");
@@ -199,7 +209,7 @@ mod tests {
 
     #[test]
     fn styles_match_the_ink_component() {
-        let buf = render(HelpOverlay, 60, 40);
+        let buf = render(HelpOverlay, 60, 44);
         assert_eq!(modifier_at(&buf, 2, 1), Modifier::BOLD);
         assert_eq!(fg_at(&buf, 2, 2), THEME.muted);
         assert_eq!(fg_at(&buf, 2, 4), THEME.brand);
@@ -208,10 +218,42 @@ mod tests {
         assert_eq!(fg_at(&buf, 12, 5), THEME.text);
     }
 
+    // Rows from the real Ink `<App>` help overlay at 80x12 and 100x30 (body
+    // heights 9 and 27), where the content is taller than the box.
+    #[test]
+    fn overflowing_content_shrinks_the_title_rows_like_yoga() {
+        let lines = rows(&render(HelpOverlay, 80, 9));
+        assert_eq!(
+            lines[..5],
+            [
+                "",
+                "  Press ? or esc to close",
+                "  Everywhere",
+                "  1 / 2     Shots · Friction Logs",
+                "  tab       next tab",
+            ]
+        );
+
+        let buf = render(HelpOverlay, 100, 27);
+        let lines = rows(&buf);
+        assert_eq!(lines[0], "");
+        assert_eq!(lines[1], "  Press ? or esc to close");
+        assert_eq!(fg_at(&buf, 2, 1), THEME.muted);
+        assert_eq!(modifier_at(&buf, 2, 1), Modifier::empty());
+        assert_eq!(lines[2], "");
+        assert_eq!(lines[3], "");
+        assert_eq!(lines[4], format!("  {:<48}Stream", "Everywhere"));
+        assert_eq!(
+            lines[19],
+            format!("  {:<48}Friction Logs", "Detail / Review")
+        );
+        assert_eq!(lines[26], "  [ ]       previous / next chapter");
+    }
+
     #[test]
     fn small_areas_clip_instead_of_panicking() {
         let buf = render(HelpOverlay, 12, 5);
-        assert_eq!(rows(&buf)[1], "  Keyboard");
-        assert_eq!(rows(&buf)[4], "  Everywhe");
+        assert_eq!(rows(&buf)[1], "  Press ? or");
+        assert_eq!(rows(&buf)[2], "  Everywhe");
     }
 }
