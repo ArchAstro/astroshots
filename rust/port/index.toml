@@ -1,6 +1,10 @@
 # Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
 
 [[module]]
+ts = "packages/astroshot-review/src/data/hash-cache.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/index-cache.ts"
 status = "ported"
 rust = "astroshot_review/data/index_cache.rs"
@@ -221,6 +225,14 @@ rgbaToRgb = "astroshot::astroshot_review::images::scale::rgba_to_rgb"
 scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
 
 [[module]]
+ts = "packages/astroshot-review/src/images/worker.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/graphics-stdout.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
 status = "ported"
 rust = "astroshot_review/terminal/herdr.rs"
@@ -242,6 +254,10 @@ HerdrSink = "astroshot::astroshot_review::terminal::herdr::HerdrSink"
 discoverHerdr = "astroshot::astroshot_review::terminal::herdr::discover_herdr"
 herdrAddress = "astroshot::astroshot_review::terminal::herdr::herdr_address"
 probeHerdrSet = "astroshot::astroshot_review::terminal::herdr::probe_herdr_set"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/image-layer.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/kitty.ts"
@@ -470,6 +486,10 @@ runDemo = "astroshot::bin::demo::run_demo"
 writeDemo = "astroshot::bin::demo::write_demo"
 
 [[module]]
+ts = "packages/astroshot/bin/doctor.mjs"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
 status = "ported"
 rust = "bin/mac_preferences.rs"
@@ -509,6 +529,10 @@ canonicalTemplateMode = "astroshot::bin::templates::canonical_template_mode"
 writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
 
 [[module]]
+ts = "packages/movie-harness/src/encode.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/movie-harness/src/paths.ts"
 status = "ported"
 rust = "movie_harness/paths.rs"
@@ -546,6 +570,10 @@ notes = "same pixels and chunks; deflate bytes come from flate2 and may differ f
 [module.symbols]
 encodeRgbPng = "astroshot::movie_harness::png::encode_rgb_png"
 encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
+
+[[module]]
+ts = "packages/movie-harness/src/sink.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/movie-harness/src/source-help.ts"
@@ -666,6 +694,10 @@ isDialogSelector = "astroshot::react_shot::meta::is_dialog_selector"
 resolveShotMeta = "astroshot::react_shot::meta::resolve_shot_meta"
 
 [[module]]
+ts = "packages/react-shot/src/shot.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/react-shot/src/stubs.ts"
 status = "replaced"
 module = "node helper: react-serve (rust/node-helper/helper.mjs)"
@@ -712,6 +744,10 @@ notes = "TODO NFC normalization — currently lowercase only"
 resolveBatchOutputPaths = "astroshot::tui_shot::batch_paths::resolve_batch_output_paths"
 
 [[module]]
+ts = "packages/tui-shot/src/kitty-graphics.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
 status = "ported"
 rust = "tui_shot/pty_exit_wrapper.rs"
@@ -732,6 +768,10 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [module.ts_blobs]
 "packages/tui-shot/src/render-ink.ts" = "3562008a2a961c48ba08bd37752313611628f454"
+
+[[module]]
+ts = "packages/tui-shot/src/shot.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/tui-shot/src/terminal-html.ts"
