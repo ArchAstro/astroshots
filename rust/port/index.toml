@@ -176,15 +176,65 @@ writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
 
 [[module]]
 ts = "packages/movie-harness/src/paths.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/paths.rs"
+module = "astroshot::movie_harness::paths"
+ported_at = "2026-10-06T21:33:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "lexical resolve_root; JS-exact trim"
+
+[module.ts_blobs]
+"packages/movie-harness/src/paths.ts" = "065b4fe26e0b6a51031c1194cbecf485fbf06068"
+
+[module.symbols]
+assertKebabCase = "astroshot::movie_harness::paths::assert_kebab_case"
+assertSlug = "astroshot::movie_harness::paths::assert_slug"
+defaultRunId = "astroshot::movie_harness::paths::default_run_id"
+ensureDir = "astroshot::movie_harness::paths::ensure_dir"
+featureDir = "astroshot::movie_harness::paths::feature_dir"
+humanize = "astroshot::movie_harness::paths::humanize"
+movieStateDir = "astroshot::movie_harness::paths::movie_state_dir"
+nextSequence = "astroshot::movie_harness::paths::next_sequence"
+resolveRoot = "astroshot::movie_harness::paths::resolve_root"
 
 [[module]]
 ts = "packages/movie-harness/src/png.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/png.rs"
+module = "astroshot::movie_harness::png"
+ported_at = "2026-10-06T21:33:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "same pixels and chunks; deflate bytes come from flate2 and may differ from node zlib"
+
+[module.ts_blobs]
+"packages/movie-harness/src/png.ts" = "91901f5a40aacc2bb6686c9f7035d8ae491c691b"
+
+[module.symbols]
+encodeRgbPng = "astroshot::movie_harness::png::encode_rgb_png"
+encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
 
 [[module]]
 ts = "packages/movie-harness/src/source-help.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/source_help.rs"
+module = "astroshot::movie_harness::source_help"
+ported_at = "2026-10-06T21:33:21Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/source-help.test.ts"]
+notes = "catalog is a static array; 'kind in SOURCE_CATALOG' no longer matches prototype keys"
+
+[module.ts_blobs]
+"packages/movie-harness/src/source-help.test.ts" = "7cf02e12ddcbbcf5175a7578bf43eb0695c2bf3d"
+"packages/movie-harness/src/source-help.ts" = "99f5180370f9f9a63897fd49b346a3f48ebb2212"
+
+[module.symbols]
+SOURCE_CATALOG = "astroshot::movie_harness::source_help::SOURCE_CATALOG"
+SOURCE_DECISION_TABLE = "astroshot::movie_harness::source_help::SOURCE_DECISION_TABLE"
+SourceAdvice = "astroshot::movie_harness::source_help::SourceAdvice"
+SourceKindHelp = "astroshot::movie_harness::source_help::SourceKindHelp"
+formatSourceCatalog = "astroshot::movie_harness::source_help::format_source_catalog"
+recommendSource = "astroshot::movie_harness::source_help::recommend_source"
+sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_error"
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
@@ -192,7 +242,32 @@ status = "in_progress"
 
 [[module]]
 ts = "packages/movie-harness/src/types.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/types.rs"
+module = "astroshot::movie_harness::types"
+ported_at = "2026-10-06T21:33:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "camelCase serde in TS order; js_number helper writes JS-style numbers; PtyMovieFixture.env is a BTreeMap (read-only)"
+
+[module.ts_blobs]
+"packages/movie-harness/src/types.ts" = "18434caffe53e6432344cf96c3d7baa23f335c28"
+
+[module.symbols]
+BrowserMovieOptions = "astroshot::movie_harness::types::BrowserMovieOptions"
+EncodeFramesRequest = "astroshot::movie_harness::types::EncodeFramesRequest"
+ManifestStatus = "astroshot::movie_harness::types::ManifestStatus"
+MovieArtifact = "astroshot::movie_harness::types::MovieArtifact"
+MovieChapter = "astroshot::movie_harness::types::MovieChapter"
+MovieFormat = "astroshot::movie_harness::types::MovieFormat"
+MovieSessionOptions = "astroshot::movie_harness::types::MovieSessionOptions"
+MovieSourceKind = "astroshot::movie_harness::types::MovieSourceKind"
+PersistedFrameSession = "astroshot::movie_harness::types::PersistedFrameSession"
+PtyAction = "astroshot::movie_harness::types::PtyAction"
+PtyKey = "astroshot::movie_harness::types::PtyKey"
+PtyMovieFixture = "astroshot::movie_harness::types::PtyMovieFixture"
+SinkMovieRequest = "astroshot::movie_harness::types::SinkMovieRequest"
+SinkMovieResult = "astroshot::movie_harness::types::SinkMovieResult"
+Size = "astroshot::movie_harness::types::Size"
 
 [[module]]
 ts = "packages/react-shot/src/stubs.ts"
