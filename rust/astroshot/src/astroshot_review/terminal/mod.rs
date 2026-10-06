@@ -3,3 +3,4 @@
 #[cfg(unix)]
 pub mod herdr;
 pub mod kitty;
+pub mod probe;
