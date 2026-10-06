@@ -1064,10 +1064,6 @@ mod tests {
         }
     }
 
-    fn check_by_id<'a>(checks: &'a [Check], id: &str) -> &'a Check {
-        checks.iter().find(|c| c.id == id).unwrap()
-    }
-
     fn collect(host: &FakeHost, skip_screen: bool) -> Vec<Check> {
         collect_doctor_checks(host, "/Users/tester/proj", &host.platform(), skip_screen)
     }
