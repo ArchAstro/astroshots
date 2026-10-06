@@ -1,6 +1,30 @@
 # Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
 
 [[module]]
+ts = "packages/astroshot-review/src/cli.ts"
+status = "ported"
+rust = "astroshot_review/cli.rs"
+module = "astroshot::astroshot_review::cli"
+ported_at = "2026-10-06T23:41:05Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+test_provenance = [
+    "packages/astroshot-review/src/capture.e2e.test.ts",
+    "packages/astroshot-review/src/review.e2e.test.ts",
+]
+notes = "Version flag prints CARGO_PKG_VERSION; Ink render to crossterm/ratatui loop; signals return 129/143 after restoring the terminal; store dispose and runtime shutdown are bounded; e2e cases live in tests/review_cli.rs"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/capture.e2e.test.ts" = "e74f4a04e44fd6f976192acca7eb3cb07ed165b3"
+"packages/astroshot-review/src/cli.ts" = "041fe255fd80fb6134bbb37ce0418df569a9e651"
+"packages/astroshot-review/src/review.e2e.test.ts" = "59cab8d54c0b173fe67eb15953fab719902f72cd"
+
+[module.symbols]
+ParsedArgs = "astroshot::astroshot_review::cli::ParsedArgs"
+main = "astroshot::astroshot_review::cli::run"
+parseArgs = "astroshot::astroshot_review::cli::parse_args"
+reviewHelp = "astroshot::astroshot_review::cli::review_help"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/friction.ts"
 status = "ported"
 rust = "astroshot_review/data/friction.rs"
@@ -342,6 +366,18 @@ WorkerRequest = "astroshot::astroshot_review::images::worker::WorkerRequest"
 WorkerResponse = "astroshot::astroshot_review::images::worker::WorkerResponse"
 
 [[module]]
+ts = "packages/astroshot-review/src/index.ts"
+status = "ported"
+rust = "astroshot_review/mod.rs"
+module = "astroshot::astroshot_review"
+ported_at = "2026-10-06T23:41:06Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "re-exports only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/index.ts" = "bfdbe7a46c96019e0a7f79af8607745868c13103"
+
+[[module]]
 ts = "packages/astroshot-review/src/terminal/graphics-stdout.ts"
 status = "ported"
 rust = "astroshot_review/terminal/graphics_stdout.rs"
@@ -460,6 +496,23 @@ parseCellSizeEnv = "astroshot::astroshot_review::terminal::probe::parse_cell_siz
 parseProbeResponse = "astroshot::astroshot_review::terminal::probe::parse_probe_response"
 probeTerminal = "astroshot::astroshot_review::terminal::probe::probe_terminal"
 supportsTrueColor = "astroshot::astroshot_review::terminal::probe::supports_true_color"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/app.tsx"
+status = "ported"
+rust = "astroshot_review/ui/app.rs"
+module = "astroshot::astroshot_review::ui::app"
+ported_at = "2026-10-06T23:40:51Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "useState→UiState, ui.playback→shared Playback handle; effects run in App::sync; store writes and desktop opens go through injectable ReviewActions/Desktop traits; no TS unit test, frames replayed from an Ink capture (tests/fixtures/review_app_frames.json)"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/app.tsx" = "21d845a79321334320210580f8958ab0ce32b19c"
+
+[module.symbols]
+App = "astroshot::astroshot_review::ui::app::App"
+AppProps = "astroshot::astroshot_review::ui::app::AppProps"
+frictionLogDirectory = "astroshot::astroshot_review::ui::app::friction_log_directory"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/chrome.tsx"
