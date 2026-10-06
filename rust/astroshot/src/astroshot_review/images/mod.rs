@@ -2,3 +2,4 @@
 pub mod halfblocks;
 pub mod png;
 pub mod scale;
+pub mod worker;
