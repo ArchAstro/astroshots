@@ -153,8 +153,10 @@ pub mod pending {
 
     /// `tui-shot`: `mode` is `ink` or `pty`; for `pty`, `args` start with
     /// `pty`, as the TS dispatcher forwards them.
-    pub async fn tui_shot(mode: &str, _args: &[String]) -> i32 {
-        not_available(mode)
+    pub async fn tui_shot(_mode: &str, args: &[String]) -> i32 {
+        // One CLI serves both modes, as the TS `tui-shot` bin did: `pty` is
+        // its own subcommand there.
+        crate::tui_shot::cli::run(args).await
     }
 }
 

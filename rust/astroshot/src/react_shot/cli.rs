@@ -89,7 +89,7 @@ fn parse_args(argv: &[String]) -> Result<(Flags, Vec<String>)> {
 }
 
 /// JS `Number(text)` for the spellings a CLI flag can plausibly carry.
-fn js_number(text: &str) -> f64 {
+pub(crate) fn js_number(text: &str) -> f64 {
     let trimmed = text.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
     if trimmed.is_empty() {
         return 0.0;
@@ -162,7 +162,7 @@ fn manifest_relative(base: &Path, value: Option<&str>) -> Option<String> {
 }
 
 /// `path.relative(process.cwd(), target)` for absolute lexical paths.
-fn relative_to_cwd(target: &str) -> String {
+pub(crate) fn relative_to_cwd(target: &str) -> String {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
     let from: Vec<Component> = cwd.components().collect();
     let to_path = Path::new(target);
