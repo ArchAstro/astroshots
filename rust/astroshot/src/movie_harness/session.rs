@@ -68,7 +68,7 @@ fn path_string(path: PathBuf) -> String {
 }
 
 /// `fs.mkdtempSync(path.join(os.tmpdir(), prefix))`.
-fn mkdtemp(prefix: &str) -> Result<PathBuf> {
+pub(crate) fn mkdtemp(prefix: &str) -> Result<PathBuf> {
     const CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let base = std::env::temp_dir();
     for _ in 0..100 {

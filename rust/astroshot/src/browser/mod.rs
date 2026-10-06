@@ -195,6 +195,7 @@ struct BrowserInner {
     alive: Arc<AtomicBool>,
     handler: JoinHandle<()>,
     user_data_dir: PathBuf,
+    ws_endpoint: String,
 }
 
 impl Drop for BrowserInner {
@@ -258,6 +259,7 @@ impl Browser {
         let (browser, mut handler) = chromiumoxide::Browser::launch(config)
             .await
             .map_err(|e| BrowserError::Launch(format!("{e}\nExecutable: {}", exe.display())))?;
+        let ws_endpoint = browser.websocket_address().clone();
         let alive = Arc::new(AtomicBool::new(true));
         let guard = AliveGuard(alive.clone());
         let handler = tokio::spawn(async move {
@@ -271,6 +273,7 @@ impl Browser {
                 alive,
                 handler,
                 user_data_dir,
+                ws_endpoint,
             }),
         })
     }
@@ -304,6 +307,12 @@ impl Browser {
             Some(browser) => browser.close().await,
             None => Ok(()),
         }
+    }
+
+    /// The browser's CDP websocket endpoint (`ws://127.0.0.1:port/devtools/browser/..`),
+    /// for attaching another client such as `playwright-core` in the Node helper.
+    pub fn ws_endpoint(&self) -> &str {
+        &self.inner.ws_endpoint
     }
 
     pub fn is_connected(&self) -> bool {
@@ -461,6 +470,11 @@ impl Page {
             .await
             .map_err(cdp)?;
         Ok(())
+    }
+
+    /// The page's CDP target id, to find it again from another CDP client.
+    pub fn target_id(&self) -> String {
+        AsRef::<str>::as_ref(self.page.target_id()).to_string()
     }
 
     pub fn viewport(&self) -> Size {

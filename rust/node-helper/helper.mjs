@@ -694,6 +694,59 @@ async function cmdInkRender({ fixture: fixturePath, cols, rows }) {
   return result;
 }
 
+// -------------------------------------------------------------- browser-script
+
+// Run a user's browser movie script (`export default async (page) => ...`, or
+// `run`) against the Rust-launched Chrome. `playwright-core` attaches over CDP
+// and the script gets the existing page, identified by CDP target id or URL.
+// Mirrors `movie-harness/src/sources/browser.ts` `runScript`.
+async function cmdBrowserScript({ wsEndpoint, targetId, url, scriptPath }) {
+  if (typeof wsEndpoint !== "string" || !wsEndpoint) {
+    throw new Error("browser-script: wsEndpoint is required");
+  }
+  const absolute = path.resolve(String(scriptPath ?? ""));
+  if (!fs.existsSync(absolute)) {
+    throw new Error(`browser script not found: ${absolute}`);
+  }
+  const mod = await import(pathToFileURL(absolute).href);
+  const runner = mod.default ?? mod.run;
+  if (typeof runner !== "function") {
+    throw new Error(
+      `browser script must export default or run async function(page): ${absolute}`,
+    );
+  }
+  const playwright = await importOwn("playwright-core");
+  const chromium = playwright.chromium ?? playwright.default?.chromium;
+  const browser = await chromium.connectOverCDP(wsEndpoint);
+  try {
+    const pages = browser.contexts().flatMap((context) => context.pages());
+    let page;
+    if (targetId) {
+      for (const candidate of pages) {
+        const session = await candidate.context().newCDPSession(candidate);
+        try {
+          const { targetInfo } = await session.send("Target.getTargetInfo");
+          if (targetInfo.targetId === targetId) page = candidate;
+        } finally {
+          await session.detach().catch(() => undefined);
+        }
+        if (page) break;
+      }
+    }
+    page ??= url ? pages.find((candidate) => candidate.url() === url) : undefined;
+    if (!page) {
+      throw new Error(
+        `browser-script: could not find the page to drive (${targetId ?? url ?? "no target"})`,
+      );
+    }
+    await runner(page);
+  } finally {
+    // Detaches from a CDP-attached browser; Chrome stays up for Rust.
+    await browser.close().catch(() => undefined);
+  }
+  return { ok: true };
+}
+
 // ------------------------------------------------------------------ dispatch
 
 const COMMANDS = {
@@ -702,6 +755,7 @@ const COMMANDS = {
   "react-serve": cmdReactServe,
   "react-stop": cmdReactStop,
   "ink-render": cmdInkRender,
+  "browser-script": cmdBrowserScript,
 };
 
 async function closeAll() {

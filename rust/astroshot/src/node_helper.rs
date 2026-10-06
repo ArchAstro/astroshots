@@ -116,6 +116,16 @@ pub enum Command {
         #[serde(skip_serializing_if = "Option::is_none")]
         rows: Option<u32>,
     },
+    /// Run a browser movie script against a Rust-launched Chrome
+    /// (`movie-harness` `sources/browser.ts` `runScript`).
+    BrowserScript {
+        ws_endpoint: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        script_path: String,
+    },
     Shutdown,
 }
 
@@ -464,6 +474,27 @@ impl NodeHelper {
             rows,
         })
         .await
+    }
+
+    /// Run the user's browser script (`export default async (page)`) with
+    /// `playwright-core` attached to Chrome at `ws_endpoint`, driving the page
+    /// with CDP `target_id` (else the one at `url`).
+    pub async fn browser_script(
+        &mut self,
+        ws_endpoint: &str,
+        target_id: Option<&str>,
+        url: Option<&str>,
+        script_path: &Path,
+    ) -> Result<(), NodeHelperError> {
+        let _: serde_json::Value = self
+            .call(&Command::BrowserScript {
+                ws_endpoint: ws_endpoint.to_string(),
+                target_id: target_id.map(str::to_string),
+                url: url.map(str::to_string),
+                script_path: script_path.display().to_string(),
+            })
+            .await?;
+        Ok(())
     }
 
     /// Ask the helper to close its servers and exit, then reap it.
