@@ -12,7 +12,7 @@ use anyhow::{Result, bail};
 use super::types::BatchEntry;
 
 /// Lexical `path.resolve(base, rel)` for POSIX paths.
-fn resolve(base: &Path, rel: &str) -> PathBuf {
+pub(crate) fn resolve(base: &Path, rel: &str) -> PathBuf {
     let joined = if Path::new(rel).is_absolute() {
         PathBuf::from(rel)
     } else {
