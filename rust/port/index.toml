@@ -506,6 +506,24 @@ ServicesContext = "-"
 useServices = "astroshot::astroshot_review::ui::context::use_services"
 
 [[module]]
+ts = "packages/astroshot-review/src/ui/detail.tsx"
+status = "ported"
+rust = "astroshot_review/ui/detail.rs"
+module = "astroshot::astroshot_review::ui::detail"
+ported_at = "2026-10-06T22:41:27Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "width/height = Rect; playback/onPlayback = Playback handle in DetailPaneState; onComposerSubmit/Cancel = Outcome from DetailPaneState::handle; heading row keeps badges whole and cuts the heading where Ink wraps the badge onto the next row; narrow page header and widths under 22 are clipped where Ink spills"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/detail.tsx" = "840c12bda26b7f3a41a8fadd358086c9a8927acc"
+
+[module.symbols]
+CommentList = "astroshot::astroshot_review::ui::detail::CommentList"
+DetailPane = "astroshot::astroshot_review::ui::detail::DetailPane"
+DetailPaneProps = "astroshot::astroshot_review::ui::detail::DetailPaneProps"
+previewHeight = "astroshot::astroshot_review::ui::detail::preview_height"
+
+[[module]]
 ts = "packages/astroshot-review/src/ui/friction.tsx"
 status = "in_progress"
 
