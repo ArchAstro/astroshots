@@ -141,8 +141,8 @@ pub mod pending {
     }
 
     /// `astroshot-movie` (`movie_harness::cli`).
-    pub async fn movie(_args: &[String]) -> i32 {
-        not_available("movie")
+    pub async fn movie(args: &[String]) -> i32 {
+        crate::movie_harness::cli::run_cli(args).await
     }
 
     /// `react-shot`: `args` already carry the `shot` prefix when the first

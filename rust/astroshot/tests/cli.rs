@@ -1,8 +1,7 @@
 //! Binary-level tests for the `astroshot` dispatcher. Ports the cases of
 //! `packages/astroshot/test/cli.test.mjs` that the ported commands satisfy.
 //!
-//! Waiting on later waves (need the review / movie CLIs):
-//! - `movie which-source steers agents to the right capture path`
+//! Waiting on a later wave (needs the review CLI):
 //! - `review documents the terminal tray and refuses to run without a TTY`
 
 use std::fs;
@@ -233,11 +232,30 @@ fn install_browser_reports_the_chrome_it_found_or_the_hint() {
 }
 
 #[test]
+fn movie_which_source_steers_agents_to_the_right_capture_path() {
+    let tui = run(&["movie", "which-source", "ratatui truecolor dashboard"]);
+    assert_eq!(tui.status.code(), Some(0), "{}", stderr(&tui));
+    assert!(stdout(&tui).contains("\"recommended\": \"pty\""));
+
+    let native = run(&[
+        "movie",
+        "which-source",
+        "SwiftUI native app window bundle id",
+    ]);
+    assert_eq!(native.status.code(), Some(0), "{}", stderr(&native));
+    assert!(stdout(&native).contains("\"recommended\": \"desktop.window\""));
+
+    let help = run(&["movie", "--help"]);
+    assert_eq!(help.status.code(), Some(0), "{}", stderr(&help));
+    assert!(stdout(&help).contains("Which --source should I use"));
+    assert!(stdout(&help).contains("NEVER screenshot Terminal"));
+}
+
+#[test]
 fn pending_commands_say_they_are_not_available_and_exit_2() {
     for (args, name) in [
         (&["review", "--root", "x"][..], "review"),
         (&["tray"][..], "review"),
-        (&["movie", "which-source"][..], "movie"),
     ] {
         let result = run(args);
         assert_eq!(result.status.code(), Some(2), "{args:?}");
@@ -252,17 +270,22 @@ fn pending_commands_say_they_are_not_available_and_exit_2() {
 #[test]
 fn argv0_selects_the_subcommand_like_the_npm_bins() {
     let dir = tempfile::tempdir().unwrap();
-    for (link, name) in [("astroshot-review", "review"), ("astroshot-movie", "movie")] {
-        let path = dir.path().join(link);
-        std::os::unix::fs::symlink(BIN, &path).unwrap();
-        let result = run_named(&path, dir.path(), &["--root", "x"]);
-        assert_eq!(result.status.code(), Some(2), "{link}");
-        assert_eq!(
-            stderr(&result),
-            format!("astroshot {name}: not yet available in the Rust build\n"),
-            "{link}"
-        );
-    }
+    let review = dir.path().join("astroshot-review");
+    std::os::unix::fs::symlink(BIN, &review).unwrap();
+    let result = run_named(&review, dir.path(), &["--root", "x"]);
+    assert_eq!(result.status.code(), Some(2));
+    assert_eq!(
+        stderr(&result),
+        "astroshot review: not yet available in the Rust build\n"
+    );
+
+    // `astroshot-movie` runs the real movie CLI: its first argument is the
+    // movie command.
+    let movie = dir.path().join("astroshot-movie");
+    std::os::unix::fs::symlink(BIN, &movie).unwrap();
+    let result = run_named(&movie, dir.path(), &["which-source", "ratatui dashboard"]);
+    assert_eq!(result.status.code(), Some(0), "{}", stderr(&result));
+    assert!(stdout(&result).contains("\"recommended\": \"pty\""));
 
     // `react-shot` runs the real react-shot CLI (no pending stub).
     let react = dir.path().join("react-shot");

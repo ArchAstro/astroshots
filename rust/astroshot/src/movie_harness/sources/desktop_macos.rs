@@ -418,8 +418,8 @@ pub fn ensure_screen_recording_access(
     bail!("{}", format_screen_recording_denied_help(Some(&report)))
 }
 
-/// List layer-0 windows as JSON via shipped Swift tool (interpreted by `swift`).
-pub fn list_desktop_windows() -> Result<Vec<DesktopWindowInfo>> {
+/// Run the Swift window lister and return its stdout.
+fn window_list_stdout() -> Result<String> {
     assert_macos()?;
     let result = run_window_tools(&["list"])?;
     if result.status != Some(0) {
@@ -429,7 +429,34 @@ pub fn list_desktop_windows() -> Result<Vec<DesktopWindowInfo>> {
             result.stderr.chars().take(500).collect::<String>()
         );
     }
-    parse_window_list(&result.stdout)
+    Ok(result.stdout)
+}
+
+/// List layer-0 windows as JSON via shipped Swift tool (interpreted by `swift`).
+pub fn list_desktop_windows() -> Result<Vec<DesktopWindowInfo>> {
+    parse_window_list(&window_list_stdout()?)
+}
+
+/// [`list_desktop_windows`] as the rows `JSON.stringify` saw in TS: the Swift
+/// tool's keys in its (sorted) order, with `bundleId: null` appended to rows
+/// that lack one. `astroshot movie list-windows` prints this.
+pub fn list_desktop_windows_json() -> Result<Vec<Value>> {
+    window_rows_json(&window_list_stdout()?)
+}
+
+fn window_rows_json(stdout: &str) -> Result<Vec<Value>> {
+    let text = js_trim(stdout);
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut rows: Vec<Value> = serde_json::from_str(text).map_err(|error| anyhow!("{error}"))?;
+    for row in &mut rows {
+        if let Value::Object(fields) = row {
+            // `{ ...row, bundleId: row.bundleId ?? null }`
+            fields.entry("bundleId").or_insert(Value::Null);
+        }
+    }
+    Ok(rows)
 }
 
 fn parse_window_list(stdout: &str) -> Result<Vec<DesktopWindowInfo>> {
@@ -1099,6 +1126,23 @@ mod tests {
         assert!(help.contains(&report.enable_app));
         let json: Value = serde_json::from_str(&report.to_json_pretty()).unwrap();
         assert!(json["granted"].is_boolean());
+    }
+
+    #[test]
+    fn window_rows_keep_the_tool_key_order_and_gain_a_null_bundle_id() {
+        let rows = window_rows_json(
+            r#"
+            [{"bundleId":"com.apple.finder","height":2,"id":7,"layer":0,"onScreen":true},
+             {"height":1,"id":8,"layer":0,"onScreen":false}]
+            "#,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_string(&rows).unwrap(),
+            r#"[{"bundleId":"com.apple.finder","height":2,"id":7,"layer":0,"onScreen":true},{"height":1,"id":8,"layer":0,"onScreen":false,"bundleId":null}]"#
+        );
+        assert!(window_rows_json("  \n").unwrap().is_empty());
+        assert!(window_rows_json("not json").is_err());
     }
 
     // Listing windows needs a logged-in GUI session (CGWindowList).
