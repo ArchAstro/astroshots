@@ -301,6 +301,14 @@ impl HeadlessTerminal {
             converted.push(byte);
         }
         self.processor.advance(&mut self.term, &converted);
+        // alacritty holds everything inside a synchronized update
+        // (`CSI ? 2026 h` ... `l`) back until the update ends. xterm.js, which
+        // the TS used, applies it as it arrives, and callers read the cursor
+        // between writes (kitty placements land at the cursor), so apply the
+        // held bytes now.
+        if self.processor.sync_bytes_count() > 0 {
+            self.processor.stop_sync(&mut self.term);
+        }
     }
 
     pub fn screen(&self) -> &Screen {

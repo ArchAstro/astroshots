@@ -32,6 +32,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::text::Span;
 
+pub mod app;
 pub mod chrome;
 pub mod context;
 pub mod detail;

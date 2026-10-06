@@ -1,8 +1,5 @@
-//! Binary-level tests for the `astroshot` dispatcher. Ports the cases of
-//! `packages/astroshot/test/cli.test.mjs` that the ported commands satisfy.
-//!
-//! Waiting on a later wave (needs the review CLI):
-//! - `review documents the terminal tray and refuses to run without a TTY`
+//! Binary-level tests for the `astroshot` dispatcher. Ports
+//! `packages/astroshot/test/cli.test.mjs`.
 
 use std::fs;
 use std::path::Path;
@@ -252,19 +249,52 @@ fn movie_which_source_steers_agents_to_the_right_capture_path() {
 }
 
 #[test]
-fn pending_commands_say_they_are_not_available_and_exit_2() {
-    for (args, name) in [
-        (&["review", "--root", "x"][..], "review"),
-        (&["tray"][..], "review"),
-    ] {
-        let result = run(args);
-        assert_eq!(result.status.code(), Some(2), "{args:?}");
-        assert_eq!(
-            stderr(&result),
-            format!("astroshot {name}: not yet available in the Rust build\n"),
-            "{args:?}"
-        );
-    }
+fn review_documents_the_terminal_tray_and_refuses_to_run_without_a_tty() {
+    let help = run(&["review", "--help"]);
+    assert_eq!(help.status.code(), Some(0), "{}", stderr(&help));
+    assert!(stdout(&help).contains("Astroshots tray in your terminal"));
+    assert!(stdout(&help).contains("Kitty"));
+    assert!(stdout(&help).contains("herdr"));
+    assert!(stdout(&help).contains("--root <dir>"));
+
+    let bare_help = run(&["review", "help"]);
+    assert_eq!(bare_help.status.code(), Some(0), "{}", stderr(&bare_help));
+    assert!(stdout(&bare_help).contains("astroshot review"));
+    assert_eq!(stdout(&bare_help), stdout(&help));
+
+    let package_root = env!("CARGO_MANIFEST_DIR");
+    let piped = run(&["review", "--root", package_root]);
+    assert_eq!(piped.status.code(), Some(1));
+    assert_eq!(
+        stderr(&piped),
+        "astroshot review needs an interactive terminal (stdin and stdout must be a TTY).\n"
+    );
+    assert_eq!(stdout(&piped), "");
+
+    // `tray` is the same command.
+    let tray = run(&["tray"]);
+    assert_eq!(tray.status.code(), Some(1));
+    assert!(stderr(&tray).contains("interactive terminal"));
+}
+
+#[test]
+fn review_usage_errors_print_the_message_then_the_help() {
+    let unknown = run(&["review", "--nope"]);
+    assert_eq!(unknown.status.code(), Some(1));
+    let help = stdout(&run(&["review", "--help"]));
+    assert_eq!(
+        stderr(&unknown),
+        format!("Unknown option: --nope\n\n{help}")
+    );
+    assert_eq!(stdout(&unknown), "");
+
+    let missing = run(&["review", "--root"]);
+    assert_eq!(missing.status.code(), Some(1));
+    assert!(stderr(&missing).starts_with("--root requires a directory\n\n"));
+
+    let version = run(&["review", "--root", "x", "--version"]);
+    assert_eq!(version.status.code(), Some(0));
+    assert_eq!(stdout(&version), format!("{}\n", env!("CARGO_PKG_VERSION")));
 }
 
 #[test]
@@ -272,12 +302,16 @@ fn argv0_selects_the_subcommand_like_the_npm_bins() {
     let dir = tempfile::tempdir().unwrap();
     let review = dir.path().join("astroshot-review");
     std::os::unix::fs::symlink(BIN, &review).unwrap();
+    // `astroshot-review` runs the review CLI: without a TTY it refuses.
     let result = run_named(&review, dir.path(), &["--root", "x"]);
-    assert_eq!(result.status.code(), Some(2));
+    assert_eq!(result.status.code(), Some(1));
     assert_eq!(
         stderr(&result),
-        "astroshot review: not yet available in the Rust build\n"
+        "astroshot review needs an interactive terminal (stdin and stdout must be a TTY).\n"
     );
+    let help = run_named(&review, dir.path(), &["--help"]);
+    assert_eq!(help.status.code(), Some(0));
+    assert!(stdout(&help).starts_with("astroshot review — the Astroshots tray in your terminal\n"));
 
     // `astroshot-movie` runs the real movie CLI: its first argument is the
     // movie command.
