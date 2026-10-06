@@ -850,6 +850,21 @@ canonicalTemplateMode = "astroshot::bin::templates::canonical_template_mode"
 writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
 
 [[module]]
+ts = "packages/movie-harness/src/cli.ts"
+status = "ported"
+rust = "movie_harness/cli.rs"
+module = "astroshot::movie_harness::cli"
+ported_at = "2026-10-06T22:47:14Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "run_cli(argv)->i32; --status on stop/run is validated (TS cast any string into the manifest); --size components must fit u32; list-windows prints via desktop_macos::list_desktop_windows_json; binary-level cases live in tests/movie_cli.rs"
+
+[module.ts_blobs]
+"packages/movie-harness/src/cli.ts" = "6e4237f83510b6b64e212d83a70c120336fde254"
+
+[module.symbols]
+runCli = "astroshot::movie_harness::cli::run_cli"
+
+[[module]]
 ts = "packages/movie-harness/src/encode.ts"
 status = "ported"
 rust = "movie_harness/encode.rs"
@@ -864,6 +879,18 @@ notes = "Playwright recordVideo → crate::browser::record_webm; returns Encoded
 [module.symbols]
 encodeFrames = "astroshot::movie_harness::encode::encode_frames"
 posterFromFrames = "astroshot::movie_harness::encode::poster_from_frames"
+
+[[module]]
+ts = "packages/movie-harness/src/index.ts"
+status = "ported"
+rust = "movie_harness/mod.rs"
+module = "astroshot::movie_harness"
+ported_at = "2026-10-06T22:47:15Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "terminal-paint exports replaced by crate::raster::HeadlessTerminal; other names re-exported from movie_harness"
+
+[module.ts_blobs]
+"packages/movie-harness/src/index.ts" = "c631d4c0233aaa860e4dac3cec296ef02c7b264f"
 
 [[module]]
 ts = "packages/movie-harness/src/paths.ts"
