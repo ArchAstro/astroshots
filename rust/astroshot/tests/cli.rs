@@ -238,7 +238,6 @@ fn pending_commands_say_they_are_not_available_and_exit_2() {
         (&["review", "--root", "x"][..], "review"),
         (&["tray"][..], "review"),
         (&["movie", "which-source"][..], "movie"),
-        (&["react", "a.shot.tsx", "-o", "a.png"][..], "react"),
         (&["ink", "batch", "m.yaml"][..], "ink"),
         (&["tui", "a.tsx"][..], "ink"),
         (&["pty", "a.yaml"][..], "pty"),
@@ -259,7 +258,6 @@ fn argv0_selects_the_subcommand_like_the_npm_bins() {
     for (link, name) in [
         ("astroshot-review", "review"),
         ("astroshot-movie", "movie"),
-        ("react-shot", "react"),
         ("tui-shot", "ink"),
     ] {
         let path = dir.path().join(link);
@@ -272,6 +270,13 @@ fn argv0_selects_the_subcommand_like_the_npm_bins() {
             "{link}"
         );
     }
+
+    // `react-shot` runs the real react-shot CLI (no pending stub).
+    let react = dir.path().join("react-shot");
+    std::os::unix::fs::symlink(BIN, &react).unwrap();
+    let result = run_named(&react, dir.path(), &["--root", "x"]);
+    assert_eq!(result.status.code(), Some(1));
+    assert_eq!(stderr(&result), "Unknown command: undefined\n");
 
     // `tui-shot pty ...` is the PTY mode.
     let tui = dir.path().join("tui-shot");
