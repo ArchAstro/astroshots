@@ -554,7 +554,19 @@ writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
 
 [[module]]
 ts = "packages/movie-harness/src/encode.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/encode.rs"
+module = "astroshot::movie_harness::encode"
+ported_at = "2026-10-06T21:54:03Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Playwright recordVideo → crate::browser::record_webm; returns EncodedVideo; fractional fps rounded for the browser fallback"
+
+[module.ts_blobs]
+"packages/movie-harness/src/encode.ts" = "df3341c926e4e4c0e3a5b84f429bcf5dc868834b"
+
+[module.symbols]
+encodeFrames = "astroshot::movie_harness::encode::encode_frames"
+posterFromFrames = "astroshot::movie_harness::encode::poster_from_frames"
 
 [[module]]
 ts = "packages/movie-harness/src/paths.ts"
@@ -597,7 +609,19 @@ encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
 
 [[module]]
 ts = "packages/movie-harness/src/sink.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/sink.rs"
+module = "astroshot::movie_harness::sink"
+ported_at = "2026-10-06T21:54:04Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "manifest edited as an order-preserving serde_json Map for byte-identical output"
+
+[module.ts_blobs]
+"packages/movie-harness/src/sink.ts" = "da5eaa385b2f4263156c896a96fffb6ca80dab59"
+
+[module.symbols]
+finalizeManifest = "astroshot::movie_harness::sink::finalize_manifest"
+sinkMovie = "astroshot::movie_harness::sink::sink_movie"
 
 [[module]]
 ts = "packages/movie-harness/src/source-help.ts"
