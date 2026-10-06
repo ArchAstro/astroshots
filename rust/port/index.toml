@@ -183,6 +183,10 @@ snapshotFromEntry = "astroshot::astroshot_review::data::review_store::snapshot_f
 writeReviewDocument = "astroshot::astroshot_review::data::review_store::write_review_document"
 
 [[module]]
+ts = "packages/astroshot-review/src/data/scan.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/watcher.ts"
 status = "ported"
 rust = "astroshot_review/data/watcher.rs"
@@ -462,6 +466,10 @@ ServicesContext = "-"
 useServices = "astroshot::astroshot_review::ui::context::use_services"
 
 [[module]]
+ts = "packages/astroshot-review/src/ui/friction.tsx"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/ui/help.tsx"
 status = "ported"
 rust = "astroshot_review/ui/help.rs"
@@ -493,6 +501,10 @@ TerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSize"
 useClock = "astroshot::astroshot_review::ui::hooks::ClockHook"
 useStoreState = "astroshot::astroshot_review::ui::hooks::StoreStateHook"
 useTerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSizeHook"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/movie-player.tsx"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/picture.tsx"
@@ -536,6 +548,14 @@ latestRun = "astroshot::astroshot_review::ui::selectors::latest_run"
 reviewSiblings = "astroshot::astroshot_review::ui::selectors::review_siblings"
 reviewStateOf = "astroshot::astroshot_review::ui::selectors::review_state_of"
 streamCounts = "astroshot::astroshot_review::ui::selectors::stream_counts"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/settings.tsx"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/stream.tsx"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
@@ -816,6 +836,14 @@ recommendSource = "astroshot::movie_harness::source_help::recommend_source"
 sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_error"
 
 [[module]]
+ts = "packages/movie-harness/src/sources/browser.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/desktop-macos.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/movie-harness/src/sources/frames-store.ts"
 status = "ported"
 rust = "movie_harness/sources/frames_store.rs"
@@ -833,6 +861,10 @@ markFrameSession = "astroshot::movie_harness::sources::frames_store::mark_frame_
 pushFrameToSession = "astroshot::movie_harness::sources::frames_store::push_frame_to_session"
 startFrameSession = "astroshot::movie_harness::sources::frames_store::start_frame_session"
 stopFrameSession = "astroshot::movie_harness::sources::frames_store::stop_frame_session"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/pty.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
@@ -891,6 +923,10 @@ notes = "NFC + lowercase collision key, as TS"
 resolveBatchOutputPaths = "astroshot::react_shot::batch_paths::resolve_batch_output_paths"
 
 [[module]]
+ts = "packages/react-shot/src/cli.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/react-shot/src/config.ts"
 status = "replaced"
 module = "node helper: load-config / react-serve (resolved configPath, packageRoot)"
@@ -909,6 +945,10 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [module.ts_blobs]
 "packages/react-shot/src/create-server.ts" = "1dbd9d7cd4fdbe30997972baf8fd83ebb8b29a79"
+
+[[module]]
+ts = "packages/react-shot/src/index.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/react-shot/src/meta.ts"
