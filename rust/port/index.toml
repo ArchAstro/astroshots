@@ -1,0 +1,81 @@
+# Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
+
+[[module]]
+ts = "packages/astroshot-review/src/data/model.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/paths.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/halfblocks.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/png.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/herdr.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/kitty.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/system.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/theme.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot/bin/mac-preferences.mjs"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot/bin/templates.mjs"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/paths.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/png.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/source-help.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/terminal-paint.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/movie-harness/src/types.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/react-shot/src/stubs.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/react-shot/src/types.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/tui-shot/src/terminal-html.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/tui-shot/src/types.ts"
+status = "in_progress"
