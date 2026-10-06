@@ -214,7 +214,7 @@ fn truncate_start(text: &str, width: usize) -> String {
 }
 
 /// Greedy word wrap to `width` columns; words wider than the line are broken.
-fn wrap_words(text: &str, width: usize) -> Vec<String> {
+pub(crate) fn wrap_words(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     let mut lines: Vec<String> = Vec::new();
     for paragraph in text.split('\n') {
