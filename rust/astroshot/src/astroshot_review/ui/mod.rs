@@ -34,6 +34,7 @@ use ratatui::text::Span;
 
 pub mod chrome;
 pub mod context;
+pub mod detail;
 pub mod help;
 pub mod hooks;
 pub mod movie_player;

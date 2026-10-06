@@ -530,10 +530,12 @@ impl StatefulWidget for MoviePlayer<'_> {
             .render(area, buf, poster);
         }
         if !state.enabled {
-            // Absolutely positioned and centered in the stage.
+            // Absolutely positioned and centered in the stage. Yoga rounds a
+            // box's half-cell offset up (text nodes, like the poster caption,
+            // round down), so on an even height the hint sits one row below it.
             let width = crate::astroshot_review::ui::text_width(POSTER_HINT) as u16;
-            let x = area.x + area.width.saturating_sub(width) / 2;
-            let y = area.y + (area.height - 1) / 2;
+            let x = area.x + area.width.saturating_sub(width).div_ceil(2);
+            let y = area.y + area.height / 2;
             put_spans(
                 buf,
                 area,
