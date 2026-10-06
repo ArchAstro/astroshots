@@ -147,8 +147,8 @@ pub mod pending {
 
     /// `react-shot`: `args` already carry the `shot` prefix when the first
     /// argument was a fixture path.
-    pub async fn react_shot(_args: &[String]) -> i32 {
-        not_available("react")
+    pub async fn react_shot(args: &[String]) -> i32 {
+        crate::react_shot::cli::run(args).await
     }
 
     /// `tui-shot`: `mode` is `ink` or `pty`; for `pty`, `args` start with
