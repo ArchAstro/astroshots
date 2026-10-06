@@ -33,7 +33,10 @@ use ratatui::layout::Rect;
 use ratatui::text::Span;
 
 pub mod chrome;
+pub mod context;
 pub mod help;
+pub mod hooks;
+pub mod picture;
 pub mod selectors;
 pub mod system;
 pub mod text_input;

@@ -6,4 +6,5 @@ pub mod manifest;
 pub mod model;
 pub mod paths;
 pub mod review_store;
+pub mod store;
 pub mod watcher;
