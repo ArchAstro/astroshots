@@ -254,7 +254,21 @@ WorkerResponse = "astroshot::astroshot_review::images::worker::WorkerResponse"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/graphics-stdout.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/terminal/graphics_stdout.rs"
+module = "astroshot::astroshot_review::terminal::graphics_stdout"
+ported_at = "2026-10-06T21:57:15Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/graphics-stdout.test.ts"]
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/graphics-stdout.test.ts" = "6fd8f7ee6e8bb5e7b8fc6604413a6f7f8df1ba87"
+"packages/astroshot-review/src/terminal/graphics-stdout.ts" = "2af2a7e9db346cc1f7a0cb2f2cf88cdb43e04514"
+
+[module.symbols]
+createGraphicsStdout = "astroshot::astroshot_review::terminal::graphics_stdout::create_graphics_stdout"
+hasPrintableText = "astroshot::astroshot_review::terminal::graphics_stdout::has_printable_text"
+spliceGraphics = "astroshot::astroshot_review::terminal::graphics_stdout::splice_graphics"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
@@ -281,7 +295,22 @@ probeHerdrSet = "astroshot::astroshot_review::terminal::herdr::probe_herdr_set"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/image-layer.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/terminal/image_layer.rs"
+module = "astroshot::astroshot_review::terminal::image_layer"
+ported_at = "2026-10-06T21:58:27Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Ink DOMElement + measureElement become CellBox passed by the UI; ImageService/PreparedImage declared types-first in images::service; herdr cfg(unix) with a non-unix stub; Arc handle created inside a tokio runtime"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/image-layer.ts" = "647baa0ccb5f5551ef61030d4e8dffa57f9abbf9"
+
+[module.symbols]
+FrameHandle = "astroshot::astroshot_review::terminal::image_layer::FrameHandle"
+ImageHandle = "astroshot::astroshot_review::terminal::image_layer::ImageHandle"
+ImageLayer = "astroshot::astroshot_review::terminal::image_layer::ImageLayer"
+ImageLayerOptions = "astroshot::astroshot_review::terminal::image_layer::ImageLayerOptions"
+Placement = "astroshot::astroshot_review::terminal::image_layer::Placement"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/kitty.ts"

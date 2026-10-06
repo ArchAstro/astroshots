@@ -15,19 +15,19 @@
 //! - The layer is a cheap-to-clone handle (`Arc` inside); the async `prepare`
 //!   completions and the deferred flush run on the tokio runtime that was
 //!   current when the layer was created, so construct it inside one.
-//! - `ImageService` (`images/service.ts`, not yet ported) is the
-//!   [`ImageService`] trait plus [`PreparedImage`] defined here.
+//! - `ImageService` and `PreparedImage` live in `images::service`
+//!   (`images/service.ts`); the service implementation lands with that port.
 //! - herdr is `cfg(unix)`; non-unix builds get an uninhabited `HerdrSink`.
 //! - `ImageLayerOptions::image_id_base` pins the otherwise random first
 //!   kitty image id (`1000 + random`) so tests can assert exact bytes.
 
 use std::collections::BTreeMap;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tokio::runtime::Handle;
+
+pub use crate::astroshot_review::images::service::{ImageService, PrepareFuture, PreparedImage};
 
 use super::kitty::{
     DeleteRequest, ImageFormat, PlaceRequest, RESTORE_CURSOR, SAVE_CURSOR, TransmitRequest,
@@ -83,40 +83,8 @@ pub struct CellBox {
     pub height: u32,
 }
 
-/// Result of `ImageService::prepare` (`PreparedImage` in `images/service.ts`).
-#[derive(Debug, Clone)]
-pub struct PreparedImage {
-    pub key: String,
-    pub path: String,
-    /// Pixel size of the prepared payload.
-    pub width: u32,
-    pub height: u32,
-    /// Pixel size of the source file.
-    pub source_width: u32,
-    pub source_height: u32,
-    pub format: ScaledFormat,
-    pub data: Vec<u8>,
-    /// True when `data` is the untouched file, so a file-path transmission is valid.
-    pub is_original: bool,
-    pub mtime_ms: f64,
-    pub size: u64,
-}
-
-pub type PrepareFuture = Pin<Box<dyn Future<Output = anyhow::Result<Arc<PreparedImage>>> + Send>>;
-
 pub type ErrorCallback = Box<dyn Fn(&str, anyhow::Error) + Send + Sync>;
 pub type DebugCallback = Box<dyn Fn(&str) + Send + Sync>;
-
-/// `ImageService.prepare(filePath, target, format, crop)`.
-pub trait ImageService: Send + Sync {
-    fn prepare(
-        &self,
-        file_path: String,
-        target: ImageSize,
-        format: ScaledFormat,
-        crop: Option<Rect>,
-    ) -> PrepareFuture;
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ImageView {
