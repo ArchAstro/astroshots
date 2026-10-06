@@ -17,6 +17,7 @@ name = "astroshot"
 path = "src/main.rs"
 
 [dependencies]
+alacritty_terminal = "0.25"
 anyhow = "1"
 base64 = "0.22"
 chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"] }
@@ -34,6 +35,7 @@ portable-pty = "0.9"
 ratatui = "0.29"
 rayon = "1"
 regex = "1"
+rustix = { version = "1", features = ["event", "stdio", "termios", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
@@ -41,6 +43,7 @@ sha2 = "0.10"
 thiserror = "2"
 tiny-skia = "0.11"
 tokio = { version = "1", features = ["full"] }
+unicode-normalization = "0.1"
 url = "2"
 vt100 = "0.15"
 walkdir = "2"
