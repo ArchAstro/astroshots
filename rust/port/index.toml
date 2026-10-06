@@ -109,7 +109,27 @@ readPngSizeFromFile = "astroshot::astroshot_review::images::png::read_png_size_f
 
 [[module]]
 ts = "packages/astroshot-review/src/images/scale.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/images/scale.rs"
+module = "astroshot::astroshot_review::images::scale"
+ported_at = "2026-10-06T21:43:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/images/scale.test.ts"]
+notes = "keeps the TS premultiplied area-average (identical pixels); PNG compression differs from zlib level 6"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/scale.test.ts" = "0174da5f344e906f581eb4da05a2ec38256c9ef9"
+"packages/astroshot-review/src/images/scale.ts" = "6d80481e949a2040e7671df0d5198d6a3f069e9b"
+
+[module.symbols]
+Rect = "astroshot::astroshot_review::images::scale::Rect"
+ScaleRequest = "astroshot::astroshot_review::images::scale::ScaleRequest"
+ScaledFormat = "astroshot::astroshot_review::images::scale::ScaledFormat"
+ScaledImage = "astroshot::astroshot_review::images::scale::ScaledImage"
+cropRgba = "astroshot::astroshot_review::images::scale::crop_rgba"
+resampleRgba = "astroshot::astroshot_review::images::scale::resample_rgba"
+rgbaToRgb = "astroshot::astroshot_review::images::scale::rgba_to_rgb"
+scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
@@ -226,7 +246,28 @@ truncate = "astroshot::astroshot_review::ui::theme::truncate"
 
 [[module]]
 ts = "packages/astroshot-review/src/video/ffmpeg.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/video/ffmpeg.rs"
+module = "astroshot::astroshot_review::video::ffmpeg"
+ported_at = "2026-10-06T21:43:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/video/ffmpeg.test.ts"]
+notes = "FramePlayer needs a tokio runtime; spawn errors carry io::Error text; stderr cut by chars; FramePlayer/probe_video untested, as in TS"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/video/ffmpeg.test.ts" = "74c412821db7109335760422e908a711ee284651"
+"packages/astroshot-review/src/video/ffmpeg.ts" = "7374525fa5ca4565e38e4f9af44a8fafbb47cddd"
+
+[module.symbols]
+FfmpegInfo = "astroshot::astroshot_review::video::ffmpeg::FfmpegInfo"
+FramePlayer = "astroshot::astroshot_review::video::ffmpeg::FramePlayer"
+FramePlayerOptions = "astroshot::astroshot_review::video::ffmpeg::FramePlayerOptions"
+VideoFrame = "astroshot::astroshot_review::video::ffmpeg::VideoFrame"
+VideoInfo = "astroshot::astroshot_review::video::ffmpeg::VideoInfo"
+detectFfmpeg = "astroshot::astroshot_review::video::ffmpeg::detect_ffmpeg"
+probeVideo = "astroshot::astroshot_review::video::ffmpeg::probe_video"
+resetFfmpegCache = "astroshot::astroshot_review::video::ffmpeg::reset_ffmpeg_cache"
+splitPngStream = "astroshot::astroshot_review::video::ffmpeg::split_png_stream"
 
 [[module]]
 ts = "packages/astroshot/bin/demo.mjs"
