@@ -2,11 +2,50 @@
 
 [[module]]
 ts = "packages/astroshot-review/src/data/index-cache.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/index_cache.rs"
+module = "astroshot::astroshot_review::data::index_cache"
+ported_at = "2026-10-06T21:47:36Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/index-cache.test.ts"]
+notes = "hash records in path order (BTreeMap), cache only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/index-cache.test.ts" = "ca0755c973ddf9e7370f5eba6f01572e0cdfe6f6"
+"packages/astroshot-review/src/data/index-cache.ts" = "039e0902193039db5d02cda0c6ac942098bebea8"
+
+[module.symbols]
+IndexDocument = "astroshot::astroshot_review::data::index_cache::IndexDocument"
+indexCachePath = "astroshot::astroshot_review::data::index_cache::index_cache_path"
+loadIndex = "astroshot::astroshot_review::data::index_cache::load_index"
+reconcileArrivalOrder = "astroshot::astroshot_review::data::index_cache::reconcile_arrival_order"
+saveIndex = "astroshot::astroshot_review::data::index_cache::save_index"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/manifest.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/manifest.rs"
+module = "astroshot::astroshot_review::data::manifest"
+ported_at = "2026-10-06T21:47:33Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/manifest.test.ts"]
+notes = "lenient Value reads; parseIsoDate: ES ISO + RFC2822 only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/manifest.test.ts" = "54b90a6af8d993012601cd6e40336b05ad142167"
+"packages/astroshot-review/src/data/manifest.ts" = "28c6a65e318b8688b8a9708773e301488f9dea79"
+
+[module.symbols]
+FeatureManifest = "astroshot::astroshot_review::data::manifest::FeatureManifest"
+ManifestChapter = "astroshot::astroshot_review::data::manifest::ManifestChapter"
+ManifestShot = "astroshot::astroshot_review::data::manifest::ManifestShot"
+chapterTimeLabel = "astroshot::astroshot_review::data::manifest::chapter_time_label"
+chaptersOf = "astroshot::astroshot_review::data::manifest::chapters_of"
+durationLabel = "astroshot::astroshot_review::data::manifest::duration_label"
+matchManifestShot = "astroshot::astroshot_review::data::manifest::match_manifest_shot"
+parseFeatureStatus = "astroshot::astroshot_review::data::manifest::parse_feature_status"
+parseIsoDate = "astroshot::astroshot_review::data::manifest::parse_iso_date"
+readManifest = "astroshot::astroshot_review::data::manifest::read_manifest"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/model.ts"
@@ -65,11 +104,61 @@ worktreeShort = "astroshot::astroshot_review::data::paths::worktree_short"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/review-store.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/review_store.rs"
+module = "astroshot::astroshot_review::data::review_store"
+ported_at = "2026-10-06T21:47:31Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/review-store.test.ts"]
+notes = "review.json bytes pinned against TS serializer; random ids from /dev/urandom"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/review-store.test.ts" = "eff6fa430ca2fc5afa2f4553b5a893a91d3f998f"
+"packages/astroshot-review/src/data/review-store.ts" = "54cfa265ce43d6d7a770d5345ba6c1dcf790665a"
+
+[module.symbols]
+REVIEW_FILE = "astroshot::astroshot_review::data::review_store::REVIEW_FILE"
+ReviewDocument = "astroshot::astroshot_review::data::review_store::ReviewDocument"
+ReviewEntry = "astroshot::astroshot_review::data::review_store::ReviewEntry"
+ReviewWriteRequest = "astroshot::astroshot_review::data::review_store::ReviewWriteRequest"
+UnsupportedReviewVersion = "astroshot::astroshot_review::data::review_store::UnsupportedReviewVersion"
+addComment = "astroshot::astroshot_review::data::review_store::add_comment"
+emptyDocument = "astroshot::astroshot_review::data::review_store::empty_document"
+entryNeedsHash = "astroshot::astroshot_review::data::review_store::entry_needs_hash"
+markSeen = "astroshot::astroshot_review::data::review_store::mark_seen"
+newCommentId = "astroshot::astroshot_review::data::review_store::new_comment_id"
+nowIso = "astroshot::astroshot_review::data::review_store::now_iso"
+parseReviewDocument = "astroshot::astroshot_review::data::review_store::parse_review_document"
+readReviewDocument = "astroshot::astroshot_review::data::review_store::read_review_document"
+resetReviewsIfNeeded = "astroshot::astroshot_review::data::review_store::reset_reviews_if_needed"
+scopedEntry = "astroshot::astroshot_review::data::review_store::scoped_entry"
+serializeReviewDocument = "astroshot::astroshot_review::data::review_store::serialize_review_document"
+sha256Bytes = "astroshot::astroshot_review::data::review_store::sha256_bytes"
+sha256File = "astroshot::astroshot_review::data::review_store::sha256_file"
+snapshotFromEntry = "astroshot::astroshot_review::data::review_store::snapshot_from_entry"
+writeReviewDocument = "astroshot::astroshot_review::data::review_store::write_review_document"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/watcher.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/watcher.rs"
+module = "astroshot::astroshot_review::data::watcher"
+ported_at = "2026-10-06T21:47:34Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/watcher.test.ts"]
+notes = "notify, one watcher per target, single debounce worker; paths rebased under the given root"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/watcher.test.ts" = "a277dd257cd671473a5a691d847d5d3b5bdb5e95"
+"packages/astroshot-review/src/data/watcher.ts" = "e563651cab7e81531c16c539c6a186d5689500ed"
+
+[module.symbols]
+RootWatcher = "astroshot::astroshot_review::data::watcher::RootWatcher"
+WatchEvent = "astroshot::astroshot_review::data::watcher::WatchEvent"
+WatchOptions = "astroshot::astroshot_review::data::watcher::WatchOptions"
+classifyPath = "astroshot::astroshot_review::data::watcher::classify_path"
+eventKey = "astroshot::astroshot_review::data::watcher::event_key"
+watchRoots = "astroshot::astroshot_review::data::watcher::watch_roots"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/halfblocks.ts"
@@ -216,15 +305,72 @@ supportsTrueColor = "astroshot::astroshot_review::terminal::probe::supports_true
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/chrome.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/chrome.rs"
+module = "astroshot::astroshot_review::ui::chrome"
+ported_at = "2026-10-06T21:47:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "inline Text components are fns returning Span; block components are Widgets; greedy word wrap, not wrap-ansi"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/chrome.tsx" = "c2efcbbc846de3174490c3b285833a84aeefe70a"
+
+[module.symbols]
+EmptyState = "astroshot::astroshot_review::ui::chrome::EmptyState"
+ExecutionPill = "astroshot::astroshot_review::ui::chrome::execution_pill"
+HintBar = "astroshot::astroshot_review::ui::chrome::HintBar"
+KeyHint = "astroshot::astroshot_review::ui::chrome::KeyHint"
+Line = "-"
+MetaRow = "astroshot::astroshot_review::ui::chrome::MetaRow"
+MovieBadge = "astroshot::astroshot_review::ui::chrome::movie_badge"
+ReviewBadge = "astroshot::astroshot_review::ui::chrome::review_badge"
+Rule = "astroshot::astroshot_review::ui::chrome::rule"
+SectionLabel = "astroshot::astroshot_review::ui::chrome::section_label"
+StatusPill = "astroshot::astroshot_review::ui::chrome::status_pill"
+Toast = "astroshot::astroshot_review::ui::chrome::Toast"
+WorktreeChip = "astroshot::astroshot_review::ui::chrome::worktree_chip"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/help.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/help.rs"
+module = "astroshot::astroshot_review::ui::help"
+ported_at = "2026-10-06T21:47:29Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "flex-wrap computed manually; columns clipped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/help.tsx" = "087b9d24d2de53f4049f414eee730d12f8c20ffc"
+
+[module.symbols]
+HelpOverlay = "astroshot::astroshot_review::ui::help::HelpOverlay"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/selectors.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/selectors.rs"
+module = "astroshot::astroshot_review::ui::selectors"
+ported_at = "2026-10-06T21:47:24Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/ui/selectors.test.ts"]
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/selectors.test.ts" = "99c8b86bd67b6eef800be59b30b1576edea7f890"
+"packages/astroshot-review/src/ui/selectors.ts" = "7ebab7b19aa57e59ce511c479657989ac22a6e8e"
+
+[module.symbols]
+StreamCounts = "astroshot::astroshot_review::ui::selectors::StreamCounts"
+StreamFilter = "astroshot::astroshot_review::ui::selectors::StreamFilter"
+StreamGroup = "astroshot::astroshot_review::ui::selectors::StreamGroup"
+contiguousGroups = "astroshot::astroshot_review::ui::selectors::contiguous_groups"
+filterFrictionLogs = "astroshot::astroshot_review::ui::selectors::filter_friction_logs"
+filterShots = "astroshot::astroshot_review::ui::selectors::filter_shots"
+frictionState = "astroshot::astroshot_review::ui::selectors::friction_state"
+frictionSummary = "astroshot::astroshot_review::ui::selectors::friction_summary"
+latestRun = "astroshot::astroshot_review::ui::selectors::latest_run"
+reviewSiblings = "astroshot::astroshot_review::ui::selectors::review_siblings"
+reviewStateOf = "astroshot::astroshot_review::ui::selectors::review_state_of"
+streamCounts = "astroshot::astroshot_review::ui::selectors::stream_counts"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
@@ -244,7 +390,19 @@ revealInFileManager = "astroshot::astroshot_review::ui::system::reveal_in_file_m
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/text-input.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/text_input.rs"
+module = "astroshot::astroshot_review::ui::text_input"
+ported_at = "2026-10-06T21:49:18Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TextInputState handle(KeyEvent)/handle_paste -> Outcome; scroll keeps caret in view (width-4; TS width-2 let it wrap out)"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/text-input.tsx" = "d6c72abf1abf7a5ce37510ab7d3c0e6b08a52e42"
+
+[module.symbols]
+TextInput = "astroshot::astroshot_review::ui::text_input::TextInput"
+TextInputProps = "astroshot::astroshot_review::ui::text_input::TextInput"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/theme.ts"
