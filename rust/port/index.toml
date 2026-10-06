@@ -677,7 +677,20 @@ encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
 
 [[module]]
 ts = "packages/movie-harness/src/session.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/session.rs"
+module = "astroshot::movie_harness::session"
+ported_at = "2026-10-06T22:02:54Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/session.test.ts"]
+notes = "mark/push_frame/stop take &mut self and return Result; FrameExtension enum; StopOptions; the test's pty/terminal-paint cases belong to sources/pty"
+
+[module.ts_blobs]
+"packages/movie-harness/src/session.test.ts" = "98111c88f3d000934ec235e847b3e297a90f1a1d"
+"packages/movie-harness/src/session.ts" = "4ea000e75193241d7985e9555b5d047468ad3d98"
+
+[module.symbols]
+MovieSession = "astroshot::movie_harness::session::MovieSession"
 
 [[module]]
 ts = "packages/movie-harness/src/sink.ts"
@@ -720,7 +733,22 @@ sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_err
 
 [[module]]
 ts = "packages/movie-harness/src/sources/frames-store.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/sources/frames_store.rs"
+module = "astroshot::movie_harness::sources::frames_store"
+ported_at = "2026-10-06T22:02:55Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "state JSON pretty + newline, atomic .tmp rename; TS version-check message kept; 12-hex session id"
+
+[module.ts_blobs]
+"packages/movie-harness/src/sources/frames-store.ts" = "af70de5d46d639bda5509b89c2fbfca970326fb3"
+
+[module.symbols]
+loadFrameSession = "astroshot::movie_harness::sources::frames_store::load_frame_session"
+markFrameSession = "astroshot::movie_harness::sources::frames_store::mark_frame_session"
+pushFrameToSession = "astroshot::movie_harness::sources::frames_store::push_frame_to_session"
+startFrameSession = "astroshot::movie_harness::sources::frames_store::start_frame_session"
+stopFrameSession = "astroshot::movie_harness::sources::frames_store::stop_frame_session"
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
