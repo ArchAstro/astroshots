@@ -1066,7 +1066,20 @@ notes = "node script becomes pty_exit_wrapper::run(args, stdout) -> i32, run fro
 
 [[module]]
 ts = "packages/tui-shot/src/pty-shot.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/pty_shot.rs"
+module = "astroshot::tui_shot::pty_shot"
+ported_at = "2026-10-06T22:09:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/shot.test.ts"]
+notes = "portable-pty + native raster replace node-pty and xterm+Chromium; exit wrapper = current binary re-exec'd as __pty-exit-wrapper; signal death reports exit 0 like node-pty; graphics mode answers DA1/DSR like xterm; headed/fontFamily ignored"
+
+[module.ts_blobs]
+"packages/tui-shot/src/pty-shot.ts" = "432359ec1b6f91e08bd7efba2eb880df7cfebc92"
+"packages/tui-shot/src/shot.test.ts" = "8dc97f7da8d23a2ff67c247b51b2b03f2694045c"
+
+[module.symbols]
+takePtyShot = "astroshot::tui_shot::pty_shot::take_pty_shot"
 
 [[module]]
 ts = "packages/tui-shot/src/render-ink.ts"
