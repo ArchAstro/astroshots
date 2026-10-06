@@ -1152,6 +1152,36 @@ notes = "NFC + lowercase collision key, as TS"
 resolveBatchOutputPaths = "astroshot::tui_shot::batch_paths::resolve_batch_output_paths"
 
 [[module]]
+ts = "packages/tui-shot/src/cli.ts"
+status = "ported"
+rust = "tui_shot/cli.rs"
+module = "astroshot::tui_shot::cli"
+ported_at = "2026-10-06T22:36:52Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+test_provenance = [
+    "packages/tui-shot/src/cli.e2e.test.ts",
+    "packages/tui-shot/src/pty-cli.e2e.test.ts",
+]
+notes = "run(argv)->i32 instead of process.argv/exitCode; install-browser reports find_chrome() instead of running Playwright's installer; --headed accepted but unused (native raster); manifest JSON/YAML syntax errors carry the Rust parser's wording; e2e cases live in tests/tui_shot_cli.rs and check PNGs with the image crate"
+
+[module.ts_blobs]
+"packages/tui-shot/src/cli.e2e.test.ts" = "a5943ca9d8e63a92f0720f3c3489fb2d3a81c1bd"
+"packages/tui-shot/src/cli.ts" = "d60bf630669e67d52b9994c7c77c8a6ecf69fdf1"
+"packages/tui-shot/src/pty-cli.e2e.test.ts" = "f1e2b9a97ff193f73b81e560a1edac0f242cb13b"
+
+[[module]]
+ts = "packages/tui-shot/src/index.ts"
+status = "ported"
+rust = "tui_shot/mod.rs"
+module = "astroshot::tui_shot"
+ported_at = "2026-10-06T22:36:47Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "re-exports only"
+
+[module.ts_blobs]
+"packages/tui-shot/src/index.ts" = "b7fa1682ec28824d25616a1c722e6c27f31d32b1"
+
+[[module]]
 ts = "packages/tui-shot/src/kitty-graphics.ts"
 status = "ported"
 rust = "tui_shot/kitty_graphics.rs"
