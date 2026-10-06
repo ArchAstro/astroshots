@@ -2,7 +2,31 @@
 
 [[module]]
 ts = "packages/astroshot-review/src/data/friction.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/friction.rs"
+module = "astroshot::astroshot_review::data::friction"
+ported_at = "2026-10-06T22:04:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/friction.test.ts"]
+notes = "loaders return io::Result; Date.parse ISO forms only; FrictionContext struct; byte-sorted dir listings like libuv readdir"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/friction.test.ts" = "f3ef71785e22e84eaf2c14ff009dfecb928b70ae"
+"packages/astroshot-review/src/data/friction.ts" = "a933e5207e1d3bb800dcf9d577befe3876570b04"
+
+[module.symbols]
+LOG_FILE = "astroshot::astroshot_review::data::friction::LOG_FILE"
+META_FILE = "astroshot::astroshot_review::data::friction::META_FILE"
+PROMPT_FILE = "astroshot::astroshot_review::data::friction::PROMPT_FILE"
+RUNS_DIR = "astroshot::astroshot_review::data::friction::RUNS_DIR"
+frictionStatusLabel = "astroshot::astroshot_review::data::friction::friction_status_label"
+loadFrictionLog = "astroshot::astroshot_review::data::friction::load_friction_log"
+loadFrictionLogs = "astroshot::astroshot_review::data::friction::load_friction_logs"
+loadRun = "astroshot::astroshot_review::data::friction::load_run"
+loadRuns = "astroshot::astroshot_review::data::friction::load_runs"
+parseJsonl = "astroshot::astroshot_review::data::friction::parse_jsonl"
+runDisplayTitle = "astroshot::astroshot_review::data::friction::run_display_title"
+stepCountLabel = "astroshot::astroshot_review::data::friction::step_count_label"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/hash-cache.ts"
