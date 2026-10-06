@@ -357,7 +357,8 @@ mod tests {
         let lines = rows(&buf);
         assert_eq!(lines[2], " Every worktree below any of these folders");
         assert_eq!(lines[3], " streams into one feed (from the Astroshots app");
-        assert_eq!(lines[4], " preferences).");
+        // The row above is exactly full, so the separating space starts this one.
+        assert_eq!(lines[4], "  preferences).");
         assert_eq!(lines[5], " ● ~/projects");
         // Long paths are cut at the end.
         assert_eq!(lines[6], " ● /work/a-very-long-directory-name-that-canno…");
