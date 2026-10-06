@@ -1,11 +1,9 @@
 //! Port of `packages/react-shot/src/batch-paths.ts`.
-//!
-//! Divergence: the TS key is `.normalize("NFC").toLowerCase()`. No Unicode
-//! normalization crate is available, so only the lowercase step runs; paths
-//! that differ solely by NFC/NFD composition are not detected as collisions.
 
 use std::collections::HashMap;
+
 use std::path::{Component, Path, PathBuf};
+use unicode_normalization::UnicodeNormalization;
 
 use anyhow::{Result, bail};
 
@@ -55,7 +53,11 @@ fn collision_key(file_path: &Path) -> String {
     for segment in missing_segments {
         canonical.push(segment);
     }
-    canonical.to_string_lossy().to_lowercase()
+    canonical
+        .to_string_lossy()
+        .nfc()
+        .collect::<String>()
+        .to_lowercase()
 }
 
 /// Resolve every destination before capture and reject accidental overwrites.
@@ -153,6 +155,20 @@ mod tests {
                 entry("two.tsx", "alias/screen.png"),
             ],
             &root.path().to_string_lossy(),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("same destination"));
+    }
+
+    #[test]
+    fn rejects_composed_and_decomposed_unicode_duplicates() {
+        // "café" with a precomposed é versus e + combining acute.
+        let err = resolve_batch_output_paths(
+            &[
+                entry("one.tsx", "caf\u{e9}.png"),
+                entry("two.tsx", "cafe\u{301}.png"),
+            ],
+            "/shots",
         )
         .unwrap_err();
         assert!(err.to_string().contains("same destination"));

@@ -9,11 +9,11 @@
 //!
 //! Divergence: Node's `ReadStream`/`WriteStream` pair becomes the
 //! [`ProbeStreams`] trait so tests can fake a terminal. [`StdioStreams`] is the
-//! real implementation; its reader thread cannot be cancelled, so after a
-//! timeout it consumes one further stdin chunk (and drops it).
+//! real implementation; it polls the stdin fd with `rustix` and reads only
+//! when data is ready, so a timed-out wait never consumes a later chunk.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -21,7 +21,6 @@ use std::time::Duration;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use regex::Regex;
-use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use super::kitty::{encode_file_query, encode_query};
@@ -433,11 +432,44 @@ fn lossy_pair(pair: (std::ffi::OsString, std::ffi::OsString)) -> Option<(String,
     ))
 }
 
+/// How often [`read_ready_chunk`] re-polls the fd while waiting.
+const POLL_INTERVAL: Duration = Duration::from_millis(5);
+
+/// Wait until `fd` has data or `deadline` passes. The fd is polled without
+/// blocking and read only once it is readable, so giving up at the deadline
+/// leaves any later input unread for the next reader. `None` on timeout, EOF
+/// or a read error.
+async fn read_ready_chunk(fd: impl std::os::fd::AsFd, deadline: Instant) -> Option<Vec<u8>> {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    loop {
+        let mut fds = [PollFd::new(&fd, PollFlags::IN)];
+        let no_wait = Timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        match poll(&mut fds, Some(&no_wait)) {
+            Ok(ready) if ready > 0 => {
+                let mut chunk = [0u8; 1024];
+                return match rustix::io::read(&fd, &mut chunk) {
+                    Ok(0) | Err(_) => None,
+                    Ok(read) => Some(chunk[..read].to_vec()),
+                };
+            }
+            Ok(_) | Err(rustix::io::Errno::INTR) => {}
+            Err(_) => return None,
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return None;
+        }
+        tokio::time::sleep(remaining.min(POLL_INTERVAL)).await;
+    }
+}
+
 /// The process's real stdin/stdout.
 pub struct StdioStreams {
     was_raw: bool,
     entered_raw: bool,
-    receiver: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
 }
 
 impl StdioStreams {
@@ -445,7 +477,6 @@ impl StdioStreams {
         Self {
             was_raw: false,
             entered_raw: false,
-            receiver: None,
         }
     }
 }
@@ -478,17 +509,6 @@ impl ProbeStreams for StdioStreams {
         if self.stdin_is_tty() && !self.was_raw {
             self.entered_raw = crossterm::terminal::enable_raw_mode().is_ok();
         }
-        let (sender, receiver) = mpsc::unbounded_channel();
-        std::thread::spawn(move || {
-            let mut stdin = std::io::stdin().lock();
-            let mut chunk = [0u8; 1024];
-            while let Ok(read) = stdin.read(&mut chunk) {
-                if read == 0 || sender.send(chunk[..read].to_vec()).is_err() {
-                    break;
-                }
-            }
-        });
-        self.receiver = Some(receiver);
     }
 
     fn write_stdout(&mut self, data: &str) {
@@ -498,11 +518,7 @@ impl ProbeStreams for StdioStreams {
     }
 
     async fn next_chunk(&mut self, deadline: Instant) -> Option<Vec<u8>> {
-        let receiver = self.receiver.as_mut()?;
-        tokio::time::timeout_at(deadline, receiver.recv())
-            .await
-            .ok()
-            .flatten()
+        read_ready_chunk(rustix::stdio::stdin(), deadline).await
     }
 
     fn end_read(&mut self) {
@@ -510,13 +526,29 @@ impl ProbeStreams for StdioStreams {
             let _ = crossterm::terminal::disable_raw_mode();
             self.entered_raw = false;
         }
-        self.receiver = None;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::net::UnixStream;
+
+    #[tokio::test]
+    async fn a_timed_out_read_does_not_swallow_a_later_chunk() {
+        let (reader, mut writer) = UnixStream::pair().unwrap();
+        // Nothing written: the wait gives up at its deadline.
+        let timed_out = read_ready_chunk(&reader, Instant::now() + Duration::from_millis(30)).await;
+        assert_eq!(timed_out, None);
+        // A chunk arriving after the timeout is still there for the next read.
+        writer.write_all(b"\x1b[?62;22c").unwrap();
+        let chunk = read_ready_chunk(&reader, Instant::now() + Duration::from_secs(2)).await;
+        assert_eq!(chunk.as_deref(), Some(&b"\x1b[?62;22c"[..]));
+        // EOF ends the wait immediately.
+        drop(writer);
+        let eof = read_ready_chunk(&reader, Instant::now() + Duration::from_secs(2)).await;
+        assert_eq!(eof, None);
+    }
 
     fn env(pairs: &[(&str, &str)]) -> Env {
         pairs

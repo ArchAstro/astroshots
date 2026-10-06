@@ -1,9 +1,8 @@
 //! Port of `packages/tui-shot/src/batch-paths.ts`.
-//!
-//! Divergence: the TS key is `.normalize("NFC").toLowerCase()`. No Unicode
-//! normalization crate is available, so only the lowercase step runs.
 
 use std::collections::HashMap;
+
+use unicode_normalization::UnicodeNormalization;
 
 use anyhow::{Result, bail};
 
@@ -83,7 +82,10 @@ fn resolve(base: &str, rel: &str) -> String {
 fn collision_key(file_path: &str) -> String {
     // Reject case-only collisions on every platform so a manifest behaves the
     // same on case-sensitive and case-insensitive filesystems.
-    resolve("/", file_path).to_lowercase()
+    resolve("/", file_path)
+        .nfc()
+        .collect::<String>()
+        .to_lowercase()
 }
 
 fn safe_relative_output(output: &str) -> Result<String> {
@@ -188,6 +190,21 @@ mod tests {
             ],
             "/project/shots",
             Some("/artifacts"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("same destination"));
+    }
+
+    #[test]
+    fn rejects_composed_and_decomposed_unicode_duplicates() {
+        // "café" with a precomposed é versus e + combining acute.
+        let err = resolve_batch_output_paths(
+            &[
+                entry("one.tsx", "caf\u{e9}.png"),
+                entry("two.tsx", "cafe\u{301}.png"),
+            ],
+            "/artifacts",
+            None,
         )
         .unwrap_err();
         assert!(err.to_string().contains("same destination"));

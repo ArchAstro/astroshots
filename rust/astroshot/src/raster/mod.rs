@@ -2,7 +2,7 @@
 //!
 //! Replaces the TS path "terminal -> HTML -> Chromium screenshot":
 //! `packages/tui-shot/src/terminal-html.ts`, the `captureTerminalHtml` page in
-//! `shot.ts`, and `packages/movie-harness/src/terminal-paint.ts`. A `vt100`
+//! `shot.ts`, and `packages/movie-harness/src/terminal-paint.ts`. An `alacritty_terminal`
 //! screen is resolved to cells ([`TerminalFrame`]), glyphs are shaped and
 //! rasterized with `cosmic-text` from a bundled JetBrains Mono, and everything
 //! is composited with `tiny-skia`.
@@ -18,10 +18,6 @@
 //!   scripts it lacks (CJK, emoji, most symbols) are skipped, not drawn as
 //!   tofu. Wide cells reserve two columns but draw only if the font has the
 //!   glyph.
-//! - `vt100` 0.15 does not track SGR dim (2), strikethrough (9) or invisible
-//!   (8); the style fields exist and are rendered when a frame sets them.
-//! - Autowrap-off (`ESC[?7l`) is not supported by `vt100`; rows longer than
-//!   the grid wrap instead of overwriting the last column.
 //! - Block elements (U+2580-259F) are drawn as exact cell fractions; box
 //!   drawing lines come from the font and may leave sub-pixel gaps at other
 //!   line heights.
@@ -31,7 +27,9 @@ mod frame;
 mod render;
 
 pub use colors::{ANSI_16, Rgb, Rgba, palette_color, parse_css_color, to_hex};
-pub use frame::{HeadlessTerminal, StyledCell, TerminalFrame, style_cell, terminal_plain_text};
+pub use frame::{
+    HeadlessTerminal, Screen, StyledCell, TerminalFrame, style_cell, terminal_plain_text,
+};
 pub use render::Rasterizer;
 
 use std::cell::RefCell;
@@ -102,12 +100,9 @@ pub struct Cursor {
 
 impl Cursor {
     /// The screen's cursor, or `None` when the program hid it.
-    pub fn from_screen(screen: &vt100::Screen) -> Option<Self> {
-        if screen.hide_cursor() {
-            return None;
-        }
-        let (row, col) = screen.cursor_position();
-        Some(Self { row, col })
+    pub fn from_screen(screen: &Screen) -> Option<Self> {
+        let (row, col, visible) = frame::cursor_state(screen);
+        visible.then_some(Self { row, col })
     }
 }
 
