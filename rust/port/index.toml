@@ -525,7 +525,27 @@ previewHeight = "astroshot::astroshot_review::ui::detail::preview_height"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/friction.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/friction.rs"
+module = "astroshot::astroshot_review::ui::friction"
+ported_at = "2026-10-06T22:42:50Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "counts prop split into pending/seen; mode is enum StepMode; step views share FrictionStepState; content that does not fit is clipped at the bottom where Ink shrinks and overlaps rows"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/friction.tsx" = "0764a6261f0162f1d9d4c1e183d93c07205fadea"
+
+[module.symbols]
+FRICTION_ROW_HEIGHT = "astroshot::astroshot_review::ui::friction::FRICTION_ROW_HEIGHT"
+FrictionFilterBar = "astroshot::astroshot_review::ui::friction::FrictionFilterBar"
+FrictionList = "astroshot::astroshot_review::ui::friction::FrictionList"
+FrictionListProps = "astroshot::astroshot_review::ui::friction::FrictionListProps"
+FrictionLogDetail = "astroshot::astroshot_review::ui::friction::FrictionLogDetail"
+FrictionLogDetailProps = "astroshot::astroshot_review::ui::friction::FrictionLogDetailProps"
+FrictionStepDetail = "astroshot::astroshot_review::ui::friction::FrictionStepDetail"
+FrictionStepDetailProps = "astroshot::astroshot_review::ui::friction::FrictionStepDetailProps"
+FrictionStepTakeover = "astroshot::astroshot_review::ui::friction::FrictionStepTakeover"
+frictionScroll = "astroshot::astroshot_review::ui::friction::friction_scroll"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/help.tsx"
@@ -639,7 +659,28 @@ SettingsPane = "astroshot::astroshot_review::ui::settings::SettingsPane"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/stream.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/stream.rs"
+module = "astroshot::astroshot_review::ui::stream"
+ported_at = "2026-10-06T22:42:49Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/ui/selectors.test.ts"]
+notes = "StreamItem.height is a method; per-shot PictureState lives in StreamListState; an overfull group header keeps arrow and chip and cuts the count text"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/selectors.test.ts" = "99c8b86bd67b6eef800be59b30b1576edea7f890"
+"packages/astroshot-review/src/ui/stream.tsx" = "462a14b1ff29b20071d7bf73a1a03f0e1ba8ed70"
+
+[module.symbols]
+FilterBar = "astroshot::astroshot_review::ui::stream::FilterBar"
+SHOT_ROW_HEIGHT = "astroshot::astroshot_review::ui::stream::SHOT_ROW_HEIGHT"
+StreamItem = "astroshot::astroshot_review::ui::stream::StreamItem"
+StreamList = "astroshot::astroshot_review::ui::stream::StreamList"
+StreamProps = "astroshot::astroshot_review::ui::stream::StreamProps"
+flattenStream = "astroshot::astroshot_review::ui::stream::flatten_stream"
+isNavigable = "astroshot::astroshot_review::ui::stream::is_navigable"
+nextNavigable = "astroshot::astroshot_review::ui::stream::next_navigable"
+scrollWindow = "astroshot::astroshot_review::ui::stream::scroll_window"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
