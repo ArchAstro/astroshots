@@ -819,7 +819,19 @@ resolveShotMeta = "astroshot::react_shot::meta::resolve_shot_meta"
 
 [[module]]
 ts = "packages/react-shot/src/shot.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/shot.rs"
+module = "astroshot::react_shot::shot"
+ported_at = "2026-10-06T22:01:51Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "shot queue is one async mutex; readFixtureMeta = node helper nodeMeta; take_shot_detailed also returns the resolved meta; browser ignores Chrome's favicon 404 that Playwright's headless shell never requested"
+
+[module.ts_blobs]
+"packages/react-shot/src/shot.ts" = "ba3374f83a29cb536776f2dd73522d2843f71581"
+
+[module.symbols]
+closeSharedBrowser = "astroshot::react_shot::shot::close_shared_browser"
+takeShot = "astroshot::react_shot::shot::take_shot"
 
 [[module]]
 ts = "packages/react-shot/src/stubs.ts"
