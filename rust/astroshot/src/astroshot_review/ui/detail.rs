@@ -197,9 +197,9 @@ pub(crate) fn ink_wrap(text: &str, columns: usize) -> Vec<String> {
     out
 }
 
-type Spans = Vec<Span<'static>>;
+pub(crate) type Spans = Vec<Span<'static>>;
 
-fn spans_width(spans: &[Span<'_>]) -> usize {
+pub(crate) fn spans_width(spans: &[Span<'_>]) -> usize {
     spans.iter().map(Span::width).sum()
 }
 
@@ -231,7 +231,7 @@ fn take_columns(spans: &[Span<'_>], columns: usize) -> Spans {
 
 /// Ink `wrap="truncate"`: cut to `width` columns, the last one being `…`.
 /// The ellipsis takes the style of the outer `<Text>`.
-fn truncate_end(spans: Spans, width: usize, outer: Style) -> Spans {
+pub(crate) fn truncate_end(spans: Spans, width: usize, outer: Style) -> Spans {
     if spans_width(&spans) <= width {
         return spans;
     }
@@ -244,21 +244,21 @@ fn truncate_end(spans: Spans, width: usize, outer: Style) -> Spans {
 }
 
 /// A default-wrap `<Text>` in a one-row `<Line>`: only its first wrapped row shows.
-fn first_wrapped_row(spans: Spans, width: usize) -> Spans {
+pub(crate) fn first_wrapped_row(spans: Spans, width: usize) -> Spans {
     let plain: String = spans.iter().map(|span| span.content.as_ref()).collect();
     let first = ink_wrap(&plain, width).swap_remove(0);
     take_columns(&spans, text_width(&first))
 }
 
-fn styled(text: impl Into<String>, style: Style) -> Span<'static> {
+pub(crate) fn styled(text: impl Into<String>, style: Style) -> Span<'static> {
     Span::styled(text.into(), style)
 }
 
-fn fg(color: ratatui::style::Color) -> Style {
+pub(crate) fn fg(color: ratatui::style::Color) -> Style {
     Style::new().fg(color)
 }
 
-fn bold(color: ratatui::style::Color) -> Style {
+pub(crate) fn bold(color: ratatui::style::Color) -> Style {
     Style::new().fg(color).add_modifier(Modifier::BOLD)
 }
 
@@ -479,7 +479,7 @@ fn execution_label(status: FeatureStatus) -> &'static str {
 }
 
 /// JS truthiness of a `string | null`.
-fn truthy(value: Option<&str>) -> Option<&str> {
+pub(crate) fn truthy(value: Option<&str>) -> Option<&str> {
     value.filter(|value| !value.is_empty())
 }
 
