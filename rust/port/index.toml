@@ -242,7 +242,20 @@ scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/service.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/images/service.rs"
+module = "astroshot::astroshot_review::images::service"
+ported_at = "2026-10-06T22:03:41Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TS class ImageService is ImageServiceImpl (the trait owns the name); worker pool = worker::run_job_async with a semaphore; in-flight dedupe via Shared futures"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/service.ts" = "b52c5ba7f172ed57ccce797089fb47412a1b339a"
+
+[module.symbols]
+ImageService = "astroshot::astroshot_review::images::service::ImageServiceImpl"
+ImageServiceOptions = "astroshot::astroshot_review::images::service::ImageServiceOptions"
+PreparedImage = "astroshot::astroshot_review::images::service::PreparedImage"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/worker.ts"
@@ -540,7 +553,15 @@ splitPngStream = "astroshot::astroshot_review::video::ffmpeg::split_png_stream"
 
 [[module]]
 ts = "packages/astroshot/bin/astroshot.mjs"
-status = "in_progress"
+status = "ported"
+rust = "bin/astroshot.rs"
+module = "astroshot::bin::astroshot"
+ported_at = "2026-10-06T22:03:42Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "engines review/movie/react/ink/pty dispatch to bin::astroshot::pending until ported; install-browser reports find_chrome(); argv0 multi-call and hidden __pty-exit-wrapper in main.rs"
+
+[module.ts_blobs]
+"packages/astroshot/bin/astroshot.mjs" = "11658d6333faa89fd67ac0cb6a2fb8cbb854b16d"
 
 [[module]]
 ts = "packages/astroshot/bin/demo.mjs"
