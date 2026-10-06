@@ -50,9 +50,16 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
      cells. Keep the color tables (`ANSI_16`, 256-color, truecolor), cell
      metrics, padding, and backgrounds from `terminal-html.ts` /
      `terminal-paint.ts` exactly.
+   - Browser movie `scriptPath` (a user JS module that drives a Playwright
+     `Page`) keeps working: the Node helper runs it with `playwright-core`
+     attached to the Rust-launched Chrome over CDP (`connectOverCDP`). Rust
+     still owns the browser; `playwright-core` is needed only for scripted
+     browser movies.
    - Encoding uses `ffmpeg` as today. The TS fallback (replay frames in
      Chromium's recorder) becomes the same replay over CDP.
-3. **Terminal emulation:** `@xterm/headless` → `vt100`. **PTY:** `node-pty` →
+3. **Terminal emulation:** `@xterm/headless` → `alacritty_terminal` (replacing
+   the initial `vt100`, which drops dim, strikethrough, hidden, and
+   autowrap-off). **PTY:** `node-pty` →
    `portable-pty`. **Ink UI:** ratatui + crossterm; screen state is a struct,
    input goes through `handle(event)`, the app loop is
    `crossterm::event::EventStream` + `tokio::select!`. The kitty graphics and
