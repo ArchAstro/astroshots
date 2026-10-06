@@ -369,7 +369,14 @@ impl Browser {
         let sink = errors.clone();
         tasks.push(tokio::spawn(async move {
             while let Some(event) = log.next().await {
-                if event.entry.level == LogEntryLevel::Error {
+                // New headless Chrome requests /favicon.ico; Playwright's headless
+                // shell does not, so its 404 is not a page error.
+                let favicon = event
+                    .entry
+                    .url
+                    .as_deref()
+                    .is_some_and(|url| url.ends_with("/favicon.ico"));
+                if event.entry.level == LogEntryLevel::Error && !favicon {
                     sink.lock().unwrap().push(event.entry.text.clone());
                 }
             }

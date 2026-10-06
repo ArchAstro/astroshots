@@ -2,4 +2,5 @@
 
 pub mod batch_paths;
 pub mod meta;
+pub mod shot;
 pub mod types;
