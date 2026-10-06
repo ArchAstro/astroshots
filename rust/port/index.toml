@@ -2,7 +2,19 @@
 
 [[module]]
 ts = "packages/astroshot-review/src/data/hash-cache.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/hash_cache.rs"
+module = "astroshot::astroshot_review::data::hash_cache"
+ported_at = "2026-10-06T21:53:25Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "key-sorted BTreeMap (as index_cache); FileStat replaces fs.Stats; shared in-flight future"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/hash-cache.ts" = "55a29f34690aaaae9b016a0dc8b4c7df5ca36c46"
+
+[module.symbols]
+HashCache = "astroshot::astroshot_review::data::hash_cache::HashCache"
+HashRecord = "astroshot::astroshot_review::data::hash_cache::HashRecord"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/index-cache.ts"
@@ -226,7 +238,19 @@ scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/worker.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/images/worker.rs"
+module = "astroshot::astroshot_review::images::worker"
+ported_at = "2026-10-06T21:53:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "worker_threads loop → run_job/run_job_async/run_jobs (spawn_blocking/rayon); job ids and buffer transfer dropped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/worker.ts" = "e6f0ca4d78208606b4e5245f122fa605ef343dec"
+
+[module.symbols]
+WorkerRequest = "astroshot::astroshot_review::images::worker::WorkerRequest"
+WorkerResponse = "astroshot::astroshot_review::images::worker::WorkerResponse"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/graphics-stdout.ts"
