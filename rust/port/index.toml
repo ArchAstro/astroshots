@@ -1,6 +1,10 @@
 # Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
 
 [[module]]
+ts = "packages/astroshot-review/src/data/friction.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/hash-cache.ts"
 status = "ported"
 rust = "astroshot_review/data/hash_cache.rs"
@@ -237,6 +241,10 @@ rgbaToRgb = "astroshot::astroshot_review::images::scale::rgba_to_rgb"
 scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
 
 [[module]]
+ts = "packages/astroshot-review/src/images/service.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/images/worker.ts"
 status = "ported"
 rust = "astroshot_review/images/worker.rs"
@@ -400,6 +408,10 @@ Toast = "astroshot::astroshot_review::ui::chrome::Toast"
 WorktreeChip = "astroshot::astroshot_review::ui::chrome::worktree_chip"
 
 [[module]]
+ts = "packages/astroshot-review/src/ui/context.tsx"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/ui/help.tsx"
 status = "ported"
 rust = "astroshot_review/ui/help.rs"
@@ -413,6 +425,14 @@ notes = "flex-wrap computed manually; columns clipped"
 
 [module.symbols]
 HelpOverlay = "astroshot::astroshot_review::ui::help::HelpOverlay"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/hooks.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/picture.tsx"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/selectors.ts"
@@ -517,6 +537,10 @@ detectFfmpeg = "astroshot::astroshot_review::video::ffmpeg::detect_ffmpeg"
 probeVideo = "astroshot::astroshot_review::video::ffmpeg::probe_video"
 resetFfmpegCache = "astroshot::astroshot_review::video::ffmpeg::reset_ffmpeg_cache"
 splitPngStream = "astroshot::astroshot_review::video::ffmpeg::split_png_stream"
+
+[[module]]
+ts = "packages/astroshot/bin/astroshot.mjs"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot/bin/demo.mjs"
@@ -652,6 +676,10 @@ encodeRgbPng = "astroshot::movie_harness::png::encode_rgb_png"
 encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
 
 [[module]]
+ts = "packages/movie-harness/src/session.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/movie-harness/src/sink.ts"
 status = "ported"
 rust = "movie_harness/sink.rs"
@@ -689,6 +717,10 @@ SourceKindHelp = "astroshot::movie_harness::source_help::SourceKindHelp"
 formatSourceCatalog = "astroshot::movie_harness::source_help::format_source_catalog"
 recommendSource = "astroshot::movie_harness::source_help::recommend_source"
 sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_error"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/frames-store.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
@@ -867,6 +899,10 @@ notes = "node script becomes pty_exit_wrapper::run(args, stdout) -> i32, run fro
 
 [module.ts_blobs]
 "packages/tui-shot/src/pty-exit-wrapper.ts" = "29f896026c52bf48185e8014d961ed6422f7b4dc"
+
+[[module]]
+ts = "packages/tui-shot/src/pty-shot.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/tui-shot/src/render-ink.ts"
