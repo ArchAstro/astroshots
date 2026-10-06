@@ -137,11 +137,42 @@ truncate = "astroshot::astroshot_review::ui::theme::truncate"
 
 [[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
-status = "in_progress"
+status = "ported"
+rust = "bin/mac_preferences.rs"
+module = "astroshot::bin::mac_preferences"
+ported_at = "2026-10-06T21:33:02Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "platform strings are std::env::consts::OS ('macos', not 'darwin'); spawn-error text is Rust's io::Error; read_domain seam on ReadWatchConfigurationOptions"
+
+[module.ts_blobs]
+"packages/astroshot/bin/mac-preferences.mjs" = "528f72478bab9dded2383f3bbda3aac066350c57"
+
+[module.symbols]
+ASTROSHOTS_DOMAIN = "astroshot::bin::mac_preferences::ASTROSHOTS_DOMAIN"
+evaluateWatchCoverage = "astroshot::bin::mac_preferences::evaluate_watch_coverage"
+extractPreferenceKey = "astroshot::bin::mac_preferences::extract_preference_key"
+normalizePath = "astroshot::bin::mac_preferences::normalize_path"
+normalizeWatchRootPaths = "astroshot::bin::mac_preferences::normalize_watch_root_paths"
+pathIsInside = "astroshot::bin::mac_preferences::path_is_inside"
+preferenceToolsAvailable = "astroshot::bin::mac_preferences::preference_tools_available"
+readPreferenceDomain = "astroshot::bin::mac_preferences::read_preference_domain"
+readWatchConfiguration = "astroshot::bin::mac_preferences::read_watch_configuration"
 
 [[module]]
 ts = "packages/astroshot/bin/templates.mjs"
-status = "in_progress"
+status = "ported"
+rust = "bin/templates.rs"
+module = "astroshot::bin::templates"
+ported_at = "2026-10-06T21:33:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "anyhow errors with identical messages; options as a struct; lexical path resolution"
+
+[module.ts_blobs]
+"packages/astroshot/bin/templates.mjs" = "545fa42a759bfadcb36cc66d4ccd267b7e101cdd"
+
+[module.symbols]
+canonicalTemplateMode = "astroshot::bin::templates::canonical_template_mode"
+writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
 
 [[module]]
 ts = "packages/movie-harness/src/paths.ts"
