@@ -99,7 +99,9 @@ pub struct Shot {
 #[serde(rename_all = "camelCase")]
 pub struct FrictionStep {
     pub id: String,
-    pub step: i64,
+    /// A JS number: the log may carry a fractional `step`.
+    #[serde(with = "js_number")]
+    pub step: f64,
     pub step_id: String,
     pub title: String,
     pub description: String,
