@@ -190,7 +190,29 @@ parseGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::parse_grap
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/probe.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/terminal/probe.rs"
+module = "astroshot::astroshot_review::terminal::probe"
+ported_at = "2026-10-06T21:45:12Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/probe.test.ts"]
+notes = "ProbeStreams is a trait (StdioStreams real impl); stdin reader thread is not cancellable after timeout (TODO poll via rustix)"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/probe.test.ts" = "bc77c200f3adc3da22f24d7738edd25a4b1ad33d"
+"packages/astroshot-review/src/terminal/probe.ts" = "6e5bf20954e2af2f7e505141cdda4e693f41db41"
+
+[module.symbols]
+FALLBACK_CELL = "astroshot::astroshot_review::terminal::probe::FALLBACK_CELL"
+GraphicsProtocol = "astroshot::astroshot_review::terminal::probe::GraphicsProtocol"
+ProbeOptions = "astroshot::astroshot_review::terminal::probe::ProbeOptions"
+ProbeReport = "astroshot::astroshot_review::terminal::probe::ProbeReport"
+ProbeStreams = "astroshot::astroshot_review::terminal::probe::ProbeStreams"
+TerminalCapabilities = "astroshot::astroshot_review::terminal::probe::TerminalCapabilities"
+parseCellSizeEnv = "astroshot::astroshot_review::terminal::probe::parse_cell_size_env"
+parseProbeResponse = "astroshot::astroshot_review::terminal::probe::parse_probe_response"
+probeTerminal = "astroshot::astroshot_review::terminal::probe::probe_terminal"
+supportsTrueColor = "astroshot::astroshot_review::terminal::probe::supports_true_color"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/chrome.tsx"
@@ -431,7 +453,20 @@ Size = "astroshot::movie_harness::types::Size"
 
 [[module]]
 ts = "packages/react-shot/src/batch-paths.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/batch_paths.rs"
+module = "astroshot::react_shot::batch_paths"
+ported_at = "2026-10-06T21:45:09Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/react-shot/src/batch-paths.test.ts"]
+notes = "TODO NFC normalization (unicode-normalization) — currently lowercase only"
+
+[module.ts_blobs]
+"packages/react-shot/src/batch-paths.test.ts" = "28790a6424973f953ba97b5c2508fc91b93f1b2d"
+"packages/react-shot/src/batch-paths.ts" = "e85f9a987f9caeeb5831e6bf466e2f59797d2552"
+
+[module.symbols]
+resolveBatchOutputPaths = "astroshot::react_shot::batch_paths::resolve_batch_output_paths"
 
 [[module]]
 ts = "packages/react-shot/src/config.ts"
@@ -455,7 +490,22 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [[module]]
 ts = "packages/react-shot/src/meta.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/meta.rs"
+module = "astroshot::react_shot::meta"
+ported_at = "2026-10-06T21:45:08Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/react-shot/src/meta.test.ts"]
+notes = "resolve_shot_meta returns a ResolvedShotMeta struct; ShotMeta aliases ReactShotFixtureMeta"
+
+[module.ts_blobs]
+"packages/react-shot/src/meta.test.ts" = "261f481088fa2830d7f9324fb0a48e5d96aa2e0d"
+"packages/react-shot/src/meta.ts" = "6b013b9f10192e5f72a79f19e3fb39b1e8656b12"
+
+[module.symbols]
+ShotMeta = "astroshot::react_shot::meta::ShotMeta"
+isDialogSelector = "astroshot::react_shot::meta::is_dialog_selector"
+resolveShotMeta = "astroshot::react_shot::meta::resolve_shot_meta"
 
 [[module]]
 ts = "packages/react-shot/src/stubs.ts"
@@ -488,7 +538,20 @@ ShotRequest = "astroshot::react_shot::types::ShotRequest"
 
 [[module]]
 ts = "packages/tui-shot/src/batch-paths.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/batch_paths.rs"
+module = "astroshot::tui_shot::batch_paths"
+ported_at = "2026-10-06T21:45:10Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/batch-paths.test.ts"]
+notes = "TODO NFC normalization — currently lowercase only"
+
+[module.ts_blobs]
+"packages/tui-shot/src/batch-paths.test.ts" = "62624f5919c757c90ba1d6273a65a4c7d10d57e8"
+"packages/tui-shot/src/batch-paths.ts" = "5bd4fd06738964082a9fabb62baf733c187f4579"
+
+[module.symbols]
+resolveBatchOutputPaths = "astroshot::tui_shot::batch_paths::resolve_batch_output_paths"
 
 [[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
