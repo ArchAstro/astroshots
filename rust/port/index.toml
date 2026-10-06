@@ -1,6 +1,14 @@
 # Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
 
 [[module]]
+ts = "packages/astroshot-review/src/data/index-cache.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/manifest.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/model.ts"
 status = "ported"
 rust = "astroshot_review/data/model.rs"
@@ -56,6 +64,14 @@ sequenceAndSlug = "astroshot::astroshot_review::data::paths::sequence_and_slug"
 worktreeShort = "astroshot::astroshot_review::data::paths::worktree_short"
 
 [[module]]
+ts = "packages/astroshot-review/src/data/review-store.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/watcher.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/images/halfblocks.ts"
 status = "ported"
 rust = "astroshot_review/images/halfblocks.rs"
@@ -90,6 +106,10 @@ fitInside = "astroshot::astroshot_review::images::png::fit_inside"
 isPngPath = "astroshot::astroshot_review::images::png::is_png_path"
 readPngSize = "astroshot::astroshot_review::images::png::read_png_size"
 readPngSizeFromFile = "astroshot::astroshot_review::images::png::read_png_size_from_file"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/scale.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
@@ -149,6 +169,22 @@ encodeTransmit = "astroshot::astroshot_review::terminal::kitty::encode_transmit"
 parseGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::parse_graphics_command"
 
 [[module]]
+ts = "packages/astroshot-review/src/terminal/probe.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/chrome.tsx"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/help.tsx"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/selectors.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
 status = "ported"
 rust = "astroshot_review/ui/system.rs"
@@ -163,6 +199,10 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 copyImageToClipboard = "astroshot::astroshot_review::ui::system::copy_image_to_clipboard"
 openWithDefaultApp = "astroshot::astroshot_review::ui::system::open_with_default_app"
 revealInFileManager = "astroshot::astroshot_review::ui::system::reveal_in_file_manager"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/text-input.tsx"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/theme.ts"
@@ -183,6 +223,14 @@ isoDateTime = "astroshot::astroshot_review::ui::theme::iso_date_time"
 relativeTime = "astroshot::astroshot_review::ui::theme::relative_time"
 theme = "astroshot_review::ui::theme::THEME"
 truncate = "astroshot::astroshot_review::ui::theme::truncate"
+
+[[module]]
+ts = "packages/astroshot-review/src/video/ffmpeg.ts"
+status = "in_progress"
+
+[[module]]
+ts = "packages/astroshot/bin/demo.mjs"
+status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
@@ -319,6 +367,10 @@ SinkMovieResult = "astroshot::movie_harness::types::SinkMovieResult"
 Size = "astroshot::movie_harness::types::Size"
 
 [[module]]
+ts = "packages/react-shot/src/batch-paths.ts"
+status = "in_progress"
+
+[[module]]
 ts = "packages/react-shot/src/config.ts"
 status = "replaced"
 module = "node helper: load-config / react-serve (resolved configPath, packageRoot)"
@@ -337,6 +389,10 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [module.ts_blobs]
 "packages/react-shot/src/create-server.ts" = "1dbd9d7cd4fdbe30997972baf8fd83ebb8b29a79"
+
+[[module]]
+ts = "packages/react-shot/src/meta.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/react-shot/src/stubs.ts"
@@ -366,6 +422,10 @@ BatchManifest = "astroshot::react_shot::types::BatchManifest"
 ReactShotConfig = "astroshot::react_shot::types::ReactShotConfig"
 ReactShotFixture = "react_shot::types::ReactShotFixtureMeta"
 ShotRequest = "astroshot::react_shot::types::ShotRequest"
+
+[[module]]
+ts = "packages/tui-shot/src/batch-paths.ts"
+status = "in_progress"
 
 [[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
