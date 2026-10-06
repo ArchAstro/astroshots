@@ -206,6 +206,27 @@ scanFeatureDir = "astroshot::astroshot_review::data::scan::scan_feature_dir"
 scanTree = "astroshot::astroshot_review::data::scan::scan_tree"
 
 [[module]]
+ts = "packages/astroshot-review/src/data/store.ts"
+status = "ported"
+rust = "astroshot_review/data/store.rs"
+module = "astroshot::astroshot_review::data::store"
+ported_at = "2026-10-06T22:38:45Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Arc-shared store: state+listeners and scan data behind two std mutexes, TS promise queue = fair tokio Mutex; watcher events go through a channel to one task that calls handle_event in order; subscribe returns a Subscription guard; publish is publish_with(closure); new ReviewStore(options) = ReviewStore::with_options (new(roots) kept for the UI); trees map is a Vec-backed insertion-ordered map; log text after the 'scan <dir>: '/'event <kind>: '/'index save: ' prefixes is the Rust error's; StoreEvent.kind is the StoreEventKind enum; index.json hashes object is key-sorted where TS writes insertion order"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/store.ts" = "5229a0feda51257be99926cd0265529977f34f0c"
+
+[module.symbols]
+FULL_SCAN_TTL_MS = "astroshot::astroshot_review::data::store::FULL_SCAN_TTL_MS"
+ReviewStore = "astroshot::astroshot_review::data::store::ReviewStore"
+SHALLOW_DEPTH = "astroshot::astroshot_review::data::store::SHALLOW_DEPTH"
+ScanPhase = "astroshot::astroshot_review::data::store::ScanPhase"
+StoreEvent = "astroshot::astroshot_review::data::store::StoreEvent"
+StoreOptions = "astroshot::astroshot_review::data::store::StoreOptions"
+StoreState = "astroshot::astroshot_review::data::store::StoreState"
+
+[[module]]
 ts = "packages/astroshot-review/src/data/watcher.ts"
 status = "ported"
 rust = "astroshot_review/data/watcher.rs"
