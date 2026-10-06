@@ -335,7 +335,13 @@ sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_err
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
-status = "in_progress"
+status = "replaced"
+module = "astroshot::raster (native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:38:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/movie-harness/src/terminal-paint.ts" = "415eb944d99542b21279b9bc4fe0626c14894590"
 
 [[module]]
 ts = "packages/movie-harness/src/types.ts"
@@ -429,7 +435,15 @@ status = "in_progress"
 
 [[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/pty_exit_wrapper.rs"
+module = "astroshot::tui_shot::pty_exit_wrapper"
+ported_at = "2026-10-06T21:38:25Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "node script becomes pty_exit_wrapper::run(args, stdout) -> i32, run from a hidden subcommand of the astroshot binary"
+
+[module.ts_blobs]
+"packages/tui-shot/src/pty-exit-wrapper.ts" = "29f896026c52bf48185e8014d961ed6422f7b4dc"
 
 [[module]]
 ts = "packages/tui-shot/src/render-ink.ts"
@@ -443,8 +457,32 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [[module]]
 ts = "packages/tui-shot/src/terminal-html.ts"
-status = "in_progress"
+status = "replaced"
+module = "astroshot::raster (native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:38:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/tui-shot/src/terminal-html.ts" = "15d5c7ddf5a6126f6217813ab1fe235769de382a"
 
 [[module]]
 ts = "packages/tui-shot/src/types.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/types.rs"
+module = "astroshot::tui_shot::types"
+ported_at = "2026-10-06T21:38:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TuiShotFixture drops the React component (Ink renders in the node helper); numbers are f64 — switch to js_number where written"
+
+[module.ts_blobs]
+"packages/tui-shot/src/types.ts" = "0880414e5d3e8fdf7fdd47f0dcf5cf851f1a8a90"
+
+[module.symbols]
+BatchEntry = "astroshot::tui_shot::types::BatchEntry"
+BatchManifest = "astroshot::tui_shot::types::BatchManifest"
+PtyAction = "astroshot::tui_shot::types::PtyAction"
+PtyKey = "astroshot::tui_shot::types::PtyKey"
+PtyShotFixture = "astroshot::tui_shot::types::PtyShotFixture"
+PtyShotRequest = "astroshot::tui_shot::types::PtyShotRequest"
+TuiShotFixture = "-"
+TuiShotRequest = "astroshot::tui_shot::types::TuiShotRequest"
