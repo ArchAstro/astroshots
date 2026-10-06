@@ -699,6 +699,23 @@ openWithDefaultApp = "astroshot::astroshot_review::ui::system::open_with_default
 revealInFileManager = "astroshot::astroshot_review::ui::system::reveal_in_file_manager"
 
 [[module]]
+ts = "packages/astroshot-review/src/ui/takeover.tsx"
+status = "ported"
+rust = "astroshot_review/ui/takeover.rs"
+module = "astroshot::astroshot_review::ui::takeover"
+ported_at = "2026-10-06T22:57:59Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "width/height = Rect; playback/onPlayback = Playback handle in ReviewTakeoverState; composer callbacks = text_input::Outcome. Rail layout reproduces Yoga shrink passes + rounding (incl. composer hint landing on the box border). Divergences: rail and comment list are clipped as overflow=hidden asks (Ink 7 applies only the innermost clip, so clipped rows bleed through); header title yields to the paging text when both do not fit; widths under 39 clip to the screen. Added TakeoverLayout (no TS export)."
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/takeover.tsx" = "21ec4d837cdb7f618a3979ed537f4f7ad4437d9e"
+
+[module.symbols]
+RAIL_WIDTH = "astroshot::astroshot_review::ui::takeover::RAIL_WIDTH"
+ReviewTakeover = "astroshot::astroshot_review::ui::takeover::ReviewTakeover"
+ReviewTakeoverProps = "astroshot::astroshot_review::ui::takeover::ReviewTakeoverProps"
+
+[[module]]
 ts = "packages/astroshot-review/src/ui/text-input.tsx"
 status = "ported"
 rust = "astroshot_review/ui/text_input.rs"
