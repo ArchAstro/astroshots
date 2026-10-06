@@ -523,7 +523,22 @@ useTerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSizeHook"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/movie-player.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/movie_player.rs"
+module = "astroshot::astroshot_review::ui::movie_player"
+ported_at = "2026-10-06T22:20:17Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Ink hooks are MoviePlayerState effects run in render; playback prop + onPlayback are the shared Playback handle; ffprobe/FramePlayer behind MovieBackend/FrameSource; callbacks read live playback instead of a stale closure"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/movie-player.tsx" = "d32516f43424f2084ad1e48464fbc3108076c51f"
+
+[module.symbols]
+MoviePlayer = "astroshot::astroshot_review::ui::movie_player::MoviePlayer"
+MoviePlayerProps = "-"
+PlaybackState = "astroshot::astroshot_review::ui::movie_player::PlaybackState"
+ProgressBar = "astroshot::astroshot_review::ui::movie_player::ProgressBar"
+formatClock = "astroshot::astroshot_review::ui::movie_player::format_clock"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/picture.tsx"
@@ -570,7 +585,18 @@ streamCounts = "astroshot::astroshot_review::ui::selectors::stream_counts"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/settings.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/settings.rs"
+module = "astroshot::astroshot_review::ui::settings"
+ported_at = "2026-10-06T22:20:18Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "SettingsPane takes borrowed props; home and index cache paths injectable via with_paths; rows past the height are clipped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/settings.tsx" = "4865688916b472d2d3da84e1e66edc3d308e32a1"
+
+[module.symbols]
+SettingsPane = "astroshot::astroshot_review::ui::settings::SettingsPane"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/stream.tsx"
