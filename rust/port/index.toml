@@ -2,19 +2,94 @@
 
 [[module]]
 ts = "packages/astroshot-review/src/data/model.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/model.rs"
+module = "astroshot::astroshot_review::data::model"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/model.ts" = "e8a165784ac0653959cae0a74b454cbfe7f914c6"
+
+[module.symbols]
+AstroshotTree = "astroshot::astroshot_review::data::model::AstroshotTree"
+Chapter = "astroshot::astroshot_review::data::model::Chapter"
+FeatureStatus = "astroshot::astroshot_review::data::model::FeatureStatus"
+FrictionLog = "astroshot::astroshot_review::data::model::FrictionLog"
+FrictionRun = "astroshot::astroshot_review::data::model::FrictionRun"
+FrictionStep = "astroshot::astroshot_review::data::model::FrictionStep"
+ReviewComment = "astroshot::astroshot_review::data::model::ReviewComment"
+ReviewSnapshot = "astroshot::astroshot_review::data::model::ReviewSnapshot"
+ReviewState = "astroshot::astroshot_review::data::model::ReviewState"
+Shot = "astroshot::astroshot_review::data::model::Shot"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/paths.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/paths.rs"
+module = "astroshot::astroshot_review::data::paths"
+ported_at = "2026-10-06T21:32:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/paths.test.ts"]
+notes = "POSIX path semantics on &str (node dirname quirks kept); worktree_short counts UTF-16 units"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/paths.test.ts" = "bbd9a687a05af017fb07255a045dcb9ef02cdde8"
+"packages/astroshot-review/src/data/paths.ts" = "9ab5d64eba354945e4dadee627a40ce0a33d0f88"
+
+[module.symbols]
+ASTROSHOT_DIR = "astroshot::astroshot_review::data::paths::ASTROSHOT_DIR"
+FRICTION_DIR = "astroshot::astroshot_review::data::paths::FRICTION_DIR"
+IMAGE_EXTENSIONS = "astroshot::astroshot_review::data::paths::IMAGE_EXTENSIONS"
+MAX_SCAN_DEPTH = "astroshot::astroshot_review::data::paths::MAX_SCAN_DEPTH"
+SKIP_DIRECTORIES = "astroshot::astroshot_review::data::paths::SKIP_DIRECTORIES"
+ShotPath = "astroshot::astroshot_review::data::paths::ShotPath"
+VIDEO_EXTENSIONS = "astroshot::astroshot_review::data::paths::VIDEO_EXTENSIONS"
+abbreviateHome = "astroshot::astroshot_review::data::paths::abbreviate_home"
+extensionOf = "astroshot::astroshot_review::data::paths::extension_of"
+frictionLogsDir = "astroshot::astroshot_review::data::paths::friction_logs_dir"
+humanize = "astroshot::astroshot_review::data::paths::humanize"
+isImageFile = "astroshot::astroshot_review::data::paths::is_image_file"
+isInsideFrictionLogs = "astroshot::astroshot_review::data::paths::is_inside_friction_logs"
+parseShotPath = "astroshot::astroshot_review::data::paths::parse_shot_path"
+sequenceAndSlug = "astroshot::astroshot_review::data::paths::sequence_and_slug"
+worktreeShort = "astroshot::astroshot_review::data::paths::worktree_short"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/halfblocks.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/images/halfblocks.rs"
+module = "astroshot::astroshot_review::images::halfblocks"
+ported_at = "2026-10-06T21:32:24Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/images/halfblocks.test.ts"]
+notes = "out-of-range rgb reads are 0 instead of the string undefined"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/halfblocks.test.ts" = "bbdefa643665983a01cdcb8e04f22de8b5802fa7"
+"packages/astroshot-review/src/images/halfblocks.ts" = "5fa6fb59ec7e7b9f2407de3bafb32e542ad1351e"
+
+[module.symbols]
+CellArtOptions = "astroshot::astroshot_review::images::halfblocks::CellArtOptions"
+rgbToHalfBlockLines = "astroshot::astroshot_review::images::halfblocks::rgb_to_half_block_lines"
 
 [[module]]
 ts = "packages/astroshot-review/src/images/png.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/images/png.rs"
+module = "astroshot::astroshot_review::images::png"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/png.ts" = "55d81458633c83f2f0d37d9782b3cf86f67bd4f6"
+
+[module.symbols]
+ImageSize = "astroshot::astroshot_review::images::png::ImageSize"
+fitInside = "astroshot::astroshot_review::images::png::fit_inside"
+isPngPath = "astroshot::astroshot_review::images::png::is_png_path"
+readPngSize = "astroshot::astroshot_review::images::png::read_png_size"
+readPngSizeFromFile = "astroshot::astroshot_review::images::png::read_png_size_from_file"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
@@ -26,11 +101,39 @@ status = "in_progress"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/system.rs"
+module = "astroshot::astroshot_review::ui::system"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/system.ts" = "c0e94fdefcb0dad3fc142c62a283f16e69657c3e"
+
+[module.symbols]
+copyImageToClipboard = "astroshot::astroshot_review::ui::system::copy_image_to_clipboard"
+openWithDefaultApp = "astroshot::astroshot_review::ui::system::open_with_default_app"
+revealInFileManager = "astroshot::astroshot_review::ui::system::reveal_in_file_manager"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/theme.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/theme.rs"
+module = "astroshot::astroshot_review::ui::theme"
+ported_at = "2026-10-06T21:32:28Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "relative_time(from, now_ms) + now_ms(); abbreviated_date_time takes DateInput; truncate counts chars, not UTF-16 units; clock_time uses Local tz"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/theme.ts" = "e73541aedb41da9cd6ac98a6105956a1e34efe3b"
+
+[module.symbols]
+abbreviatedDateTime = "astroshot::astroshot_review::ui::theme::abbreviated_date_time"
+clockTime = "astroshot::astroshot_review::ui::theme::clock_time"
+isoDateTime = "astroshot::astroshot_review::ui::theme::iso_date_time"
+relativeTime = "astroshot::astroshot_review::ui::theme::relative_time"
+theme = "astroshot_review::ui::theme::THEME"
+truncate = "astroshot::astroshot_review::ui::theme::truncate"
 
 [[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
