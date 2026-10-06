@@ -34,12 +34,15 @@ use ratatui::text::Span;
 
 pub mod chrome;
 pub mod context;
+pub mod friction;
 pub mod help;
 pub mod hooks;
+pub mod inline;
 pub mod movie_player;
 pub mod picture;
 pub mod selectors;
 pub mod settings;
+pub mod stream;
 pub mod system;
 pub mod text_input;
 pub mod theme;

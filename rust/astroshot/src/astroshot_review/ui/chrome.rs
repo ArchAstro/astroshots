@@ -213,51 +213,80 @@ fn truncate_start(text: &str, width: usize) -> String {
     format!("…{}", tail.into_iter().collect::<String>())
 }
 
-/// Greedy word wrap to `width` columns; words wider than the line are broken.
+/// Ink `<Text wrap="wrap">`: `wrap-ansi` with `{trim: false, hard: true}`.
+///
+/// Spaces are kept, so a row can end in a space, and a row that follows an
+/// exactly full one starts with the space that separated the two words. A
+/// word wider than the line is broken; it starts on the current row unless a
+/// fresh row saves a break.
 pub(crate) fn wrap_words(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     let mut lines: Vec<String> = Vec::new();
     for paragraph in text.split('\n') {
-        let mut line = String::new();
-        for word in paragraph.split(' ').filter(|word| !word.is_empty()) {
-            let separator = usize::from(!line.is_empty());
-            if text_width(&line) + separator + text_width(word) <= width {
-                if separator == 1 {
-                    line.push(' ');
+        let mut rows = vec![String::new()];
+        for (index, word) in paragraph.split(' ').enumerate() {
+            let mut row_width = text_width(&rows[rows.len() - 1]);
+            if index != 0 {
+                if row_width >= width {
+                    rows.push(String::new());
+                    row_width = 0;
                 }
-                line.push_str(word);
+                let last = rows.len() - 1;
+                rows[last].push(' ');
+                row_width += 1;
+            }
+            let word_width = text_width(word);
+            if word_width > width {
+                let remaining = width - row_width.min(width);
+                let breaks_starting_this_row = 1 + (word_width - remaining - 1) / width;
+                let breaks_starting_next_row = (word_width - 1) / width;
+                if breaks_starting_next_row < breaks_starting_this_row {
+                    rows.push(String::new());
+                }
+                wrap_word(&mut rows, word, width);
                 continue;
             }
-            if !line.is_empty() {
-                lines.push(std::mem::take(&mut line));
+            if row_width + word_width > width && row_width > 0 && word_width > 0 {
+                rows.push(String::new());
             }
-            let mut rest = word;
-            while text_width(rest) > width {
-                let mut cut = 0;
-                let mut used = 0;
-                for (index, c) in rest.char_indices() {
-                    let w = text_width(c.encode_utf8(&mut [0; 4]));
-                    if used + w > width {
-                        break;
-                    }
-                    used += w;
-                    cut = index + c.len_utf8();
-                }
-                if cut == 0 {
-                    cut = rest.chars().next().map_or(rest.len(), char::len_utf8);
-                }
-                lines.push(rest[..cut].to_string());
-                rest = &rest[cut..];
-            }
-            line.push_str(rest);
+            let last = rows.len() - 1;
+            rows[last].push_str(word);
         }
-        lines.push(line);
+        lines.append(&mut rows);
     }
     lines
 }
 
+/// Append `word` to the last row character by character, opening a new row
+/// whenever the current one is full.
+fn wrap_word(rows: &mut Vec<String>, word: &str, width: usize) {
+    let mut visible = text_width(&rows[rows.len() - 1]);
+    let count = word.chars().count();
+    for (index, c) in word.chars().enumerate() {
+        let w = text_width(c.encode_utf8(&mut [0; 4]));
+        if visible + w <= width {
+            let last = rows.len() - 1;
+            rows[last].push(c);
+        } else {
+            rows.push(c.to_string());
+            visible = 0;
+        }
+        visible += w;
+        if visible == width && index + 1 < count {
+            rows.push(String::new());
+            visible = 0;
+        }
+    }
+}
+
 /// Title, wrapped body, and optional action, centered in the area both ways
 /// with 2 columns of horizontal padding.
+///
+/// Yoga places a `<Text>` at the floor of a fractional position and a `<Box>`
+/// at the nearest cell (half rounds up). The title is a `<Text>`; the body
+/// and the action sit in boxes. So when the spare rows are odd the body and
+/// action land one row lower than the title would suggest, and when the spare
+/// columns are odd the action sits one column further right.
 pub struct EmptyState<'a> {
     pub title: &'a str,
     pub body: &'a str,
@@ -270,6 +299,7 @@ impl Widget for EmptyState<'_> {
         let inner = width.saturating_sub(4);
         let body_width = inner.min(60);
         let body_lines = wrap_words(self.body, body_width);
+        // Measured with trailing spaces, as Ink measures the wrapped text.
         let block_width = body_lines
             .iter()
             .map(|line| text_width(line))
@@ -278,21 +308,24 @@ impl Widget for EmptyState<'_> {
         let action = self.action.filter(|action| !action.is_empty());
 
         let total = 1 + body_lines.len() + if action.is_some() { 2 } else { 0 };
-        let mut y = area.y + (area.height as usize).saturating_sub(total) as u16 / 2;
-        let centered = |content: usize| (2 + inner.saturating_sub(content) / 2) as u16;
+        let spare = (area.height as usize).saturating_sub(total);
+        let half_row = (spare % 2) as u16;
+        let mut y = area.y + (spare / 2) as u16;
+        let text_x = |content: usize| (2 + inner.saturating_sub(content) / 2) as u16;
+        let box_x = |content: usize| (2 + inner.saturating_sub(content).div_ceil(2)) as u16;
 
         let title = Span::styled(self.title, Style::new().add_modifier(Modifier::BOLD));
         put_spans(
             buf,
             area,
-            area.x + centered(text_width(self.title)),
+            area.x + text_x(text_width(self.title)),
             y,
             &[title],
         );
-        y += 1;
+        y += 1 + half_row;
 
         let body_x =
-            area.x + centered(body_width) + (body_width.saturating_sub(block_width) / 2) as u16;
+            area.x + box_x(body_width) + (body_width.saturating_sub(block_width) / 2) as u16;
         let body_style = Style::new().fg(THEME.muted);
         for line in &body_lines {
             put_spans(
@@ -308,7 +341,7 @@ impl Widget for EmptyState<'_> {
         if let Some(action) = action {
             y += 1; // marginTop
             let span = Span::styled(action, Style::new().fg(THEME.brand));
-            put_spans(buf, area, area.x + centered(text_width(action)), y, &[span]);
+            put_spans(buf, area, area.x + box_x(text_width(action)), y, &[span]);
         }
     }
 }
@@ -525,8 +558,9 @@ mod tests {
             30,
             9,
         );
-        // body width = 26; wraps to "Capture one with astroshot to" (29) -> too wide, so
-        // "Capture one with astroshot" (26) / "to see it here".
+        // body width = 26: "Capture one with astroshot" fills the row, so the next
+        // starts with the separating space. The action box has 9 spare columns
+        // and rounds its half column up.
         assert_eq!(
             rows(&buf),
             [
@@ -534,16 +568,16 @@ mod tests {
                 "",
                 "           No shots",
                 "  Capture one with astroshot",
-                "  to see it here",
+                "   to see it here",
                 "",
-                "      press r to rescan",
+                "       press r to rescan",
                 "",
                 "",
             ]
         );
         assert_eq!(modifier_at(&buf, 11, 2), Modifier::BOLD);
         assert_eq!(fg_at(&buf, 2, 3), THEME.muted);
-        assert_eq!(fg_at(&buf, 6, 6), THEME.brand);
+        assert_eq!(fg_at(&buf, 7, 6), THEME.brand);
     }
 
     #[test]
@@ -569,7 +603,79 @@ mod tests {
 
     #[test]
     fn wrap_words_breaks_overlong_words() {
-        assert_eq!(wrap_words("abcdefghij kl", 4), ["abcd", "efgh", "ij", "kl"]);
+        assert_eq!(
+            wrap_words("abcdefghij kl", 4),
+            ["abcd", "efgh", "ij ", "kl"]
+        );
         assert_eq!(wrap_words("a\nb", 4), ["a", "b"]);
+    }
+
+    #[test]
+    fn wrap_words_keeps_spaces_the_way_ink_does() {
+        // A full row pushes the separating space onto the next row.
+        assert_eq!(
+            wrap_words(
+                "Went to the page and looked around for a sign up button",
+                40
+            ),
+            [
+                "Went to the page and looked around for a",
+                " sign up button"
+            ]
+        );
+        assert_eq!(wrap_words("abcd efgh", 4), ["abcd", " ", "efgh"]);
+        assert_eq!(wrap_words("a  b   c", 3), ["a  ", "b  ", " c"]);
+        // A long word starts on the current row unless a fresh row saves a break.
+        assert_eq!(
+            wrap_words(
+                "see https://example.com/a/very/long/url/that/does/not/fit ok",
+                20
+            ),
+            [
+                "see https://example.",
+                "com/a/very/long/url/",
+                "that/does/not/fit ok"
+            ]
+        );
+        assert_eq!(
+            wrap_words("ab abcdefghij kl", 4),
+            ["ab ", "abcd", "efgh", "ij ", "kl"]
+        );
+        assert_eq!(wrap_words("", 5), [""]);
+    }
+
+    #[test]
+    fn empty_state_puts_body_and_action_a_row_lower_when_spare_rows_are_odd() {
+        let state = || EmptyState {
+            title: "You’re all caught up",
+            body: "Every friction log has been seen.",
+            action: Some("u View history"),
+        };
+        // 4 content rows in 7: the title floors to row 1, the boxes round to 3 and 5.
+        assert_eq!(
+            rows(&render(state(), 40, 7)),
+            [
+                "",
+                "          You’re all caught up",
+                "",
+                "   Every friction log has been seen.",
+                "",
+                "             u View history",
+                "",
+            ]
+        );
+        assert_eq!(
+            rows(&render(state(), 40, 8)),
+            [
+                "",
+                "",
+                "          You’re all caught up",
+                "   Every friction log has been seen.",
+                "",
+                "             u View history",
+                "",
+                "",
+            ]
+        );
     }
 }
