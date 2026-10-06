@@ -238,9 +238,6 @@ fn pending_commands_say_they_are_not_available_and_exit_2() {
         (&["review", "--root", "x"][..], "review"),
         (&["tray"][..], "review"),
         (&["movie", "which-source"][..], "movie"),
-        (&["ink", "batch", "m.yaml"][..], "ink"),
-        (&["tui", "a.tsx"][..], "ink"),
-        (&["pty", "a.yaml"][..], "pty"),
     ] {
         let result = run(args);
         assert_eq!(result.status.code(), Some(2), "{args:?}");
@@ -255,11 +252,7 @@ fn pending_commands_say_they_are_not_available_and_exit_2() {
 #[test]
 fn argv0_selects_the_subcommand_like_the_npm_bins() {
     let dir = tempfile::tempdir().unwrap();
-    for (link, name) in [
-        ("astroshot-review", "review"),
-        ("astroshot-movie", "movie"),
-        ("tui-shot", "ink"),
-    ] {
+    for (link, name) in [("astroshot-review", "review"), ("astroshot-movie", "movie")] {
         let path = dir.path().join(link);
         std::os::unix::fs::symlink(BIN, &path).unwrap();
         let result = run_named(&path, dir.path(), &["--root", "x"]);
@@ -278,10 +271,15 @@ fn argv0_selects_the_subcommand_like_the_npm_bins() {
     assert_eq!(result.status.code(), Some(1));
     assert_eq!(stderr(&result), "Unknown command: undefined\n");
 
-    // `tui-shot pty ...` is the PTY mode.
+    // `tui-shot` runs the real tui-shot CLI; `tui-shot pty ...` is its PTY mode.
     let tui = dir.path().join("tui-shot");
+    std::os::unix::fs::symlink(BIN, &tui).unwrap();
+    let result = run_named(&tui, dir.path(), &["--root", "x"]);
+    assert_eq!(result.status.code(), Some(1));
+    assert_eq!(stderr(&result), "Unknown command: --root\n");
     let result = run_named(&tui, dir.path(), &["pty", "a.yaml"]);
-    assert!(stderr(&result).starts_with("astroshot pty:"));
+    assert_eq!(result.status.code(), Some(1));
+    assert_eq!(stderr(&result), "pty requires -o <out.png>\n");
 
     // A symlink named `astroshot` behaves like the binary itself.
     let plain = dir.path().join("astroshot");
