@@ -45,6 +45,7 @@ pub mod selectors;
 pub mod settings;
 pub mod stream;
 pub mod system;
+pub mod takeover;
 pub mod text_input;
 pub mod theme;
 
