@@ -446,7 +446,20 @@ WorktreeChip = "astroshot::astroshot_review::ui::chrome::worktree_chip"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/context.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/context.rs"
+module = "astroshot::astroshot_review::ui::context"
+ported_at = "2026-10-06T22:05:47Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "React context becomes an AppServices struct passed by reference"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/context.tsx" = "a71ea2d817c4b90412d2c3f6650d71aae9b51844"
+
+[module.symbols]
+AppServices = "astroshot::astroshot_review::ui::context::AppServices"
+ServicesContext = "-"
+useServices = "astroshot::astroshot_review::ui::context::use_services"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/help.tsx"
@@ -465,11 +478,37 @@ HelpOverlay = "astroshot::astroshot_review::ui::help::HelpOverlay"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/hooks.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/hooks.rs"
+module = "astroshot::astroshot_review::ui::hooks"
+ported_at = "2026-10-06T22:05:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "hooks are state structs; subscriptions and timers call a Wake callback; drop is the effect cleanup"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/hooks.ts" = "a5c3a8af0bd3300f114e02d3fed7306433adeb68"
+
+[module.symbols]
+TerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSize"
+useClock = "astroshot::astroshot_review::ui::hooks::ClockHook"
+useStoreState = "astroshot::astroshot_review::ui::hooks::StoreStateHook"
+useTerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSizeHook"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/picture.tsx"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/ui/picture.rs"
+module = "astroshot::astroshot_review::ui::picture"
+ported_at = "2026-10-06T22:05:49Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "StatefulWidget; refs/state/effects live in PictureState; measureElement becomes the reported CellBox"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/picture.tsx" = "cac52b19497e5b26ce4f150dbd7b433b83034ac4"
+
+[module.symbols]
+Picture = "astroshot::astroshot_review::ui::picture::Picture"
+PictureProps = "astroshot::astroshot_review::ui::picture::PictureProps"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/selectors.ts"
