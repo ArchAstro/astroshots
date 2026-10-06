@@ -93,11 +93,60 @@ readPngSizeFromFile = "astroshot::astroshot_review::images::png::read_png_size_f
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/herdr.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/terminal/herdr.rs"
+module = "astroshot::astroshot_review::terminal::herdr"
+ported_at = "2026-10-06T21:35:45Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/herdr.test.ts"]
+notes = "unix only; per-layer stream is a tokio task aborted by clear/dispose; backpressure keeps only the newest pending frame; connect-error text from io::Error"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/herdr.test.ts" = "a4b6655ed3a6708c3a3563ae0668a7e246b2d468"
+"packages/astroshot-review/src/terminal/herdr.ts" = "539c2ad87a6be4f1cdded0ae171333b3893199da"
+
+[module.symbols]
+HerdrAddress = "astroshot::astroshot_review::terminal::herdr::HerdrAddress"
+HerdrDiscovery = "astroshot::astroshot_review::terminal::herdr::HerdrDiscovery"
+HerdrPlacement = "astroshot::astroshot_review::terminal::herdr::HerdrPlacement"
+HerdrSink = "astroshot::astroshot_review::terminal::herdr::HerdrSink"
+discoverHerdr = "astroshot::astroshot_review::terminal::herdr::discover_herdr"
+herdrAddress = "astroshot::astroshot_review::terminal::herdr::herdr_address"
+probeHerdrSet = "astroshot::astroshot_review::terminal::herdr::probe_herdr_set"
 
 [[module]]
 ts = "packages/astroshot-review/src/terminal/kitty.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/terminal/kitty.rs"
+module = "astroshot::astroshot_review::terminal::kitty"
+ported_at = "2026-10-06T21:35:43Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/kitty.test.ts"]
+notes = "Buffer → &[u8]; ImageFormat enum; chunk_payload takes an explicit size"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/kitty.test.ts" = "867144f5bcb5745f5b51be4f06dc6c886d7ec95d"
+"packages/astroshot-review/src/terminal/kitty.ts" = "5a192b64d2e2dc2a70eea4c8ce6b3eb8a299fd57"
+
+[module.symbols]
+APC = "astroshot::astroshot_review::terminal::kitty::APC"
+CHUNK_SIZE = "astroshot::astroshot_review::terminal::kitty::CHUNK_SIZE"
+DeleteRequest = "astroshot::astroshot_review::terminal::kitty::DeleteRequest"
+ImageFormat = "astroshot::astroshot_review::terminal::kitty::ImageFormat"
+ParsedGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::ParsedGraphicsCommand"
+PlaceRequest = "astroshot::astroshot_review::terminal::kitty::PlaceRequest"
+RESTORE_CURSOR = "astroshot::astroshot_review::terminal::kitty::RESTORE_CURSOR"
+SAVE_CURSOR = "astroshot::astroshot_review::terminal::kitty::SAVE_CURSOR"
+ST = "astroshot::astroshot_review::terminal::kitty::ST"
+TransmitRequest = "astroshot::astroshot_review::terminal::kitty::TransmitRequest"
+chunkPayload = "astroshot::astroshot_review::terminal::kitty::chunk_payload"
+cursorTo = "astroshot::astroshot_review::terminal::kitty::cursor_to"
+encodeDelete = "astroshot::astroshot_review::terminal::kitty::encode_delete"
+encodeFileQuery = "astroshot::astroshot_review::terminal::kitty::encode_file_query"
+encodePlace = "astroshot::astroshot_review::terminal::kitty::encode_place"
+encodeQuery = "astroshot::astroshot_review::terminal::kitty::encode_query"
+encodeTransmit = "astroshot::astroshot_review::terminal::kitty::encode_transmit"
+parseGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::parse_graphics_command"
 
 [[module]]
 ts = "packages/astroshot-review/src/ui/system.ts"
@@ -270,16 +319,67 @@ SinkMovieResult = "astroshot::movie_harness::types::SinkMovieResult"
 Size = "astroshot::movie_harness::types::Size"
 
 [[module]]
+ts = "packages/react-shot/src/config.ts"
+status = "replaced"
+module = "node helper: load-config / react-serve (resolved configPath, packageRoot)"
+ported_at = "2026-10-06T21:37:10Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/config.ts" = "3da6e96d30b22d832149cbaca2212254331a9155"
+
+[[module]]
+ts = "packages/react-shot/src/create-server.ts"
+status = "replaced"
+module = "node helper: react-serve (rust/node-helper/helper.mjs)"
+ported_at = "2026-10-06T21:37:09Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/create-server.ts" = "1dbd9d7cd4fdbe30997972baf8fd83ebb8b29a79"
+
+[[module]]
 ts = "packages/react-shot/src/stubs.ts"
-status = "in_progress"
+status = "replaced"
+module = "node helper: react-serve (rust/node-helper/helper.mjs)"
+ported_at = "2026-10-06T21:35:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/stubs.ts" = "dca16db6e5e57b5c55aa2c7698248d2718b22533"
 
 [[module]]
 ts = "packages/react-shot/src/types.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/types.rs"
+module = "astroshot::react_shot::types"
+ported_at = "2026-10-06T21:35:46Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "plain-data subset; the React component itself stays in the node helper"
+
+[module.ts_blobs]
+"packages/react-shot/src/types.ts" = "26e66c44568735de5d073d87a3f116b8fe37f487"
+
+[module.symbols]
+BatchEntry = "astroshot::react_shot::types::BatchEntry"
+BatchManifest = "astroshot::react_shot::types::BatchManifest"
+ReactShotConfig = "astroshot::react_shot::types::ReactShotConfig"
+ReactShotFixture = "react_shot::types::ReactShotFixtureMeta"
+ShotRequest = "astroshot::react_shot::types::ShotRequest"
 
 [[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
 status = "in_progress"
+
+[[module]]
+ts = "packages/tui-shot/src/render-ink.ts"
+status = "replaced"
+module = "node helper: ink-render"
+ported_at = "2026-10-06T21:37:13Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/tui-shot/src/render-ink.ts" = "3562008a2a961c48ba08bd37752313611628f454"
 
 [[module]]
 ts = "packages/tui-shot/src/terminal-html.ts"

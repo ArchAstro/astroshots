@@ -43,3 +43,4 @@ npm-debug.log*
 
 # Rust port
 rust/target/
+node_modules
