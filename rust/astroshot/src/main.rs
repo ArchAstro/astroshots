@@ -34,5 +34,13 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    exit_code(runtime.block_on(run(&args)))
+    let code = runtime.block_on(run(&args));
+    if matches!(args.first().map(String::as_str), Some("review" | "tray")) {
+        // The tray has already restored the terminal and flushed its index.
+        // Dropping the runtime would wait for blocking work that is still
+        // running (a deep scan walking the disk), which is what "quit hangs"
+        // looks like; give it a moment and leave.
+        runtime.shutdown_timeout(std::time::Duration::from_millis(250));
+    }
+    exit_code(code)
 }

@@ -1,7 +1,6 @@
 //! Port of `packages/astroshot/bin/astroshot.mjs`: the top-level `astroshot`
 //! dispatcher. The TS bin spawned `node` on each engine's own bin script;
-//! here every subcommand is an in-process function. Engines that are not
-//! ported yet dispatch to [`pending`] and exit 2.
+//! here every subcommand is an in-process function.
 
 use std::path::PathBuf;
 
@@ -126,40 +125,6 @@ pub fn init_help() -> &'static str {
     INIT_HELP
 }
 
-/// Stand-ins for engines that later waves port. Each takes the arguments the
-/// TS engine bin would have received and returns its exit code; replace one
-/// function (and keep the signature) when its CLI lands.
-pub mod pending {
-    fn not_available(command: &str) -> i32 {
-        eprintln!("astroshot {command}: not yet available in the Rust build");
-        2
-    }
-
-    /// `astroshot-review` (`astroshot_review::cli`).
-    pub async fn review(_args: &[String]) -> i32 {
-        not_available("review")
-    }
-
-    /// `astroshot-movie` (`movie_harness::cli`).
-    pub async fn movie(args: &[String]) -> i32 {
-        crate::movie_harness::cli::run_cli(args).await
-    }
-
-    /// `react-shot`: `args` already carry the `shot` prefix when the first
-    /// argument was a fixture path.
-    pub async fn react_shot(args: &[String]) -> i32 {
-        crate::react_shot::cli::run(args).await
-    }
-
-    /// `tui-shot`: `mode` is `ink` or `pty`; for `pty`, `args` start with
-    /// `pty`, as the TS dispatcher forwards them.
-    pub async fn tui_shot(_mode: &str, args: &[String]) -> i32 {
-        // One CLI serves both modes, as the TS `tui-shot` bin did: `pty` is
-        // its own subcommand there.
-        crate::tui_shot::cli::run(args).await
-    }
-}
-
 fn is_help_word(value: &str) -> bool {
     matches!(value, "help" | "-h" | "--help")
 }
@@ -179,7 +144,9 @@ async fn run_engine(mode: &str, args: &[String]) -> i32 {
     if mode == "pty" {
         let mut forwarded = vec!["pty".to_string()];
         forwarded.extend_from_slice(args);
-        return pending::tui_shot("pty", &forwarded).await;
+        // One CLI serves both terminal modes, as the TS `tui-shot` bin did:
+        // `pty` is its own subcommand there.
+        return crate::tui_shot::cli::run(&forwarded).await;
     }
     let normalized: Vec<String> = if args.first().is_some_and(|first| is_ts_fixture(first)) {
         std::iter::once("shot".to_string())
@@ -189,9 +156,9 @@ async fn run_engine(mode: &str, args: &[String]) -> i32 {
         args.to_vec()
     };
     if mode == "react" {
-        pending::react_shot(&normalized).await
+        crate::react_shot::cli::run(&normalized).await
     } else {
-        pending::tui_shot("ink", &normalized).await
+        crate::tui_shot::cli::run(&normalized).await
     }
 }
 
@@ -266,7 +233,7 @@ async fn run_review(args: &[String]) -> i32 {
             forwarded.push("app".into());
         }
     }
-    pending::review(&forwarded).await
+    crate::astroshot_review::cli::run(&forwarded).await
 }
 
 /// Run the dispatcher. `args` is argv after the program name; returns the
@@ -311,7 +278,7 @@ pub async fn run(args: &[String]) -> i32 {
             run_engine(mode, rest).await
         }
         "review" | "tray" => run_review(rest).await,
-        "movie" => pending::movie(rest).await,
+        "movie" => crate::movie_harness::cli::run_cli(rest).await,
         _ => {
             eprintln!("Unknown command: {command}");
             println!("{HELP}");

@@ -1,10 +1,15 @@
 //! `app.tsx` has no unit test. These cover it three ways:
 //!
 //! 1. **Frames from the real Ink `<App>`**: `tests/fixtures/review_app_frames.json`
-//!    holds scenarios captured by driving `ink.render(<App/>)` over seeded
-//!    `.astroshot` trees (key sequence plus the rows after every step). Each
-//!    scenario is replayed here against the same tree and must draw the same
-//!    rows.
+//!    holds scenarios captured by driving `ink.render(<App/>, { debug: true })`
+//!    with a fake stdout/stdin over seeded `.astroshot` trees (a real
+//!    `ReviewStore` with `watch` and `useIndex` off, graphics `none` so each
+//!    picture box shows its label, `Date.now` fixed at 2026-08-11T16:30Z). Each
+//!    step records the keys written to stdin and the rows Ink drew once output
+//!    settled. A scenario is replayed here against the same tree and must draw
+//!    the same rows after every step. Local clock strings in the capture are
+//!    recomputed for the machine's timezone; the comment timestamp and the
+//!    index path are masked.
 //! 2. **One test per key binding** asserting the state transition.
 //! 3. **Store round trips** asserting `review.json` on disk.
 
@@ -622,7 +627,7 @@ fn touch(dir: &Path, time: std::time::SystemTime) {
     }
 }
 
-/// The tree the Ink capture seeded (`seed()` in the capture script).
+/// The tree the Ink capture seeded; file times are pinned as they were there.
 fn seed(root: &Path, options: &SeedOptions, file_time_ms: f64) {
     let feature = root.join("demo-app/.astroshot/checkout");
     std::fs::create_dir_all(&feature).unwrap();

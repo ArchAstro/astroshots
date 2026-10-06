@@ -70,6 +70,9 @@ mod non_unix {
         pub fn clear_all(&self) {
             match *self {}
         }
+        pub fn dispose(&self) {
+            match *self {}
+        }
     }
 }
 
@@ -842,6 +845,14 @@ impl ImageLayer {
                 layer.flush_now();
             }
         });
+    }
+
+    /// `herdrSink.dispose()`: close every herdr stream for good, including
+    /// ones still opening, so nothing re-places a layer after the tray quits.
+    pub fn dispose_herdr(&self) {
+        if let Some(sink) = self.shared.herdr.as_ref() {
+            sink.dispose();
+        }
     }
 
     /// Remove every placement and free image data in the terminal.
