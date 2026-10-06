@@ -329,7 +329,7 @@ mod tests {
     fn step(improve: usize) -> FrictionStep {
         FrictionStep {
             id: "s".into(),
-            step: 1,
+            step: 1.0,
             step_id: "s".into(),
             title: "S".into(),
             description: String::new(),
