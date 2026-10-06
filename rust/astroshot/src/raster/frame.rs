@@ -2,11 +2,38 @@
 //!
 //! Port of the cell-resolution half of `terminal-html.ts` / `terminal-paint.ts`
 //! (`cellStyle`, `terminalToHtml`, `terminalPlainText`, `ansiFrameToHtml`,
-//! `createHeadlessTerminal`, `writeTerminal`), with `vt100` standing in for
-//! `@xterm/headless`.
+//! `createHeadlessTerminal`, `writeTerminal`), with `alacritty_terminal`
+//! standing in for `@xterm/headless`.
 
 use super::colors::{Rgb, palette_color};
-use vt100::Color;
+use alacritty_terminal::event::VoidListener;
+use alacritty_terminal::grid::Dimensions;
+use alacritty_terminal::index::{Column, Line, Point};
+use alacritty_terminal::term::cell::{Cell, Flags};
+use alacritty_terminal::term::{Config, Term, TermMode};
+use alacritty_terminal::vte::ansi::{Color, NamedColor, Processor};
+
+/// The emulator screen: an `alacritty_terminal` term with no event sink.
+pub type Screen = Term<VoidListener>;
+
+struct GridSize {
+    cols: usize,
+    rows: usize,
+}
+
+impl Dimensions for GridSize {
+    fn total_lines(&self) -> usize {
+        self.rows
+    }
+
+    fn screen_lines(&self) -> usize {
+        self.rows
+    }
+
+    fn columns(&self) -> usize {
+        self.cols
+    }
+}
 
 /// One resolved terminal cell: text plus the computed style the HTML path put
 /// in the `<span style=...>` attribute.
@@ -60,50 +87,69 @@ impl StyledCell {
 
 fn resolve(color: Color, default: Rgb) -> Rgb {
     match color {
-        Color::Default => default,
-        Color::Idx(index) => palette_color(index),
-        Color::Rgb(r, g, b) => [r, g, b],
+        Color::Spec(rgb) => [rgb.r, rgb.g, rgb.b],
+        Color::Indexed(index) => palette_color(index),
+        Color::Named(named) => match named {
+            NamedColor::Foreground | NamedColor::Background | NamedColor::Cursor => default,
+            NamedColor::DimBlack => palette_color(0),
+            NamedColor::DimRed => palette_color(1),
+            NamedColor::DimGreen => palette_color(2),
+            NamedColor::DimYellow => palette_color(3),
+            NamedColor::DimBlue => palette_color(4),
+            NamedColor::DimMagenta => palette_color(5),
+            NamedColor::DimCyan => palette_color(6),
+            NamedColor::DimWhite => palette_color(7),
+            // BrightForeground / DimForeground: no palette entry, use the default.
+            other => match u8::try_from(other as usize) {
+                Ok(index) if index < 16 => palette_color(index),
+                _ => default,
+            },
+        },
     }
 }
 
-/// Port of `cellStyle` for a `vt100` cell.
-///
-/// `vt100` 0.15 tracks bold, italic, underline and inverse only. `dim`,
-/// `strike` and `invisible` (SGR 2, 9, 8) are never set by the parser; the
-/// fields stay so other frame sources and tests can use them.
-pub fn style_cell(
-    cell: &vt100::Cell,
-    default_foreground: Rgb,
-    default_background: Rgb,
-) -> StyledCell {
-    let mut foreground = resolve(cell.fgcolor(), default_foreground);
-    let mut background = resolve(cell.bgcolor(), default_background);
-    if cell.inverse() {
+/// Port of `cellStyle` for an `alacritty_terminal` cell. Dim (SGR 2), strike
+/// (9) and hidden (8) come straight from the cell flags.
+pub fn style_cell(cell: &Cell, default_foreground: Rgb, default_background: Rgb) -> StyledCell {
+    let mut foreground = resolve(cell.fg, default_foreground);
+    let mut background = resolve(cell.bg, default_background);
+    if cell.flags.contains(Flags::INVERSE) {
         std::mem::swap(&mut foreground, &mut background);
     }
-    let contents = cell.contents();
+    let mut text = String::new();
+    text.push(cell.c);
+    for &mark in cell.zerowidth().unwrap_or(&[]) {
+        text.push(mark);
+    }
+    if text.chars().all(|c| c == '\0') {
+        text = " ".to_string();
+    }
     StyledCell {
-        text: if contents.is_empty() {
-            " ".to_string()
-        } else {
-            contents
-        },
-        width: if cell.is_wide_continuation() {
+        text,
+        width: if cell.flags.contains(Flags::WIDE_CHAR_SPACER) {
             0
-        } else if cell.is_wide() {
+        } else if cell.flags.contains(Flags::WIDE_CHAR) {
             2
         } else {
             1
         },
         foreground,
         background,
-        bold: cell.bold(),
-        dim: false,
-        italic: cell.italic(),
-        underline: cell.underline(),
-        strike: false,
-        invisible: false,
+        bold: cell.flags.contains(Flags::BOLD),
+        dim: cell.flags.contains(Flags::DIM),
+        italic: cell.flags.contains(Flags::ITALIC),
+        underline: cell.flags.intersects(Flags::ALL_UNDERLINES),
+        strike: cell.flags.contains(Flags::STRIKEOUT),
+        invisible: cell.flags.contains(Flags::HIDDEN),
     }
+}
+
+fn grid_cell(screen: &Screen, row: u16, col: u16) -> Option<&Cell> {
+    let grid = screen.grid();
+    if usize::from(row) >= grid.screen_lines() || usize::from(col) >= grid.columns() {
+        return None;
+    }
+    Some(&grid[Point::new(Line(i32::from(row)), Column(usize::from(col)))])
 }
 
 /// A `cols x rows` grid of resolved cells, row-major.
@@ -134,7 +180,7 @@ impl TerminalFrame {
     /// Port of `terminalToHtml`'s cell walk: the visible `rows x cols` window
     /// of the screen (xterm `viewportY` is always 0 with `scrollback: 0`).
     pub fn from_screen(
-        screen: &vt100::Screen,
+        screen: &Screen,
         cols: u16,
         rows: u16,
         default_foreground: Rgb,
@@ -143,7 +189,7 @@ impl TerminalFrame {
         let mut frame = Self::blank(cols, rows, default_foreground, default_background);
         for row in 0..rows {
             for col in 0..cols {
-                if let Some(cell) = screen.cell(row, col) {
+                if let Some(cell) = grid_cell(screen, row, col) {
                     let index = frame.index(row, col);
                     frame.cells[index] = style_cell(cell, default_foreground, default_background);
                 }
@@ -202,17 +248,17 @@ impl TerminalFrame {
 
 /// Port of `terminalPlainText`: rows joined by `\n`, trailing whitespace
 /// trimmed.
-pub fn terminal_plain_text(screen: &vt100::Screen, rows: u16) -> String {
-    let (_, cols) = screen.size();
+pub fn terminal_plain_text(screen: &Screen, rows: u16) -> String {
+    let cols = u16::try_from(screen.columns()).unwrap_or(u16::MAX);
     let mut lines = Vec::with_capacity(usize::from(rows));
     for row in 0..rows {
         let mut line = String::new();
         for col in 0..cols {
-            if let Some(cell) = screen.cell(row, col)
-                && !cell.is_wide_continuation()
+            if let Some(cell) = grid_cell(screen, row, col)
+                && !cell.flags.contains(Flags::WIDE_CHAR_SPACER)
             {
-                let contents = cell.contents();
-                line.push_str(if contents.is_empty() { " " } else { &contents });
+                let styled = style_cell(cell, [0; 3], [0; 3]);
+                line.push_str(&styled.text);
             }
         }
         lines.push(line.trim_end().to_string());
@@ -220,17 +266,27 @@ pub fn terminal_plain_text(screen: &vt100::Screen, rows: u16) -> String {
     lines.join("\n").trim_end().to_string()
 }
 
-/// Port of `createHeadlessTerminal` / `writeTerminal`: a `vt100` parser with
-/// xterm's `convertEol: true` (a bare LF also returns the carriage) and no
-/// scrollback.
+/// Port of `createHeadlessTerminal` / `writeTerminal`: an `alacritty_terminal`
+/// term with xterm's `convertEol: true` (a bare LF also returns the carriage)
+/// and no scrollback.
 pub struct HeadlessTerminal {
-    parser: vt100::Parser,
+    term: Screen,
+    processor: Processor,
 }
 
 impl HeadlessTerminal {
     pub fn new(cols: u16, rows: u16) -> Self {
+        let config = Config {
+            scrolling_history: 0,
+            ..Config::default()
+        };
+        let size = GridSize {
+            cols: usize::from(cols.max(1)),
+            rows: usize::from(rows.max(1)),
+        };
         Self {
-            parser: vt100::Parser::new(rows, cols, 0),
+            term: Term::new(config, &size, VoidListener),
+            processor: Processor::new(),
         }
     }
 
@@ -244,26 +300,35 @@ impl HeadlessTerminal {
             }
             converted.push(byte);
         }
-        self.parser.process(&converted);
+        self.processor.advance(&mut self.term, &converted);
     }
 
-    pub fn screen(&self) -> &vt100::Screen {
-        self.parser.screen()
+    pub fn screen(&self) -> &Screen {
+        &self.term
     }
 
     pub fn plain_text(&self) -> String {
-        let (rows, _) = self.screen().size();
-        terminal_plain_text(self.screen(), rows)
+        let rows = u16::try_from(self.term.screen_lines()).unwrap_or(u16::MAX);
+        terminal_plain_text(&self.term, rows)
     }
 
     pub fn frame(&self, default_foreground: Rgb, default_background: Rgb) -> TerminalFrame {
-        let (rows, cols) = self.screen().size();
+        let rows = u16::try_from(self.term.screen_lines()).unwrap_or(u16::MAX);
+        let cols = u16::try_from(self.term.columns()).unwrap_or(u16::MAX);
         TerminalFrame::from_screen(
-            self.screen(),
+            &self.term,
             cols,
             rows,
             default_foreground,
             default_background,
         )
     }
+}
+
+/// Cursor position and visibility of a screen, for [`super::Cursor`].
+pub(super) fn cursor_state(screen: &Screen) -> (u16, u16, bool) {
+    let point = screen.grid().cursor.point;
+    let row = u16::try_from(point.line.0.max(0)).unwrap_or(u16::MAX);
+    let col = u16::try_from(point.column.0).unwrap_or(u16::MAX);
+    (row, col, screen.mode().contains(TermMode::SHOW_CURSOR))
 }

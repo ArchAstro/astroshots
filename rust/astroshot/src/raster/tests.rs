@@ -428,3 +428,41 @@ fn render_ansi_png_matches_frame_then_render() {
     };
     assert!(encode_png(&image).unwrap().starts_with(b"\x89PNG"));
 }
+
+#[test]
+fn dim_hidden_and_strike_come_through_from_real_ansi() {
+    let frame = TerminalFrame::from_ansi(
+        b"\x1b[2mD\x1b[0m\x1b[8mH\x1b[0m\x1b[9mS\x1b[0mN",
+        6,
+        1,
+        [0xe8, 0xe8, 0xf2],
+        [0x09, 0x0a, 0x12],
+    );
+    let dim = frame.cell(0, 0).unwrap();
+    assert!(dim.dim && !dim.strike && !dim.invisible);
+    let hidden = frame.cell(0, 1).unwrap();
+    assert!(hidden.invisible && !hidden.dim);
+    assert_eq!(hidden.text_color(), hidden.background);
+    let strike = frame.cell(0, 2).unwrap();
+    assert!(strike.strike && !strike.dim);
+    let plain = frame.cell(0, 3).unwrap();
+    assert!(!plain.dim && !plain.strike && !plain.invisible);
+}
+
+#[test]
+fn autowrap_off_overwrites_the_last_column() {
+    // from_ansi sends ESC[?7l first, so a long row stays on one line.
+    let frame = TerminalFrame::from_ansi(
+        b"abcdefgh\nnext",
+        4,
+        2,
+        [0xe8, 0xe8, 0xf2],
+        [0x09, 0x0a, 0x12],
+    );
+    assert_eq!(frame.row_text(0), "abch");
+    assert_eq!(frame.row_text(1), "next");
+    // With autowrap on (plain terminal) the row wraps.
+    let mut wrapped = HeadlessTerminal::new(4, 2);
+    wrapped.write(b"abcdefgh");
+    assert_eq!(wrapped.plain_text(), "abcd\nefgh");
+}
