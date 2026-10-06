@@ -18,7 +18,7 @@ pub enum PathsError {
 
 /// Lexical `path.resolve`: join onto the cwd when relative, then collapse
 /// `.` and `..` without touching the filesystem.
-fn resolve_lexically(path: &Path) -> PathBuf {
+pub(crate) fn resolve_lexically(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
