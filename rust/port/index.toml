@@ -184,7 +184,26 @@ writeReviewDocument = "astroshot::astroshot_review::data::review_store::write_re
 
 [[module]]
 ts = "packages/astroshot-review/src/data/scan.ts"
-status = "in_progress"
+status = "ported"
+rust = "astroshot_review/data/scan.rs"
+module = "astroshot::astroshot_review::data::scan"
+ported_at = "2026-10-06T22:17:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/scan.test.ts"]
+notes = "AbortSignal is Arc<AtomicBool>; FileStat for fs.Stats; FrictionContext; byte-sorted listings; JoinSet walk with a cap, results sorted by UTF-16 units like Array#sort"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/scan.test.ts" = "4960a4e5093a61d2eb99b6464d02695a1e16c547"
+"packages/astroshot-review/src/data/scan.ts" = "e57deff9653ea9fad17251f4e65a4dd0cb35fbec"
+
+[module.symbols]
+FindOptions = "astroshot::astroshot_review::data::scan::FindOptions"
+ShotContext = "astroshot::astroshot_review::data::scan::ShotContext"
+buildShot = "astroshot::astroshot_review::data::scan::build_shot"
+findAstroshotDirs = "astroshot::astroshot_review::data::scan::find_astroshot_dirs"
+rebuildShot = "astroshot::astroshot_review::data::scan::rebuild_shot"
+scanFeatureDir = "astroshot::astroshot_review::data::scan::scan_feature_dir"
+scanTree = "astroshot::astroshot_review::data::scan::scan_tree"
 
 [[module]]
 ts = "packages/astroshot-review/src/data/watcher.ts"
@@ -784,10 +803,10 @@ ts = "packages/movie-harness/src/session.ts"
 status = "ported"
 rust = "movie_harness/session.rs"
 module = "astroshot::movie_harness::session"
-ported_at = "2026-10-06T22:02:54Z"
+ported_at = "2026-10-06T22:18:40Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 tests = ["packages/movie-harness/src/session.test.ts"]
-notes = "mark/push_frame/stop take &mut self and return Result; FrameExtension enum; StopOptions; the test's pty/terminal-paint cases belong to sources/pty"
+notes = "session.test.ts pty/terminal-paint cases ported under sources::pty"
 
 [module.ts_blobs]
 "packages/movie-harness/src/session.test.ts" = "98111c88f3d000934ec235e847b3e297a90f1a1d"
@@ -853,7 +872,39 @@ recordBrowserMovie = "astroshot::movie_harness::sources::browser::record_browser
 
 [[module]]
 ts = "packages/movie-harness/src/sources/desktop-macos.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/sources/desktop_macos.rs"
+module = "astroshot::movie_harness::sources::desktop_macos"
+ported_at = "2026-10-06T22:18:41Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = [
+    "packages/movie-harness/src/desktop-macos.test.ts",
+    "packages/movie-harness/src/desktop-quality.test.ts",
+]
+notes = "WindowTools.swift embedded via include_str!; titleRegex uses the regex crate (no lookaround); capture on spawn_blocking; 2 tests #[ignore] (GUI session / Screen Recording)"
+
+[module.ts_blobs]
+"packages/movie-harness/src/desktop-macos.test.ts" = "101a9368466b31039fea72e22a2e4d0143a5b886"
+"packages/movie-harness/src/desktop-quality.test.ts" = "d08d5372e977c87637977ad3e34bbb3ea0b3e587"
+"packages/movie-harness/src/sources/desktop-macos.ts" = "ce20523f085aad3f8f9401de3365f8bfb19d6661"
+
+[module.symbols]
+DesktopWindowInfo = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowInfo"
+DesktopWindowMatch = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowMatch"
+DesktopWindowMovieOptions = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowMovieOptions"
+ScreenAccessReport = "astroshot::movie_harness::sources::desktop_macos::ScreenAccessReport"
+assertDesktopToolchain = "astroshot::movie_harness::sources::desktop_macos::assert_desktop_toolchain"
+checkScreenRecordingAccess = "astroshot::movie_harness::sources::desktop_macos::check_screen_recording_access"
+describeDesktopWindow = "astroshot::movie_harness::sources::desktop_macos::describe_desktop_window"
+desktopMatchFromFlags = "astroshot::movie_harness::sources::desktop_macos::desktop_match_from_flags"
+ensureScreenRecordingAccess = "astroshot::movie_harness::sources::desktop_macos::ensure_screen_recording_access"
+formatScreenRecordingDeniedHelp = "astroshot::movie_harness::sources::desktop_macos::format_screen_recording_denied_help"
+isNearlyBlankPng = "astroshot::movie_harness::sources::desktop_macos::is_nearly_blank_png"
+listDesktopWindows = "astroshot::movie_harness::sources::desktop_macos::list_desktop_windows"
+matchDesktopWindow = "astroshot::movie_harness::sources::desktop_macos::match_desktop_window"
+openScreenRecordingSettings = "astroshot::movie_harness::sources::desktop_macos::open_screen_recording_settings"
+recordDesktopWindowMovie = "astroshot::movie_harness::sources::desktop_macos::record_desktop_window_movie"
+resolveEnableAppName = "astroshot::movie_harness::sources::desktop_macos::resolve_enable_app_name"
 
 [[module]]
 ts = "packages/movie-harness/src/sources/frames-store.ts"
@@ -876,7 +927,23 @@ stopFrameSession = "astroshot::movie_harness::sources::frames_store::stop_frame_
 
 [[module]]
 ts = "packages/movie-harness/src/sources/pty.ts"
-status = "in_progress"
+status = "ported"
+rust = "movie_harness/sources/pty.rs"
+module = "astroshot::movie_harness::sources::pty"
+ported_at = "2026-10-06T22:18:39Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/session.test.ts"]
+notes = "node-pty → portable-pty; chromium paint → astroshot::raster (bundled font); sampler thread; PtyMovieSessionOptions wraps MovieSessionOptions"
+
+[module.ts_blobs]
+"packages/movie-harness/src/session.test.ts" = "98111c88f3d000934ec235e847b3e297a90f1a1d"
+"packages/movie-harness/src/sources/pty.ts" = "29aa3a4bf8df8b89c25d940092692c7da14a18f0"
+
+[module.symbols]
+PtyMovieSessionOptions = "astroshot::movie_harness::sources::pty::PtyMovieSessionOptions"
+loadPtyMovieFixture = "astroshot::movie_harness::sources::pty::load_pty_movie_fixture"
+recordPtyMovie = "astroshot::movie_harness::sources::pty::record_pty_movie"
+recordTruecolorDemoMovie = "astroshot::movie_harness::sources::pty::record_truecolor_demo_movie"
 
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
@@ -936,7 +1003,15 @@ resolveBatchOutputPaths = "astroshot::react_shot::batch_paths::resolve_batch_out
 
 [[module]]
 ts = "packages/react-shot/src/cli.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/cli.rs"
+module = "astroshot::react_shot::cli"
+ported_at = "2026-10-06T22:18:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "--version prints CARGO_PKG_VERSION; install-browser reports find_chrome(); run(argv) returns the exit code; binary-level e2e ported to tests/react_shot_cli.rs"
+
+[module.ts_blobs]
+"packages/react-shot/src/cli.ts" = "4c62c3bfd80cf55cbb48b0a624af0228643f2830"
 
 [[module]]
 ts = "packages/react-shot/src/config.ts"
@@ -960,7 +1035,14 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [[module]]
 ts = "packages/react-shot/src/index.ts"
-status = "in_progress"
+status = "ported"
+rust = "react_shot/mod.rs"
+module = "astroshot::react_shot"
+ported_at = "2026-10-06T22:18:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/index.ts" = "88e56e7ffc98a1049e20172440d3c2513812a005"
 
 [[module]]
 ts = "packages/react-shot/src/meta.ts"
