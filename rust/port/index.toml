@@ -511,7 +511,22 @@ writeDemo = "astroshot::bin::demo::write_demo"
 
 [[module]]
 ts = "packages/astroshot/bin/doctor.mjs"
-status = "in_progress"
+status = "ported"
+rust = "bin/doctor.rs"
+module = "astroshot::bin::doctor"
+ported_at = "2026-10-06T21:56:07Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "checks run through a Host trait; new checks astroshot (binary version) and node-helper; node optional; chromium via browser::find_chrome; screen-recording re-execs astroshot movie check-screen-access"
+
+[module.ts_blobs]
+"packages/astroshot/bin/doctor.mjs" = "07456644f2df2c203fef694f27071c11112e77e9"
+
+[module.symbols]
+checkWatchCoverage = "astroshot::bin::doctor::check_watch_coverage"
+collectDoctorChecks = "astroshot::bin::doctor::collect_doctor_checks"
+doctorHelp = "astroshot::bin::doctor::doctor_help"
+runDoctor = "astroshot::bin::doctor::run_doctor"
+summarizeDoctor = "astroshot::bin::doctor::summarize_doctor"
 
 [[module]]
 ts = "packages/astroshot/bin/mac-preferences.mjs"
@@ -793,7 +808,24 @@ resolveBatchOutputPaths = "astroshot::tui_shot::batch_paths::resolve_batch_outpu
 
 [[module]]
 ts = "packages/tui-shot/src/kitty-graphics.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/kitty_graphics.rs"
+module = "astroshot::tui_shot::kitty_graphics"
+ported_at = "2026-10-06T21:56:08Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/kitty-graphics.test.ts"]
+notes = "sync write; tracker owns the HeadlessTerminal; GraphicsOverlay carries png bytes"
+
+[module.ts_blobs]
+"packages/tui-shot/src/kitty-graphics.test.ts" = "d5d15202413db55517dbc8f1d519168bf2ce42ea"
+"packages/tui-shot/src/kitty-graphics.ts" = "bd92c31693ee06b1f233873cdd16f37d145c23f5"
+
+[module.symbols]
+GraphicsOverlay = "astroshot::tui_shot::kitty_graphics::GraphicsOverlay"
+KittyGraphicsTracker = "astroshot::tui_shot::kitty_graphics::KittyGraphicsTracker"
+KittyTrackerOptions = "astroshot::tui_shot::kitty_graphics::KittyTrackerOptions"
+encodePng = "astroshot::tui_shot::kitty_graphics::encode_png"
+overlaysToHtml = "astroshot::tui_shot::kitty_graphics::overlays_to_html"
 
 [[module]]
 ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
@@ -819,7 +851,23 @@ ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [[module]]
 ts = "packages/tui-shot/src/shot.ts"
-status = "in_progress"
+status = "ported"
+rust = "tui_shot/shot.rs"
+module = "astroshot::tui_shot::shot"
+ported_at = "2026-10-06T21:56:09Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "loadFixture + Ink render in node helper; HTML+Playwright replaced by raster; helper spawned per shot; fontFamily/headed ignored"
+
+[module.ts_blobs]
+"packages/tui-shot/src/shot.ts" = "f31571b529ab20160b941c150647518e57044205"
+
+[module.symbols]
+TerminalCaptureRequest = "-"
+captureTerminalHtml = "astroshot::raster::render_png"
+closeSharedBrowser = "astroshot::tui_shot::shot::close_shared_browser"
+queueTerminalShot = "astroshot::tui_shot::shot::queue_terminal_shot"
+takeTuiShot = "astroshot::tui_shot::shot::take_tui_shot"
+validPositive = "astroshot::tui_shot::shot::valid_positive"
 
 [[module]]
 ts = "packages/tui-shot/src/terminal-html.ts"

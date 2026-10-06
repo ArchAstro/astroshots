@@ -309,7 +309,7 @@ impl HeadlessTerminal {
 
     /// Cursor `(col, row)` in the visible window (xterm `cursorX` / `cursorY`).
     pub fn cursor_position(&self) -> (u16, u16) {
-        let (row, col) = self.screen().cursor_position();
+        let (row, col, _) = cursor_state(self.screen());
         (col, row)
     }
 

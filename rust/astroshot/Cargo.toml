@@ -45,7 +45,6 @@ tiny-skia = "0.11"
 tokio = { version = "1", features = ["full"] }
 unicode-normalization = "0.1"
 url = "2"
-vt100 = "0.15"
 walkdir = "2"
 which = "7"
 
