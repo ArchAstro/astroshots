@@ -1,0 +1,24 @@
+# rustify configuration for the astroshots TypeScript → Rust port.
+# See https://github.com/ArchAstro/rustify and rust/PORTING.md.
+state_dir = "rust/port"
+conventions = "rust/PORTING.md"
+
+roots = [
+  "packages/astroshot/bin",
+  "packages/astroshot-review/src",
+  "packages/movie-harness/src",
+  "packages/react-shot/src",
+  "packages/tui-shot/src",
+]
+packages_dir = "packages"
+primary_package = "@archastro/astroshot"
+rust_crate = "rust/astroshot"
+rust_crate_name = "astroshot"
+extensions = ["ts", "tsx", "mjs"]
+
+test_markers = [".test.ts", ".test.tsx", ".test.mjs", "/__tests__/", "/test/"]
+binary_test_markers = [".e2e.test.ts", ".e2e.test.tsx", "packages/astroshot/test/"]
+
+[batch]
+max_files = 6
+max_lines = 900

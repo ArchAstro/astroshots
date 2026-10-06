@@ -40,3 +40,6 @@ npm-debug.log*
 .vscode/
 *.swp
 *~
+
+# Rust port
+rust/target/

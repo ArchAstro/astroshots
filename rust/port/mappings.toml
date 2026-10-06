@@ -1,0 +1,934 @@
+# Starter mappings for TypeScript -> Rust ports with `rustify`.
+#
+# This file lives in the project's rustify state dir. `rustify brief` matches
+# every [[construct]] query against the TypeScript files being ported and
+# prints the guidance (`rust`, `hazards`) next to the lines it found; the
+# [[package]] entries say what each npm / node: import becomes. `rustify
+# graph` prints hit counts per rule.
+#
+# Queries use the tree-sitter-typescript grammar; capture the reported node
+# as @match. `rustify` refuses to start if a query does not compile.
+# Write alternatives that need predicates as separate top-level patterns:
+# tree-sitter applies every predicate in a pattern to every branch of a
+# `[...]` alternation, so `[(a @x (#eq? @x "A")) (b @x (#eq? @x "B"))]`
+# never matches. Check any rule that reports 0 hits against the source
+# before trusting it.
+# Runtime model assumed throughout: tokio multi-thread runtime.
+# Entries mention helpers such as a JS-exact stringifier or a readdir-order
+# sorter generically; supply your own (or a crate) for them in the port.
+
+# ─── Async and concurrency ────────────────────────────────────────────────
+
+[[construct]]
+id = "async-fn"
+title = "async function"
+query = '''
+[
+  (function_declaration "async") @match
+  (method_definition "async") @match
+  (arrow_function "async") @match
+  (function_expression "async") @match
+]
+'''
+rust = "`async fn` on the tokio runtime. Only keep it async if it awaits I/O, a timer, or another async fn; pure computation becomes a plain `fn`."
+hazards = [
+  "A TS async function runs synchronously until its first await; a Rust future does nothing until polled. Code that relied on eager side effects before the first await must do them before returning the future or be awaited immediately.",
+  "Pattern for eager registration (queues, ordering): a plain `fn` that does the side effect, then returns `async move { … }`. Release with a guard type whose `Drop` mirrors the TS `finally`.",
+  "When the eagerly-registering method must also return a value from the deferred part, keep it a plain (non-`async`) `fn` performing the synchronous mutations, returning `futures::future::BoxFuture<'static, T>` for the rest.",
+]
+
+[[construct]]
+id = "promise-combinator"
+title = "Promise.all / allSettled / race / any"
+query = '''
+(call_expression
+  function: (member_expression
+    object: (identifier) @obj
+    property: (property_identifier) @prop)
+  (#eq? @obj "Promise")
+  (#match? @prop "^(all|allSettled|race|any)$")) @match
+'''
+rust = "all → `futures::future::try_join_all` (fail fast) or `tokio::task::JoinSet` when tasks should run on other worker threads; allSettled → `join_all` over `Result`s; race → `tokio::select!`; any → `futures::future::select_ok`."
+hazards = [
+  "Promise.all over a mapped array runs every element concurrently on one thread. `JoinSet::spawn` runs them in parallel across the pool, so shared state needs `Arc` + `Mutex`/`RwLock` or message passing.",
+  "Promise.all rejects on the first error but does not cancel the others; dropping a Rust join cancels them. Keep side effects idempotent or collect results explicitly.",
+]
+
+[[construct]]
+id = "new-promise"
+title = "new Promise(...) wrapping a callback API"
+query = '''
+(new_expression constructor: (identifier) @ctor (#eq? @ctor "Promise")) @match
+'''
+rust = "Usually unnecessary: use the async API directly (`tokio::fs`, `tokio::process`, `tokio::time::sleep`). For true callback bridges use `tokio::sync::oneshot`."
+
+[[construct]]
+id = "await-in-loop"
+title = "await inside a loop"
+# Queries cannot say "at any depth", so match the loop and let `contains`
+# find an await anywhere in its body (outside nested functions).
+contains = "await_expression"
+query = '''
+[
+  (for_statement) @match
+  (for_in_statement) @match
+  (while_statement) @match
+  (do_statement) @match
+]
+'''
+rust = "Sequential awaits stay sequential in a `for` loop. If iterations are independent, this is a place to gain throughput with `JoinSet` or `futures::stream::iter(..).buffer_unordered(n)`; keep order-dependent loops sequential."
+
+[[construct]]
+id = "for-await"
+title = "for await (… of stream)"
+query = '''
+(for_in_statement "await") @match
+'''
+rust = "`while let Some(item) = stream.next().await` over a `futures::Stream` (`tokio_stream`, `async-stream` for generators)."
+
+[[construct]]
+id = "timer"
+title = "setTimeout / setInterval / setImmediate"
+query = '''
+(call_expression
+  function: (identifier) @fn
+  (#match? @fn "^(setTimeout|setInterval|setImmediate|clearTimeout|clearInterval)$")) @match
+'''
+rust = "`tokio::time::sleep`, `tokio::time::interval` (set `MissedTickBehavior`), `tokio::task::yield_now`. Cancellation: keep the `JoinHandle` and `abort()`, or a `CancellationToken`."
+hazards = [
+  "`timer.unref()` means \"don't keep the process alive\"; in Rust the runtime exits when `main` returns, so model shutdown explicitly.",
+  "setInterval → `interval_at(Instant::now() + period, period)` with `MissedTickBehavior::Delay`: `interval()` ticks immediately, and the default Burst catches up missed ticks. Create the interval before the `async move` block, not inside it, or the period starts at the task's first poll.",
+  "Paused-clock tests that race a deadline against real socket I/O on another task can see tokio auto-advance past the deadline before the I/O is ready. Any busy-poll workaround (`yield_now` until `Instant::now() >= deadline`) must be `#[cfg(test)]` with a `#[cfg(not(test))]` `sleep_until` twin; shipped, it spins a worker for the life of every wait.",
+  "vi.useFakeTimers → `#[tokio::test(start_paused = true)]`; step `tokio::time::advance` 1ms at a time with `yield_now` to mirror `vi.advanceTimersByTime`. A default clock built on `tokio::time::Instant` follows paused time, as a mocked Date.now did.",
+  "process.nextTick (\"run this after the current synchronous work, before I/O\") is NOT safely modeled by `tokio::spawn` + one `tokio::task::yield_now().await`, despite looking like the obvious translation. Under `rt-multi-thread` (the `#[tokio::main]` default), a caller that keeps its own worker busy -- e.g. draining several already-available reads back-to-back with no real `.await` on I/O in between -- is not guaranteed to let that freshly spawned task get polled promptly; recovery depends on scheduler fairness that isn't bounded on any particular timescale. `#[tokio::test]` defaults to the single-threaded `current_thread` flavor and never exercises this, so the bug is invisible in the default test suite (opt into `#[tokio::test(flavor = \"multi_thread\", worker_threads = N)]` to catch it, and don't add debug instrumentation such as `eprintln!` to the code under test while chasing it -- even a bare `AtomicUsize` counter was enough to perturb scheduling and mask a real race). If a deferred step must be immune to a busy caller under `rt-multi-thread`, hand it to `tokio::task::spawn_blocking` instead (a dedicated OS thread the work-stealing scheduler doesn't arbitrate) rather than another `tokio::spawn`.",
+  "setImmediate/clearImmediate: the internal `tokio::task::yield_now().await` before firing the callback (`tokio::spawn(async move { tokio::task::yield_now().await; fire(); })`, returning `task.abort()` as the canceller) is required, not cosmetic — without it a spawned task on a multi-thread runtime can start executing on another worker thread almost immediately, racing ahead of the 'caller already returned synchronously' guarantee that setImmediate gives for free in single-threaded JS.",
+  "When a ported closure computes `return { ...state }` synchronously immediately before triggering deferred/timer work that could later mutate the same state, capture that return value into a local *before* calling the scheduler (and before dropping any lock protecting the state) rather than re-reading state afterward. JS callers never observe the deferred work racing ahead of the synchronous return (one thread); Rust's multi-thread runtime can.",
+]
+
+[[construct]]
+id = "abort-controller"
+title = "AbortController / AbortSignal"
+query = '''
+((new_expression constructor: (identifier) @c) @match (#eq? @c "AbortController"))
+((type_identifier) @match (#eq? @match "AbortSignal"))
+'''
+rust = "`tokio_util::sync::CancellationToken`; select on `token.cancelled()` in long operations. An `abort` listener becomes a task awaiting `cancelled()`: it runs after the next yield, not synchronously inside `cancel()` (tests `yield_now` before asserting)."
+
+[[construct]]
+id = "event-emitter"
+title = "EventEmitter"
+query = '''
+((new_expression constructor: (identifier) @c) @match (#eq? @c "EventEmitter"))
+((extends_clause value: (identifier) @e) @match (#eq? @e "EventEmitter"))
+((identifier) @match (#eq? @match "EventEmitter"))
+'''
+rust = "A typed channel: `tokio::sync::broadcast` for many listeners, `mpsc` for one consumer, `watch` for latest-value state. Replace string event names with an enum."
+hazards = [
+  "A duck-typed Node stream/EventEmitter API meant for another library's event loop model (`NodeJS.ReadStream`, a terminal UI library's flowing vs paused consumption) becomes constructor-supplied callbacks (`impl Fn` params) instead of a replicated subscribable stream object.",
+]
+
+# ─── Types and data modelling ─────────────────────────────────────────────
+
+[[construct]]
+id = "interface"
+title = "interface"
+query = "(interface_declaration) @match"
+rust = "`#[derive(Debug, Clone, Serialize, Deserialize)] struct` for data; a `trait` when the interface is implemented by several classes or mocked in tests."
+hazards = [
+  "Structural typing: TS accepts any object with the right shape. Rust needs an explicit type or `From` impls at every boundary.",
+  "A TS mapped type keyed by a companion string-literal union (`interface Data { \"a\": X; \"b\": Y }` + `type Type = keyof Data`, used as `(type: Type, data: Data[Type])` dependent-pair params) has no Rust dependent typing: fuse into one discriminated-union enum, one variant per key wrapping that key's payload, `#[serde(tag = \"type\", content = \"data\")]` with each variant's `#[serde(rename = \"<exact ts key>\")]` copied verbatim (keys may mix casing/punctuation, so no single `rename_all` rule covers them). Keep a plain payload-less twin enum only if call sites need the tag alone; derive it from the fused enum via a match-based accessor (e.g. `Data::event_type()`), not a second hand-maintained list.",
+  "An optional method on an interface ported as a trait (`listSessionsStrict?()`): a trait method returning `Option<BoxFuture<...>>` with a default body returning `None`, so implementers without it compile unchanged.",
+  "An already-ported trait method returns no `Result`, but a later TS implementation throws from it: change the trait to return `Result` and update every implementor and caller; never panic to fit the old signature.",
+  "An interface whose fields are all callbacks the embedding binary supplies as configuration (not implemented by several classes, no shared state) is a struct of `Arc<dyn Fn(...) + Send + Sync>` fields, not a trait. Name each callback type with a `pub type` alias up front; clippy's `type_complexity` rejects them inline.",
+  "A field typed `Promise<T> | T` (the host may answer sync or async) is always an `Arc<dyn Fn(...) -> BoxFuture<'static, T> + Send + Sync>`; a field with no `Promise` in its type stays a plain `Fn`.",
+  "A class whose methods are synchronous but which implements an async trait shared with truly async implementations keeps sync inherent methods (called directly by its ported tests) and wraps them in `tokio::task::spawn_blocking` only in the trait impl.",
+  "A function that returns a `{ ok, ... }` result object and can also reject on host I/O returns `Result<Result<T, ReasonError>, HostError>`: the inner result is the TS return value callers match on, the outer error is the rejection.",
+  "A `WeakMap` keyed by an object the class itself returned (side data fenced to that exact value) becomes a private field on the returned type, and that type must not derive `Clone`: a copy would carry the side data TS's identity lookup would miss.",
+  "An intersection `A & { extra }` used only as one function's parameter becomes separate parameters, not a new struct (`CliClient::node(app_name, defaults, overrides)`).",
+  "A serde struct serializes in field order; a TS object literal serializes in insertion order, which differs per construction site when keys are assigned conditionally (`creds.email = ...` after `{ server, apps }`). When one struct backs several TS construction sites, their key orders cannot all match: record the divergence in the module's notes.",
+  "Reuse one Rust struct across enum variants only when the TS source itself names and shares one interface across those keys. Two keys with coincidentally identical anonymous inline object shapes get their own named structs — TS's structural typing is not a signal to collapse the Rust types, and the shapes could diverge independently later.",
+]
+
+[[construct]]
+id = "optional-property"
+title = "optional property (`x?: T`)"
+query = "(property_signature \"?\") @match"
+rust = "`Option<T>` with `#[serde(default, skip_serializing_if = \"Option::is_none\")]` when the JSON must omit it."
+hazards = [
+  "TS distinguishes a missing key from `undefined` and from `null`; serde collapses them to `None` unless you use `Option<Option<T>>` or `serde_with::rust::double_option`.",
+]
+
+[[construct]]
+id = "union-type"
+title = "union type"
+query = "(union_type) @match"
+rust = "An `enum`. String-literal unions → unit variants with `#[serde(rename_all = \"snake_case\")]` (or per-variant `rename`). Object unions tagged by a `kind`/`type` field → `#[serde(tag = \"kind\")]`."
+hazards = [
+  "Check the exact wire spelling of each literal; rename_all is only right when every variant follows the rule.",
+  "A discriminated union whose call sites read a shared field WITHOUT narrowing on the tag first (TS allows `state.error` on the whole union when every arm declares `error`, even with different literal types per arm) needs accessor methods on the Rust enum (`fn error(&self) -> Option<&str>`) instead of forcing every caller to `match` — check the union's call sites in other TS files, not just its declaration, to know whether this applies.",
+  "`#[serde(tag = \"...\")]` internally-tagged enums serialize the tag key first and can only emit the fields a given variant's own struct declares. A TS union that declares ALL fields on EVERY arm (a `null` literal type on arms that don't use a field, so the JSON always has the same keys in the same order) will not round-trip to byte-identical JSON via a naive tagged enum; call this out explicitly when a later batch might persist the value.",
+  "A TS return type shaped `{ ok: true, tokens } | { ok: false, error }` (or similar boolean-discriminated success/failure object) is a plain `Result<T, String>` (or a typed error), not a mirrored `Ok`/`Err`-variant enum — Rust already has the idiom.",
+  "An inline union not itself exported (e.g. a parameter typed `ThemeName | ThemeMode`) gets a small local Rust enum named for its role; it has no TS export to map from, so record it in the module's notes instead.",
+]
+
+[[construct]]
+id = "discriminant-switch"
+title = "switch statement"
+query = "(switch_statement) @match"
+rust = "`match` on an enum; the compiler then enforces exhaustiveness that TS `never` checks only approximated."
+hazards = [
+  "A TS function that's a structural no-op in every branch (e.g. a `wrapChunk` whose every case returns its input unchanged) keeps the same branches when ported rather than collapsing to an identity function — note the oddity in a doc comment instead of 'fixing' it, so structural diffs stay meaningful for later drift passes.",
+]
+
+[[construct]]
+id = "enum"
+title = "enum"
+query = "(enum_declaration) @match"
+rust = "Rust `enum`; numeric enums with `#[repr(u8)]` only if the numbers cross a boundary."
+
+[[construct]]
+id = "class"
+title = "class"
+query = '''
+[
+  (class_declaration) @match
+  (abstract_class_declaration) @match
+]
+'''
+rust = "`struct` + `impl`. Mutable shared instances become `Arc<Mutex<_>>` (or an actor task owning the state and a channel handle) only when they are shared across tasks."
+hazards = [
+  "Methods passed as callbacks lose `this` in TS unless bound; in Rust capture what the closure needs explicitly.",
+  "A TS module exporting mutable `let` bindings reassigned together (a live-reassigned palette/state object with no class wrapping it) has no direct Rust equivalent either: port it the same way as shared instance state — one `LazyLock<RwLock<StateSnapshot>>` (Copy struct) plus one accessor `fn` per binding. Each binding needs an explicit name mapping (`TS_NAME` -> `snake_case_fn`) in your port notes even when the name already matches snake_case, because the export *kind* changed from const/let to fn.",
+]
+
+[[construct]]
+id = "inheritance"
+title = "class inheritance (extends)"
+query = "(class_heritage (extends_clause)) @match"
+rust = "Composition plus a `trait` for the overridden behavior. No implementation inheritance in Rust; `Error` subclasses become enum variants (see throw/catch)."
+
+[[construct]]
+id = "private-field"
+title = "private field (#x) / private members"
+query = '''
+[
+  (private_property_identifier) @match
+  (accessibility_modifier) @match
+]
+'''
+rust = "Private struct fields (default visibility); `pub(crate)` for what sibling modules use."
+hazards = [
+  "Only a TS file's actual `export`ed surface constrains the Rust module's public API. An unexported helper interface/class (e.g. a private `FilterSink`-style callback interface) can be redesigned freely — callback interface to owned return value, class to free functions — as long as the file's exported functions/types keep the TS-documented behavior. Check the file's list of exports, not every internal type, before deciding what must be preserved verbatim.",
+]
+
+[[construct]]
+id = "getter-setter"
+title = "get/set accessor"
+query = '''
+[
+  (method_definition "get") @match
+  (method_definition "set") @match
+]
+'''
+rust = "Plain methods `fn x(&self) -> T` / `fn set_x(&mut self, v: T)`."
+
+[[construct]]
+id = "default-parameter"
+title = "default parameter value"
+query = "(required_parameter value: (_)) @match"
+rust = "Rust has no default parameter values: every parameter becomes required."
+hazards = [
+  "A trailing defaulted parameter (`fn(a, b, nowMs = Date.now(), retryBaseMs = 60_000)`) becomes a Rust function with every parameter required (no default params); expose the TS default as a `pub const` (e.g. `DEFAULT_RETRY_BASE_MS`) so call sites don't have to guess it.",
+  "A default-producing closure parameter (`now: () => number = () => Date.now()`, a clock/RNG/etc. seam) becomes `Option<Arc<dyn Fn() -> T + Send + Sync>>` with `.unwrap_or_else(|| Arc::new(default_fn))` inside, not two separate constructors and not a required parameter that pushes the default onto every caller.",
+  "A default that reads another parameter (`fn(cli, url = cli.defaults.url)`) becomes `Option<T>` resolved inside the function from that parameter.",
+]
+
+[[construct]]
+id = "generics"
+title = "generic type parameters"
+query = "(type_parameters) @match"
+rust = "Rust generics with explicit trait bounds (`T: Serialize + Send + 'static` for anything crossing tasks)."
+hazards = [
+  "A structural generic constraint on a still-unported 'row' shape (e.g. `T extends { content?: string; role: string; name?: string }`) is a small accessor trait (`fn content(&self) -> Option<&str>`, etc.), not a concrete struct picked up front. The future concrete row type implements the trait with one mechanical impl block when its module is ported, and the already-ported generic function's signature never has to change.",
+]
+
+[[construct]]
+id = "record-map-type"
+title = "Record<K, V> / index signature"
+query = '''
+((generic_type name: (type_identifier) @n) @match (#eq? @n "Record"))
+(index_signature) @match
+'''
+rust = "`BTreeMap<String, V>` for deterministic output (snapshot/JSON stability) or `HashMap` when order never leaks. `IndexMap` if insertion order matters."
+hazards = [
+  "JS objects keep insertion order for string keys; `HashMap` does not. Anything serialized, hashed, or diffed needs `BTreeMap`/`IndexMap`.",
+  "A `Record` built from user input (`obj[key] = v`) enumerates array-index keys (`\"0\"`, `\"12\"`) first, ascending, and ignores `__proto__`: fill an `IndexMap` through a helper that reproduces that ordering.",
+  "Replacing TS's `as const satisfies Record<ClosedUnion, V>` completeness check: a Rust `match` over the closed source enum (not a runtime HashMap/lookup table) gives the same guarantee at compile time, and strictly stronger — an unhandled variant is a compile error, not a passed CI check. Prefer a match function over building and looking up a static map whenever the mapping is from one closed enum to another.",
+  "`Record<string, unknown> & { requiredField: T; ... }` (arbitrary extra keys plus some required ones) is a struct with the required fields typed normally plus a trailing `#[serde(flatten)] extra: IndexMap<String, serde_json::Value>` for everything else.",
+]
+
+[[construct]]
+id = "map-set"
+title = "Map / Set / WeakMap"
+query = '''
+(new_expression constructor: (identifier) @c (#match? @c "^(Map|Set|WeakMap|WeakSet)$")) @match
+'''
+rust = "`IndexMap`/`IndexSet` when iteration order is observable (JS Map/Set iterate in insertion order), else `HashMap`/`HashSet`. WeakMap caches usually become explicit ownership."
+hazards = [
+  "A TS `Map<string, Promise<T>>` kept only so a later call can await-all-of-them-with-a-timeout (e.g. session-teardown draining background work) is `IndexMap<String, futures::future::Shared<BoxFuture<'static, T>>>` plus a generation-counter (see the `child-process` construct): `track()` must eagerly `tokio::spawn` a task driving the future to completion and self-clearing the entry (mirrors TS's eager `.then(clear, clear)` registered synchronously at call time, since a Rust future does nothing until polled), and the later drain call clones out the `Shared` futures and races them against a `tokio::time::sleep` deadline with `tokio::select!`.",
+]
+
+[[construct]]
+id = "any-unknown"
+title = "any / unknown"
+query = '''
+((predefined_type) @match (#match? @match "^(any|unknown)$"))
+'''
+rust = "`serde_json::Value` at untyped JSON boundaries; otherwise give it a real type. `unknown` in `catch` is the error type."
+
+[[construct]]
+id = "type-assertion"
+title = "type assertion / non-null (`as T`, `x!`)"
+query = '''
+[
+  (as_expression) @match
+  (non_null_expression) @match
+  (satisfies_expression) @match
+]
+'''
+rust = "No unchecked casts: parse (`serde_json::from_value`), `TryFrom`, or `.expect(\"reason\")` for invariants you can state."
+hazards = [
+  "`x as Foo` on parsed JSON is unchecked in TS; the Rust port must validate or the behavior changes on bad input. Decide which, and test it.",
+]
+
+[[construct]]
+id = "instanceof-typeof"
+title = "instanceof / typeof checks"
+query = '''
+[
+  (binary_expression operator: "instanceof") @match
+  (unary_expression operator: "typeof") @match
+]
+'''
+rust = "`match` on an enum or `serde_json::Value` variant; `downcast_ref` only for `anyhow::Error`/`dyn Error` chains."
+hazards = [
+  "The `(typeof x === \"string\" && x) || (typeof y === \"string\" && y) || ... || \"\"` fallback idiom (first non-empty string among several optional untyped JSON fields, JS-falsy on empty string) is `[\"x\",\"y\",...].iter().find_map(|k| value.get(*k).and_then(Value::as_str).filter(|s| !s.is_empty()))`.",
+]
+
+[[construct]]
+id = "js-global-helper"
+title = "Number() / parseInt / parseFloat / decodeURIComponent / encodeURIComponent"
+query = '''
+(call_expression
+  function: (identifier) @fn
+  (#match? @fn "^(Number|parseInt|parseFloat|decodeURIComponent|encodeURIComponent)$")) @match
+'''
+rust = "Keep one shared set of JS-semantics helpers (number parsing, truthiness, trimming, stringifying) instead of re-deriving JS coercion at each call site."
+hazards = [
+  "`Number(value)` string coercion and `Number.isSafeInteger` need shared helpers (a `parse_number` and an `is_safe_integer`); a `nonNegativeInteger`/`positiveInteger`-shaped TS validator should reuse them instead of re-deriving. `parse_number` should be gated behind a regex matching JS's `StrNumericLiteral` grammar before delegating to `f64::from_str`, because `f64::from_str` accepts spellings JS's `Number()` rejects (`Number(\"infinity\")` is `NaN`; `f64::from_str(\"infinity\")` is `Ok(inf)`) — verified empirically against node, not just reasoned about.",
+  "`decodeURIComponent` has no crate in this codebase; hand-roll it as `fn(&str) -> Option<String>` (percent-decode `%xx` hex pairs, then `String::from_utf8` to validate the result), returning `None` on a malformed/incomplete escape or invalid UTF-8 so the caller can fall back to the original text with `.unwrap_or_else(...)`, matching a TS `try { decodeURIComponent(x) } catch {}`.",
+]
+
+[[construct]]
+id = "zod-schema"
+title = "zod schema"
+query = '''
+(call_expression
+  function: (member_expression object: (identifier) @z (#eq? @z "z"))) @match
+'''
+rust = "`#[derive(Deserialize)]` types with `#[serde(deny_unknown_fields)]` where zod used `.strict()`, plus explicit validation fns for refinements. `schemars` if a JSON Schema is emitted."
+hazards = [
+  "zod `.default()`, `.transform()`, `.coerce`, and `.passthrough()` each need a deliberate serde equivalent; error messages are part of the CLI contract when they reach stderr.",
+  "zod `.optional()` rejects an explicit JSON `null`, but serde's `Option<T>` decodes `null` as `None`. On a decode boundary that must reject what zod rejects (journals, wire messages), reject `null` for every `.optional()` field that is not `.nullable()`.",
+  "`z.number().int()` accepts whole-number floats (`3.0`) because JS has one number type; deserializing straight into `i64` rejects them. Deserialize as `f64` first and check it is a finite whole number in range.",
+  "`serde_json::to_string` is not `JSON.stringify` for numbers: it writes `1.0` and `-0.0` where JS writes `1` and `0`. Where the serialized text is compared, hashed, measured (`.length`), or sent, write a JS-exact stringifier helper (one for `Value`, one for typed structs) and use it instead of serde_json.",
+]
+
+# ─── Errors ───────────────────────────────────────────────────────────────
+
+[[construct]]
+id = "commander-command-tree"
+title = "Commander command tree with .action() callbacks"
+query = '''
+(call_expression
+  function: (member_expression property: (property_identifier) @prop)
+  (#eq? @prop "action")) @match
+'''
+rust = "clap `Command`/`Arg` hold no behavior, so split a TS factory that builds a subcommand tree and binds `.action()`s into `create_x_commands(...) -> clap::Command` (structure only; take exactly what the TS construction reads) and `run_x_command(cli, opts, matches: &ArgMatches) -> Result<i32, XCommandError>` (dispatch on `matches.subcommand()` and run each action). `XCommandError` is a per-module `thiserror` enum with `#[from]` variants plus `Other(#[from] anyhow::Error)`; `Ok(code)` carries `process.exitCode` (0 when TS never sets it)."
+hazards = [
+  "A Commander command with subcommands but no `.action()` prints usage and exits 1 on a bare invocation without running `preAction` hooks; set `.subcommand_required(true)` on it. A command with both an action and subcommands runs its action when none is given.",
+  "`.hook(\"preAction\", ...)` runs before the leaf action only; call the guard at the top of each leaf's dispatch arm, not in the parent.",
+]
+
+[[construct]]
+id = "commander-root-option"
+title = "Walking to the root Command for a global option"
+query = '''
+(while_statement
+  condition: (parenthesized_expression
+    (member_expression property: (property_identifier) @prop))
+  (#eq? @prop "parent")) @match
+'''
+rust = "`while (root.parent) root = root.parent; root.opts().x` reads a global option from whatever program embeds the subcommand. A self-contained `run_x_command` has no root to walk; take the resolved value as an explicit `global_x: Option<&str>` parameter that the binary's dispatcher reads from the top-level `ArgMatches`. Apply the same TS truthiness to it."
+
+[[construct]]
+id = "void-promise"
+title = "void-prefixed, deliberately unawaited promise"
+query = '''
+(unary_expression operator: "void" argument: (call_expression)) @match
+'''
+rust = "`void doThing()` starts async work and never awaits it (best-effort telemetry, background refresh). Port as `tokio::spawn(async move { ... })` and drop the handle; clone what the future needs. Only call it on a path that runs inside the tokio runtime."
+hazards = [
+  "TS accepts losing the work on process exit; a spawned task is likewise dropped when the runtime shuts down. Do not await it to 'fix' that; it would change latency and error behavior.",
+]
+
+[[construct]]
+id = "agent-tool-typed-params"
+title = "Typed tool params (defineContextualTool<TParams>)"
+query = '''
+(call_expression function: (identifier) @fn (#eq? @fn "defineContextualTool")) @match
+'''
+rust = "Agent tools are invoked with raw JSON: the tool registry holds `serde_json::Value`-typed definitions. Build every tool through one shared wrapper generic over `TParams: DeserializeOwned` that deserializes inside the wrapper. Do not hand-roll a `Value` parse per tool."
+hazards = [
+  "TS never validates `TParams` (execute_loop passes JSON through `as any`). Give each TS-optional or destructuring-defaulted field `Option<T>` / `#[serde(default)]` so every input TS accepts still deserializes; a mismatch fails as `ToolArgumentsError::InvalidShape`.",
+  "Numeric and boolean params: TS never coerces at the boundary, so a model's `10.5`, `-5`, `\"10\"` or `\"true\"` reaches the tool body. Type them `Option<Value>` and coerce at each use site with JS-faithful helpers (number coercion, truthiness, `Math.min`/`Math.max`, ToIntegerOrInfinity, slice bounds), following what that TS line does (`??`, Math.*, slice, comparison). A strict `!== undefined` check needs the three-way `deserialize_present_value` pattern (absent vs explicit null).",
+]
+
+[[construct]]
+id = "throw"
+title = "throw"
+query = "(throw_statement) @match"
+rust = "Return `Err`. Library-style modules define a `thiserror` enum; command handlers and glue use `anyhow::Result` with `.context(...)`."
+hazards = [
+  "Thrown error messages often reach stderr and are asserted by contract tests; keep the text identical.",
+  "Properties read structurally off a caught error (`\"stage\" in error`, `error.status`, `error.code`, `error.cause.code`): give each shape a concrete error type and `anyhow::Error::downcast_ref` it at the reader. A structural TS check matches every error class that carries the property, so the reader must try every Rust type that does.",
+  "A generated SDK's `ApiError` reaches `anyhow` as the SDK enum `sdk::Error::Api(api)` when a caller uses plain `?`, not as the inner `ApiError`. A reader that reads `.status`/`.code` must downcast both shapes, and its tests must build the error with `anyhow::Error::from(sdk::Error::Api(..))`, not only with `anyhow::Error::new(ApiError{..})`.",
+  "A thrown value with extra structural properties assigned onto it (`Object.assign(new Error(...), {className: \"context_length\", ...})`, a module-specific contract) has no shape a Rust `Box<dyn Error>` can duck-type the way `isContextLengthError`'s `error.className === \"context_length\"` check does. The consumer should detect it by `downcast_ref` on a dedicated error type instead: a provider that wants to signal a context-length rejection must box (or nest via `source()`) that type, not merely produce JSON shaped like `{className: \"context_length\", ...}`.",
+]
+
+[[construct]]
+id = "try-catch"
+title = "try / catch / finally"
+query = "(try_statement) @match"
+rust = "`match`/`?` on `Result`; `finally` → a guard type with `Drop` or explicit cleanup on every path. Catch-all `catch {}` that swallows errors must stay deliberate (`let _ =` with a comment)."
+hazards = [
+  "A `finally` inside an `async function*` also runs when the consumer stops iterating. A Rust `Stream` can be dropped at any `.await`, skipping explicit cleanup, so pair explicit cleanup with a `Drop` guard that runs it once if nothing else did.",
+]
+
+[[construct]]
+id = "error-subclass"
+title = "custom Error class"
+query = '''
+(class_declaration
+  (class_heritage (extends_clause value: (identifier) @base (#match? @base "Error$")))) @match
+'''
+rust = "A variant of a `thiserror` enum (or a struct deriving `thiserror::Error`); keep `Display` text identical to the TS message."
+
+# ─── Node APIs and I/O ────────────────────────────────────────────────────
+
+[[construct]]
+id = "sync-io"
+title = "synchronous fs / child_process (…Sync)"
+query = '''
+(call_expression
+  function: [
+    (identifier) @f
+    (member_expression property: (property_identifier) @f)
+  ]
+  (#match? @f "Sync$")) @match
+'''
+rust = "`std::fs` / `std::process` in sync code. Inside async code, wrap blocking work in `tokio::task::spawn_blocking` or use `tokio::fs`/`tokio::process`."
+hazards = [
+  "Blocking calls on a tokio worker thread stall other tasks; the TS code was single-threaded so this never showed up there.",
+]
+
+[[construct]]
+id = "child-process"
+title = "child process spawn / exec"
+query = '''
+(call_expression
+  function: [
+    (identifier) @f
+    (member_expression property: (property_identifier) @f)
+  ]
+  (#match? @f "^(spawn|execFile|exec|fork|spawnSync|execFileSync|execSync)$")) @match
+'''
+rust = "`tokio::process::Command` (async) or `std::process::Command`. `kill_on_drop(true)` for owned children; process groups via `std::os::unix::process::CommandExt::process_group`. An injectable `execFile`-style runner (`(args) => Promise<string>`) is a `RunCommand` trait object or closure type, with a default implementation wrapping `tokio::process::Command`."
+hazards = [
+  "Node's `shell: true` and cross-spawn quoting differ from `Command`; never build shell strings.",
+  "stdio inheritance and `detached: true` + `unref()` need explicit equivalents (setsid/process_group).",
+  "Tests that `vi.mock(\"node:child_process\")` or override `process.platform`: inject the launcher and `std::env::consts::OS` into a private fn and test that (see local_review_http::open_url_on). `process.platform` darwin/win32 are `macos`/`windows` in Rust.",
+  "A TS class tracking a platform handle (e.g. Node's `ChildProcess`) purely for one scalar field (a pid) plus an object-identity check used later by a timer/callback (`map.get(id) === handle`), with no concrete Rust handle type exported or forced by an already-ported caller, tracks just the scalar (e.g. `Option<u32>` pid) plus a per-`track()` `generation: u64` counter standing in for the identity check — cheaper and more testable than inventing a comparable wrapper type, and exactly reproduces the staleness semantics (a later `track()` for the same id invalidates a still-pending timer from an earlier one).",
+  "Real-process tests for a process-group signal controller (SIGSTOP/SIGCONT/SIGTERM sent to `-pid`) must spawn the test child with `Command::process_group(0)` (tokio's and std's `Command` both expose this on unix) so it becomes its own process-group leader — otherwise `-pid` targets a nonexistent group and every signal comes back ESRCH/Missing even though the code under test is correct. This matches what a real caller does at spawn time with Node's `{ detached: true }`.",
+]
+
+[[construct]]
+id = "string-trim"
+title = "String#trim / trimStart / trimEnd"
+query = '''
+(call_expression
+  function: (member_expression property: (property_identifier) @f)
+  (#match? @f "^(trim|trimStart|trimEnd)$")) @match
+'''
+rust = "a JS-exact `trim` helper (and `trim_start_matches(is_js_whitespace)` / `trim_end_matches(...)`), never `str::trim`."
+hazards = [
+  "Rust `str::trim` strips U+0085 and keeps U+FEFF; JS does the opposite. A BOM-prefixed file or a NEL character changes what a prompt or config text contains.",
+]
+
+[[construct]]
+id = "process-env"
+title = "process.env"
+query = '''
+[
+  (member_expression
+    object: (member_expression
+      object: (identifier) @p (#eq? @p "process")
+      property: (property_identifier) @e (#eq? @e "env"))) @match
+  (nested_type_identifier
+    module: (identifier) @m (#eq? @m "NodeJS")
+    name: (type_identifier) @n (#eq? @n "ProcessEnv")) @match
+]
+'''
+rust = "`std::env::var_os`. Read env once into a config struct at startup where possible so tests can inject it."
+hazards = [
+  "An empty string and an unset variable are different in `process.env`; `std::env::var` returns `Err` for unset and `Ok(\"\")` for empty. Keep the same distinction.",
+  "A TS test that stubs `process.env` for a child process (`GIT_CONFIG_*`, `HOME`) must not become a process-wide `temp_env` change in a Rust lib test: `cargo test` runs tests in parallel threads of one process, so other tests' `git` children inherit it (an empty `user.name` broke unrelated tests' commits). Pass the variables to the child's `Command::envs` through a private seam.",
+  "`std::env::set_var`/`remove_var` require `unsafe` (stable since ~Rust 1.82), and this workspace forbids `unsafe_code` crate-wide with no local override (`forbid`, not `deny`). A test that scopes an env var, including around an `.await`, needs the `temp-env` dev-dependency (with its `async_closure` feature for `async_with_vars`) instead of calling `std::env::set_var` directly.",
+  "`NodeJS.ProcessEnv`-shaped resolver params (`env?: NodeJS.ProcessEnv`) map to `Option<&HashMap<String, String>>`. When several sibling modules need it, define one `pub type Env = HashMap<String, String>` in the parent module rather than one per file.",
+]
+
+[[construct]]
+id = "process-lifecycle"
+title = "process.exit / signals / exitCode"
+query = '''
+(member_expression
+  object: (identifier) @p (#eq? @p "process")
+  property: (property_identifier) @m (#match? @m "^(exit|exitCode|on|once|kill|pid|argv|cwd|chdir|stdout|stderr|stdin|platform)$")) @match
+'''
+rust = "exit codes returned from `main` (`std::process::ExitCode`); signals via `tokio::signal`; argv via clap; cwd via `std::env::current_dir`."
+hazards = [
+  "`process.exitCode = n` lets pending work finish; `std::process::exit` does not run destructors. Prefer returning an ExitCode.",
+  "A library function that calls `process.exit(n)` itself (not `exitCode`) ports to `std::process::exit(n)`; write any message to unbuffered stderr first.",
+  "When the TS tests spy on `process.exit`, give the options struct an `exit: Option<Arc<dyn Fn(i32) + Send + Sync>>` seam defaulting to `std::process::exit`; a real exit inside `cargo test` kills the test binary.",
+  "TS's 'monkeypatch a global/passed-in method, return a restore closure' pattern (`installSynchronizedStdout` patching `process.stdout.write`; more generally `stream.write = wrappedFn` on any passed-in handle) has no Rust equivalent — there is no way to preserve a global-patch call site. Port the 'install' function to consume the original handle and RETURN the wrapped replacement (an explicit `Write`/`Read` wrapper type the caller composes into its own I/O path); document that every caller must be updated to route through the returned value.",
+]
+
+[[construct]]
+id = "json"
+title = "JSON.parse / JSON.stringify"
+query = '''
+(call_expression
+  function: (member_expression
+    object: (identifier) @j (#eq? @j "JSON"))) @match
+'''
+rust = "`serde_json::from_str` into a typed struct; `serde_json::to_string(_pretty)`."
+hazards = [
+  "JSON.stringify(x, null, 2) and serde_json's pretty printer format differently (e.g. empty arrays/objects); byte-identical output needs a custom formatter or a snapshot test.",
+  "Key order follows insertion order in JS. Enable serde_json's `preserve_order` feature, so `Value`/`Map` keep insertion order; typed structs serialize in field declaration order, so declare fields in the TS insertion order.",
+  "With `preserve_order`, `serde_json::Map::remove` is a swap-remove: the last key moves into the removed slot. JS `delete` and a key set to `undefined` leave the other keys in place, so use `shift_remove`. clippy.toml bans `Map::remove` for this reason.",
+  "Numbers: JS has only f64. Integers above 2^53 in JSON lose precision in TS but not in Rust.",
+  "`Number#toFixed` rounds exact ties up; Rust's `{:.N}` rounds them to even (`1.25` → JS `1.3`, Rust `1.2`). Write a `to_fixed` helper that rounds ties up (extend it per precision).",
+  "A TS class whose `JSON.stringify()` key order comes from an object spread inside a method (e.g. `{...meta, addedAt, id}`) does NOT have a fixed wire key order — it depends on the *caller's* object-literal key order at each call site, which one Rust struct schema cannot reproduce for every caller. Port using the TS interface's *declared* field order (not any one call site's order) and record it as a deliberate divergence rather than chasing byte-for-byte parity; only revisit if a ported test asserts on the serialized string.",
+]
+
+[[construct]]
+id = "regex"
+title = "regular expression"
+query = "(regex) @match"
+rust = "`regex::Regex` in a `std::sync::LazyLock`. Needs `fancy-regex` for lookaround/backreferences."
+hazards = [
+  "The `regex` crate has no lookbehind, lookahead, or backreferences; `/u` and `\\b` semantics also differ slightly. For a small pattern that needs them, a hand-written matcher following JS backtracking order is preferred over `fancy-regex`; verify it against node on edge inputs.",
+  "`\\b` cannot share a `(?i-u:...)` group with other alternatives (\"Unicode not allowed here\"); split it out as `(?-u:\\b)(?i-u:literal)` per branch.",
+  "JS `/i` without `u` folds ASCII only; Rust `(?i)` also matches K (Kelvin) for `k` and ſ for `s`. Scope ASCII-literal case-insensitive parts with `(?i-u:…)`.",
+  "`a.localeCompare(b)` is ICU collation, not byte order (`_`/`-` before letters, case secondary, `10` before `9`): sort with an ICU collator (e.g. `icu_collator`), verified against node.",
+  "JS `\\s` differs from Rust's (U+0085 in Rust only, U+FEFF in JS only): use an explicit JS whitespace class in patterns and a JS-exact `is_whitespace`/`trim` for `String#trim`. JS `\\d` is ASCII; write `[0-9]`.",
+  "Combine a JS-whitespace class constant (say `WS`) with other items only as a nested class (`[^/{WS}]`), never by splicing its body (`[^\\s\\x{FEFF}--\\x{85}/]`): `--` binds looser than union, so trailing items join the subtracted set and still match.",
+  "In a `str` `Regex`, an ASCII-only group `(?i-u:...)` may not contain `.` (it could match part of a UTF-8 sequence, so the pattern fails to compile); wrap only the literal text that needs ASCII case folding and keep `.`/`.+` outside the group.",
+  "A backreference that only requires two captures to be equal (`a\\/(.*) b\\/\\1$`) fixes their lengths, so solve the split arithmetically instead of reaching for `fancy-regex`.",
+  "`str.replace(\"a\", \"b\")` with a string pattern (or a regex without `/g`) replaces only the first match; Rust `str::replace` replaces all. Use `replacen(pattern, replacement, 1)`.",
+  "JS `\\b` is ASCII; write `(?-u:\\b)`. JS `.` stops at `\\r`, U+2028, and U+2029 as well as `\\n`; use `[^\\n\\r\\u{2028}\\u{2029}]` where that matters. A `/g` pattern is used with `replace_all`, and `$1X` replacements are written `${1}X`.",
+]
+
+[[construct]]
+id = "string-units"
+title = "string length / slicing"
+query = '''
+(member_expression
+  property: (property_identifier) @p
+  (#match? @p "^(slice|substring|substr|charAt|charCodeAt|codePointAt|padStart|padEnd)$")) @match
+'''
+rust = "Decide per call whether the TS code meant bytes, chars, or display width: `str::len` (bytes), `.chars().count()`, `unicode-width` for terminal columns. When a JS `length` or `slice` is observable (caps, counts reported to users), use UTF-16-aware helpers (`utf16_len`, `utf16_prefix`)."
+hazards = [
+  "JS string indices are UTF-16 code units. `&s[a..b]` on byte offsets panics mid-character. Truncation and column math for the TUI must be re-derived.",
+]
+
+[[construct]]
+id = "date"
+title = "Date"
+query = '''
+((new_expression constructor: (identifier) @d) @match (#eq? @d "Date"))
+((member_expression object: (identifier) @d) @match (#eq? @d "Date"))
+'''
+rust = "`std::time::SystemTime` for timestamps, `chrono::DateTime<Utc>` for formatting/parsing (`to_rfc3339_opts(SecondsFormat::Millis, true)` matches `toISOString`)."
+hazards = [
+  "toISOString always prints milliseconds and `Z`; chrono's default RFC 3339 output does not.",
+]
+
+[[construct]]
+id = "buffer"
+title = "Buffer / Uint8Array"
+query = '''
+((member_expression object: (identifier) @b) @match (#eq? @b "Buffer"))
+((new_expression constructor: (identifier) @u) @match (#match? @u "^(Uint8Array|ArrayBuffer)$"))
+'''
+rust = "`Vec<u8>` / `&[u8]`, `bytes::Bytes` for shared buffers; base64 via the `base64` crate."
+hazards = [
+  "`Buffer.from(text, \"base64\")` never throws: it takes both alphabets, skips invalid bytes and whitespace, stops at the first `=`, and needs no padding. Use a lenient decoder that mimics `Buffer.from`, not the strict `base64` engines, whenever the text comes from outside.",
+  "`Buffer.from(bytes).toString('latin1')` over a byte range a caller has ALREADY constrained to ASCII by a prior guard (e.g. SGR param bytes: digits and `;` only) is exactly `bytes.iter().map(|&b| b as char).collect::<String>()` — cheaper than an encoding crate and equally faithful; confirm the guard actually restricts the range before using this shortcut.",
+  "When a TS module does `buffer.toString(\"latin1\")` and then runs JS regexes / `.length` / `.slice()` / `match.index` over the result: decode each byte via `char::from(byte)` into a Rust `String` (lossless, 1:1) and do ALL position/length math on it via `.chars().count()` / char-based slicing — never `regex::Match::start()`/`end()` or `&str` byte indexing. Once any byte is >= 0x80 it needs 2 UTF-8 bytes, desyncing the Rust String's byte offsets from the JS UTF-16 string-index offsets, while a char count stays 1:1 with both the original bytes and the JS index throughout.",
+]
+
+[[construct]]
+id = "generator"
+title = "generator / iterator"
+query = '''
+[
+  (generator_function_declaration) @match
+  (yield_expression) @match
+]
+'''
+rust = "Implement `Iterator` (or return `impl Iterator`); async generators → `async-stream` or a channel-backed `Stream`."
+
+[[construct]]
+id = "optional-chaining"
+title = "optional chaining (?.) / nullish (??)"
+query = '''
+[
+  (optional_chain) @match
+  (binary_expression operator: "??") @match
+]
+'''
+rust = "`Option` combinators: `.as_ref().and_then(...)`, `.unwrap_or(...)`, `.unwrap_or_else(...)`."
+hazards = [
+  "`a || b` treats `\"\"`, `0`, and `false` as missing; `a ?? b` does not. Port the one the code actually uses.",
+  "When TS copies an untyped JSON value and later gates on its truthiness (`if (x.url)`), decide the gate from the raw value (a `truthy` helper) before coercing it to a string: `0` is falsy but `\"0\"` is not, `[]` is truthy but coerces to `\"\"`.",
+]
+
+[[construct]]
+id = "spread"
+title = "object / array spread"
+query = '''
+[
+  (spread_element) @match
+]
+'''
+rust = "Struct update syntax (`..base.clone()`), `Vec::extend`, or `iter().chain()`; spreading config objects often means a builder or `merge` fn."
+hazards = [
+  "A conditional-spread 'patch' argument (`{...(x.field ? {field: x.field} : {})}`, applied via `Object.assign(target, patch)`) is a Rust struct whose `Option<T>` fields mean `None` = leave unchanged, `Some` = overwrite — but only after grepping every real call site to confirm none of them explicitly spreads an `undefined`-valued key (which `Object.assign` WOULD apply, unlike a plain omitted key); note the confirmation in the port's file-level comment/notes rather than assuming it.",
+]
+
+[[construct]]
+id = "closure"
+title = "arrow function / callback"
+query = "(arrow_function) @match"
+rust = "Closures; `impl Fn` params for sync callbacks, `Box<dyn Fn + Send + Sync>` when stored, async callbacks as `Fn() -> BoxFuture<'static, T>`."
+hazards = [
+  "A closure-returning factory (`createX(): { methodA, methodB, ... }`) with internal mutable state becomes `struct XStore { inner: Arc<Inner> }` with `::new()` / `::with_schedule()`-style constructors and public methods mirroring the returned object's fields, not a free function returning a tuple of boxed closures. Record the constructor rename (`tsName` -> `Type::new`) in the port map.",
+  "A struct field holding an optional callback (`pause?: () => boolean`) that a method must invoke AFTER checking state under an internal `Mutex` should be `Arc<dyn Fn... + Send + Sync>`, not `Box`: clone the `Arc` out of the lock, drop the guard, then call — avoids a self-deadlock if the callback reenters the same struct's methods, which a single-threaded TS class with no lock can never trigger but a shared `Arc<Mutex<_>>`-backed Rust port can.",
+]
+
+[[construct]]
+id = "dynamic-import"
+title = "dynamic import() / require()"
+query = '''
+(call_expression function: (import)) @match
+((call_expression function: (identifier) @r) @match (#eq? @r "require"))
+'''
+rust = "A normal `use`; lazy loading exists in TS only to cut startup time. Loading user-authored modules at runtime needs a deliberate design (subprocess, WASM, or a declarative format)."
+hazards = [
+  "A TS module built around a dynamic `import(specifier)` at runtime (JS/TS plugin loading, e.g. `new Function(\"specifier\", \"return import(specifier)\")`) has no faithful native-Rust equivalent without embedding a script engine. Treat this as a blocker needing an explicit, reviewed architecture decision (embedded engine vs. compiled-plugin format vs. dropping the dynamic-code extension point) — do not silently stub in fabricated behavior or skip the file.",
+]
+
+[[construct]]
+id = "jsx"
+title = "JSX (terminal UI components)"
+tsx_only = true
+query = '''
+[
+  (jsx_element) @match
+  (jsx_self_closing_element) @match
+]
+'''
+rust = "widgets from your terminal UI component library (see components.toml for what each component API becomes); screen state is a struct, input goes through `handle(event)`, and the app loop is `crossterm::event::EventStream` + `tokio::select!`."
+hazards = [
+  "Ink layout (Yoga flexbox) has no direct ratatui equivalent; prove each ported component against golden frames captured from the original UI, not by eye.",
+]
+
+# ─── External packages ────────────────────────────────────────────────────
+# `npm` is the import root (`@scope/name` or `name`) or `node:<builtin>`.
+
+[[package]]
+npm = "json-asset"
+rust = "`include_str!` + `serde_json::from_str` into a typed struct (or `const`s generated by build.rs for package.json fields like the version)"
+notes = "`package.json` version -> `env!(\"CARGO_PKG_VERSION\")` only if the crate version is kept in sync with it; otherwise embed the real package.json via `include_str!` with a relative path back to the TS tree (count `../` by directory depth) and parse it into a `LazyLock<String>` at first use, or generate a const at build time."
+
+[[package]]
+npm = "ws"
+rust = "`tokio-tungstenite` (default-features = false, features = [\"handshake\"]) over a caller-supplied transport"
+crates = ["tokio-tungstenite"]
+notes = "Wrap a `Stream + Sink` of tungstenite `Message`s as `AsyncRead + AsyncWrite` with bounded `tokio::io::duplex` pipes for backpressure (replaces `pause()`/`resume()`), send binary frames only, `shutdown` sends a close frame, and drop cancels the pumps without a close handshake (`terminate()`). Frame boundaries follow the pipe, not the caller's writes."
+
+[[package]]
+npm = "chalk"
+rust = "a small hand-rolled ANSI color module"
+notes = "ansi-styles closes bold/dim with SGR 22 and colors with 39, not a blanket reset; styling crates such as owo_colors emit `\\x1b[0m`, so the bytes differ. Enablement follows the supports-color version package.json pins: v7 (chalk 4) honors FORCE_COLOR and ignores NO_COLOR. The level is a pure function of env/argv/TTY so tests never mutate process env."
+
+[[package]]
+npm = "commander"
+rust = "clap derive (`#[derive(Parser, Subcommand)]`)"
+crates = ["clap"]
+notes = "If the CLI surface is pinned by a contract file or e2e test, aliases, hidden commands, and option spellings must match. Commander's help text layout does not need to. A TS module that mutates a *live* `commander.Command` at runtime (introspecting/cloning/filtering registered options, walking a subcommand tree) maps to clap's BUILDER API (`clap::Command`/`clap::Arg`, cloning `Arg`s via `Command::get_arguments()`), not `#[derive(Parser)]` — the derive macro produces a static type with nothing to introspect at runtime; reserve the derive for modules that only *declare* a fixed CLI shape. Commander also conflates a live option's *definition* with its post-parse *resolved value* on the same object (`getOptionValue`/`setOptionValueWithSource`); clap splits these — `Command`/`Arg` hold only definitions, and a parse's resolved values live in a separate `ArgMatches`, retrievable with `ArgMatches::value_source(id)` (`ValueSource::DefaultValue`/`CommandLine`/etc). When the TS call happens at command-construction time (before any parse), the value it reads is just that option's *default* — port it as a hidden clap `Arg` carrying the same default, not an ad hoc side channel, so `value_source` still reports `DefaultValue` the way commander's `\"default\"` tag did. An accumulating `argParser` (`(value, previous) => [...previous, value]`) is `ArgAction::Append`; the value parser validates one occurrence."
+
+[[package]]
+npm = "zod"
+rust = "serde derive + explicit validation"
+crates = ["serde", "serde_json"]
+notes = "See the `zod-schema` construct for .strict/.default/.transform equivalents."
+
+[[package]]
+npm = "ajv"
+rust = "JSON Schema validation"
+crates = ["jsonschema"]
+notes = "`validator.errors` (instancePath/schemaPath/keyword/params/message) has no identical shape in `jsonschema`'s `ValidationError`; text built from it is not byte-identical, so say so where it is surfaced."
+
+[[package]]
+npm = "yaml"
+rust = "`serde_yaml_ng` into `serde_json::Value` or a typed struct"
+crates = ["serde_yaml_ng"]
+
+[[package]]
+npm = "ajv-formats"
+rust = "format validators (the `jsonschema` crate validates common formats)"
+crates = ["jsonschema"]
+
+[[package]]
+npm = "acorn"
+rust = "JavaScript parsing — tree-sitter-javascript, or `oxc_parser` if a full AST is needed"
+crates = ["tree-sitter-javascript", "oxc_parser"]
+
+[[package]]
+npm = "cross-spawn"
+rust = "`tokio::process::Command` / `std::process::Command`"
+notes = "cross-spawn exists for Windows PATHEXT/shebang handling; `Command` resolves PATH itself, `which` covers explicit lookups."
+
+[[package]]
+npm = "open"
+rust = "open a URL in the browser"
+crates = ["open"]
+
+[[package]]
+npm = "proper-lockfile"
+rust = "advisory file locks"
+notes = "The `crates = [\"fs4\"]` this entry used to suggest was actively misleading: fs4 is flock-based, but proper-lockfile uses a `<file>.lock` directory with mtime staleness, and other versions of the program may share that on-disk protocol during upgrade windows, so keep it rather than switching to flock. Hand-roll it: mkdir the lock path, reclaim on `mtime` older than `stale`, back off retries per the `{retries,factor,minTimeout,maxTimeout}` shape (the `retry` npm package's shape), keep a held lock fresh with a background mtime touch every `update`, and report a failed touch through a lock-compromised guard. When several modules call this protocol, implement it exactly once as a shared `pub(crate)` module rather than re-deriving equivalent-but-subtly-different logic per call site. A call that omits `retries` gets proper-lockfile's default of zero retries: fail at once with `ELOCKED` when a fresh lock is held. A TS test that spies on the npm module's exported function (`vi.spyOn(lockfile.lock, ...).mockImplementation(...)`) to inject a mid-operation failure has no monkey-patch equivalent once reimplemented in-crate; port it as a `#[cfg(test)]`-only internal seam that fires the exact same failure signal (e.g. the lock-compromise guard's `on_compromised`) at the identical point in the real code path, and document why the seam exists in place of the TS spy."
+
+[[package]]
+npm = "ink"
+rust = "ratatui + crossterm"
+crates = ["ratatui", "crossterm"]
+notes = "astroshots: `<Box>` layout → `ratatui::layout::Layout` constraints, `<Text color=...>` → styled `Span`s from `ui/theme`, `useInput` → the screen's `handle(event)`, `useApp().exit()` → returning a quit action from the event loop, `useStdout` dimensions → the frame area. Port each Ink component as a function or `Widget` that renders the same text and layout; there are no goldens, so port the TS component tests by asserting on a `ratatui::backend::TestBackend` buffer."
+
+[[package]]
+npm = "react"
+rust = "no direct equivalent: component state → struct fields, effects → event-loop tasks, context → passed-in handles (per-hook rules in components.toml)"
+crates = ["ratatui"]
+notes = "React's `useState(factory)` + `useSyncExternalStore(subscribe, snapshot, snapshot)` hook pair has no per-call Rust equivalent: port `useState`'s factory argument as the store type's constructor, with the *caller's* screen state struct owning one instance as a field (the `useState` slot); port the hook function itself as a thin forwarding call (`store.observe(...)`) taking `&Store` as an explicit parameter, not synthesized hook-local persistent state. `useSyncExternalStore`'s subscribe/re-render wiring is left for the screen struct that will own the store, ported when that screen (the hook's actual caller) is ported. Per-hook rules live in your terminal UI component library's mapping (see components.toml)."
+
+[[package]]
+npm = "zustand"
+rust = "a state struct owned by the UI task, updated through messages (`tokio::sync::mpsc`) or `watch` for broadcast"
+
+[[package]]
+npm = "vitest"
+rust = "Rust tests (`#[test]`, `#[tokio::test]`); fixtures with `tempfile`, HTTP fakes with `httpmock`/`wiremock`"
+crates = ["tempfile", "wiremock"]
+notes = "Only test support imports this outside test files."
+
+[[package]]
+npm = "bun:sqlite"
+rust = "SQLite"
+crates = ["rusqlite (bundled)"]
+notes = "If the database schema is a contract (other versions or tools read the file), keep it identical. Run blocking rusqlite calls in `spawn_blocking` or a dedicated DB thread; keep PRAGMAs (WAL, busy_timeout, synchronous) identical."
+
+[[package]]
+npm = "node:sqlite"
+rust = "SQLite"
+crates = ["rusqlite (bundled)"]
+notes = "Same rules as bun:sqlite: identical schema and PRAGMAs; blocking calls off the async workers."
+
+[[package]]
+npm = "node:fs"
+rust = "`std::fs` (sync call sites) or `tokio::fs` (inside async code)"
+notes = "Atomic writes (write temp + rename) must stay atomic: `tempfile::NamedTempFile::persist`. `fs.rmSync({recursive,force})` → `std::fs::remove_dir_all` ignoring NotFound. `fs.readdir`/`readdirSync`/`fs.promises.readdir` return names byte-sorted (libuv sorts scandir with strcmp); `read_dir` returns raw OS order. Wherever order is observable (output, first match, truncation cap, tie-break in a later stable sort), sort with a byte-order helper (`sort_like_readdir`) before use; test with names whose OS order is scrambled (e.g. `beta zeta 9 10 é _x Alpha e`), since simple lowercase pairs often come back sorted on APFS."
+
+[[package]]
+npm = "node:fs/promises"
+rust = "`tokio::fs`"
+notes = "tokio::fs runs on the blocking pool; for many small files a single `spawn_blocking` with std::fs is faster. The readdir byte-order rule under node:fs applies here too."
+
+[[package]]
+npm = "node:path"
+rust = "`std::path::{Path, PathBuf}`"
+notes = "`path.resolve` normalizes `..` lexically; `Path::canonicalize` hits the filesystem and resolves symlinks. Use `path-clean` (lexical) when the TS code did not touch the filesystem. `path.win32`/`path.posix` operate on strings for a fixed platform; `std::path` follows the host, so port those by hand and check against node."
+crates = ["path-clean"]
+
+[[package]]
+npm = "node:os"
+rust = "`std::env::home_dir`/`dirs`, `std::env::temp_dir`, `std::env::consts`, `gethostname::gethostname()` for `os.hostname()`"
+crates = ["dirs", "gethostname"]
+notes = "Match where the TS code put its config/state: if it hardcoded `$HOME/.config/<app>` on every platform, do not switch to `dirs::config_dir` (which differs on macOS/Windows)."
+
+[[package]]
+npm = "node:crypto"
+rust = "hashing and randomness"
+crates = ["sha2", "hex", "rand", "uuid"]
+notes = "Hashes that feed on-disk identities (file names, lock paths) must match: hash the exact same bytes and encode the same way (hex vs base64url)."
+
+[[package]]
+npm = "node:child_process"
+rust = "`tokio::process::Command` / `std::process::Command`"
+notes = "See the `child-process` construct for detached/process-group handling."
+
+[[package]]
+npm = "node:http"
+rust = "server: `axum`/`hyper`; client: `reqwest`. Helpers that wrote to a `ServerResponse` return an `http::Response<Full<Bytes>>` instead; read request bodies through `http_body::Body`."
+crates = ["axum", "hyper", "reqwest"]
+
+[[package]]
+npm = "node:https"
+rust = "`reqwest` with rustls"
+crates = ["reqwest"]
+
+[[package]]
+npm = "node:net"
+rust = "`tokio::net` (UnixListener/UnixStream for local sockets, TcpListener)"
+notes = "If a socket path is derived from a state root, keep the derivation identical so old and new binaries find the same socket."
+
+[[package]]
+npm = "node:events"
+rust = "typed channels (`tokio::sync::broadcast`/`mpsc`/`watch`)"
+
+[[package]]
+npm = "node:readline"
+rust = "`tokio::io::BufReader::lines` for line streams; `dialoguer`/`inquire` for prompts"
+crates = ["dialoguer"]
+
+[[package]]
+npm = "node:stream"
+rust = "`tokio::io::{AsyncRead, AsyncWrite}` / `futures::Stream`"
+crates = ["tokio-util"]
+notes = "A TS test with two describe/it cases exercising the SAME mechanism through Node's two stream-consumption styles ('data' events vs paused-mode readable/read()) collapses to one Rust API when the port has no such duck-typed distinction. Port both test cases anyway for 1:1 fidelity, with a comment on the second explaining it is mechanically identical to the first in this port."
+
+[[package]]
+npm = "node:string_decoder"
+rust = "incremental UTF-8 decoding — buffer bytes and use `std::str::from_utf8` on complete sequences, or `tokio_util::codec::LinesCodec`"
+
+[[package]]
+npm = "node:timers/promises"
+rust = "`tokio::time::sleep` / `interval`"
+
+[[package]]
+npm = "node:tty"
+rust = "`std::io::IsTerminal`"
+
+[[package]]
+npm = "node:url"
+rust = "`url::Url`; `fileURLToPath` → `Url::to_file_path`"
+crates = ["url"]
+
+[[package]]
+npm = "node:util"
+rust = "promisify → the async API directly; inspect → `{:?}`; parseArgs → clap; types → pattern matching"
+
+[[package]]
+npm = "node:perf_hooks"
+rust = "`std::time::Instant`"
+
+[[package]]
+npm = "node:v8"
+rust = "no equivalent: heap statistics were used for memory diagnostics; use `sysinfo` or drop"
+crates = ["sysinfo"]
+
+[[package]]
+npm = "node:zlib"
+rust = "compression"
+crates = ["flate2"]
+notes = "node:zlib `inflateSync` ↔ `flate2::read::ZlibDecoder` (expects a zlib-wrapped stream — 2-byte header + adler32 trailer — not raw deflate); `read_to_end` into a `Vec<u8>`."
+
+[[construct]]
+id = "global-fetch"
+title = "fetch(...) (global HTTP client)"
+query = '''
+(call_expression
+  function: (identifier) @fn
+  (#eq? @fn "fetch")) @match
+'''
+rust = "`reqwest` through a per-thread client: `thread_local! { static HTTP_CLIENT: reqwest::Client = reqwest::Client::new(); }` plus `fn http_client() -> reqwest::Client { HTTP_CLIENT.with(reqwest::Client::clone) }`. Never a process-wide `static ...: LazyLock<reqwest::Client>`."
+hazards = [
+  "A `reqwest::Client` pools keep-alive connections bound to the tokio runtime that opened them. A process-wide static shared by several runtimes (every `#[tokio::test]` builds its own, and wiremock reuses ports) hands a later runtime a connection whose reactor is gone; the request never completes and the test hangs at 0% CPU, often while holding `temp_env`'s global lock so every env-using test stalls behind it.",
+]
+
+[[construct]]
+id = "clock-or-function"
+title = "Clock | (() => number) parameter normalized by clockNow"
+query = '''
+(union_type
+  (type_identifier) @t
+  (#eq? @t "Clock")) @match
+'''
+rust = "a `ClockSource` enum (`Clock(Arc<dyn Clock>)` or `Function(NowFn)`) normalized by `clock_now(impl Into<ClockSource>) -> NowFn`; any `Fn() -> i64` closure converts. When a ported module already takes a `now` closure with a `Date.now` default, keep the closure: a caller holding a `Clock` passes `clock_now(clock)`. Use `clock_now_default()` for the omitted argument. A trailing optional `clock: Clock = systemClock` parameter on an exported function becomes a paired `f_with_clock(.., clock: &dyn Clock)` with `f` delegating through `SystemClock`, so existing callers stay unchanged."
+
+# ─── astroshots ───────────────────────────────────────────────────────────
+
+[[package]]
+npm = "playwright"
+rust = "`crate::browser` (chromiumoxide over CDP) for real browser pages; `crate::raster` for terminal frames"
+crates = ["chromiumoxide"]
+notes = "See rust/PORTING.md decision 2. `page.setContent(html)` + `locator.screenshot()` used to rasterize terminal HTML: do not port that path, call `crate::raster` with the terminal grid instead. Browser launches are shared per process like the TS `sharedBrowser`."
+
+[[package]]
+npm = "@xterm/headless"
+rust = "`vt100::Parser` (screen, cells, colors, attributes)"
+crates = ["vt100"]
+notes = "Map xterm cell reads (`getFgColor`, `isFgRGB`, `isBold`, ...) to `vt100::Cell` (`fgcolor()` → `vt100::Color::{Default, Idx, Rgb}`, `bold()`, ...). Check wide-char and cursor handling against the TS tests."
+
+[[package]]
+npm = "node-pty"
+rust = "`portable-pty` (`native_pty_system().openpty`, `CommandBuilder`); read the master on a blocking thread and forward over a tokio channel"
+crates = ["portable-pty"]
+
+[[package]]
+npm = "pngjs"
+rust = "`png` crate for encode/decode; `image` for resizing"
+crates = ["png", "image"]
+
+[[package]]
+npm = "node:worker_threads"
+rust = "`rayon` or `tokio::task::spawn_blocking`; messages become function calls returning results"
+crates = ["rayon"]
+
+[[package]]
+npm = "node:module"
+rust = "usually `createRequire` to locate a package's files: resolve them through `crate::node_helper` (the helper owns the node_modules lookup)"
+
+[[package]]
+npm = "tsx"
+rust = "the Node helper: loading user TS config and fixtures stays in Node (`crate::node_helper`)"
+notes = "rust/PORTING.md decision 1. Record the TS module with `rustify replace --with \"node helper: <command>\"` if loading is all it does."
+
+[[package]]
+npm = "vite"
+rust = "the Node helper's `react-serve` command (`crate::node_helper`)"
+
+[[package]]
+npm = "@vitejs/plugin-react"
+rust = "the Node helper's `react-serve` command (`crate::node_helper`)"
