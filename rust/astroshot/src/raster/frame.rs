@@ -307,6 +307,12 @@ impl HeadlessTerminal {
         &self.term
     }
 
+    /// Cursor `(col, row)` in the visible window (xterm `cursorX` / `cursorY`).
+    pub fn cursor_position(&self) -> (u16, u16) {
+        let (row, col) = self.screen().cursor_position();
+        (col, row)
+    }
+
     pub fn plain_text(&self) -> String {
         let rows = u16::try_from(self.term.screen_lines()).unwrap_or(u16::MAX);
         terminal_plain_text(&self.term, rows)
