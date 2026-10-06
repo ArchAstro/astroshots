@@ -88,7 +88,7 @@ fn extname(path: &str) -> &str {
 }
 
 /// `path.join(a, b)` for a non-empty directory and a relative segment.
-fn join(a: &str, b: &str) -> String {
+pub fn join(a: &str, b: &str) -> String {
     if a.is_empty() {
         return b.to_string();
     }

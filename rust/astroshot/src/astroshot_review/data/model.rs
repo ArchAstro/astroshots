@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::movie_harness::types::js_number;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FeatureStatus {
@@ -22,7 +24,11 @@ pub struct Chapter {
     pub slug: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "js_number::option"
+    )]
     pub t_ms: Option<f64>,
 }
 
@@ -74,12 +80,15 @@ pub struct Shot {
     pub run_id: Option<String>,
     pub status: Option<FeatureStatus>,
     /// Epoch milliseconds.
+    #[serde(with = "js_number")]
     pub captured_at: f64,
+    #[serde(with = "js_number")]
     pub mtime_ms: f64,
     pub is_movie: bool,
     pub video_file_name: Option<String>,
     /// Absolute path when the video exists on disk.
     pub video_path: Option<String>,
+    #[serde(default, with = "js_number::option")]
     pub duration_ms: Option<f64>,
     pub source: Option<String>,
     pub chapters: Vec<Chapter>,
@@ -109,6 +118,7 @@ pub struct FrictionRun {
     pub run_id: String,
     pub directory: String,
     pub log_path: Option<String>,
+    #[serde(with = "js_number")]
     pub captured_at: f64,
     pub status: Option<String>,
     pub steps: Vec<FrictionStep>,
@@ -128,6 +138,7 @@ pub struct FrictionLog {
     pub title: String,
     pub description: String,
     pub status: Option<String>,
+    #[serde(with = "js_number")]
     pub updated_at: f64,
     pub prompt_path: Option<String>,
     pub runs: Vec<FrictionRun>,
@@ -174,6 +185,23 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&snapshot).unwrap(),
             r#"{"state":"pending","decision":null,"hashMatches":true,"isStale":false,"comments":[],"reviewedAt":null}"#
+        );
+    }
+
+    #[test]
+    fn whole_numbers_serialize_without_a_fraction() {
+        let chapter = Chapter {
+            t_ms: Some(1500.0),
+            ..Chapter::default()
+        };
+        assert_eq!(serde_json::to_string(&chapter).unwrap(), r#"{"tMs":1500}"#);
+        let fractional = Chapter {
+            t_ms: Some(1500.5),
+            ..Chapter::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&fractional).unwrap(),
+            r#"{"tMs":1500.5}"#
         );
     }
 }
