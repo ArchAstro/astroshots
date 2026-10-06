@@ -322,10 +322,10 @@ ts = "packages/astroshot-review/src/terminal/probe.ts"
 status = "ported"
 rust = "astroshot_review/terminal/probe.rs"
 module = "astroshot::astroshot_review::terminal::probe"
-ported_at = "2026-10-06T21:45:12Z"
+ported_at = "2026-10-06T21:54:36Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 tests = ["packages/astroshot-review/src/terminal/probe.test.ts"]
-notes = "ProbeStreams is a trait (StdioStreams real impl); stdin reader thread is not cancellable after timeout (TODO poll via rustix)"
+notes = "ProbeStreams is a trait; stdin read polls with rustix so a timeout never swallows later input"
 
 [module.ts_blobs]
 "packages/astroshot-review/src/terminal/probe.test.ts" = "bc77c200f3adc3da22f24d7738edd25a4b1ad33d"
@@ -649,8 +649,8 @@ sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_err
 [[module]]
 ts = "packages/movie-harness/src/terminal-paint.ts"
 status = "replaced"
-module = "astroshot::raster (native rasterizer; rust/PORTING.md decision 2)"
-ported_at = "2026-10-06T21:38:22Z"
+module = "astroshot::raster (alacritty_terminal grid → native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:54:37Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [module.ts_blobs]
@@ -690,10 +690,10 @@ ts = "packages/react-shot/src/batch-paths.ts"
 status = "ported"
 rust = "react_shot/batch_paths.rs"
 module = "astroshot::react_shot::batch_paths"
-ported_at = "2026-10-06T21:45:09Z"
+ported_at = "2026-10-06T21:54:35Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 tests = ["packages/react-shot/src/batch-paths.test.ts"]
-notes = "TODO NFC normalization (unicode-normalization) — currently lowercase only"
+notes = "NFC + lowercase collision key, as TS"
 
 [module.ts_blobs]
 "packages/react-shot/src/batch-paths.test.ts" = "28790a6424973f953ba97b5c2508fc91b93f1b2d"
@@ -779,10 +779,10 @@ ts = "packages/tui-shot/src/batch-paths.ts"
 status = "ported"
 rust = "tui_shot/batch_paths.rs"
 module = "astroshot::tui_shot::batch_paths"
-ported_at = "2026-10-06T21:45:10Z"
+ported_at = "2026-10-06T21:54:35Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 tests = ["packages/tui-shot/src/batch-paths.test.ts"]
-notes = "TODO NFC normalization — currently lowercase only"
+notes = "NFC + lowercase collision key, as TS"
 
 [module.ts_blobs]
 "packages/tui-shot/src/batch-paths.test.ts" = "62624f5919c757c90ba1d6273a65a4c7d10d57e8"
@@ -824,8 +824,8 @@ status = "in_progress"
 [[module]]
 ts = "packages/tui-shot/src/terminal-html.ts"
 status = "replaced"
-module = "astroshot::raster (native rasterizer; rust/PORTING.md decision 2)"
-ported_at = "2026-10-06T21:38:22Z"
+module = "astroshot::raster (alacritty_terminal grid → native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:54:37Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
 
 [module.ts_blobs]
