@@ -772,3 +772,49 @@ fn run_source_desktop_window_records_a_native_window() {
     assert_eq!(artifact["source"], "desktop.window");
     assert_published(&artifact, dir.path(), "native");
 }
+
+/// Help text `astroshot-movie --help` printed, captured from the TS bin.
+const MOVIE_HELP: &str = include_str!("fixtures/help/astroshot-movie.txt");
+
+/// `packages/movie-harness/bin/astroshot-movie.mjs` ran `runCli` with the raw
+/// arguments; the binary does the same when it is named `astroshot-movie`.
+#[cfg(unix)]
+#[test]
+fn astroshot_movie_bin_help_and_unknown_commands_match_the_ts_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    let alias = dir.path().join("astroshot-movie");
+    std::os::unix::fs::symlink(BIN, &alias).unwrap();
+    let call = |args: &[&str]| run_program(&alias, args, dir.path());
+    #[track_caller]
+    fn assert_exact(output: &Output, stdout: &str, stderr: &str, code: i32) {
+        assert_eq!(text(&output.stdout), stdout, "stdout");
+        assert_eq!(text(&output.stderr), stderr, "stderr");
+        assert_eq!(output.status.code(), Some(code), "exit code");
+    }
+
+    // No arguments, the help words, and --help after any command: usage, exit 0.
+    for args in [
+        &[][..],
+        &["--help"],
+        &["-h"],
+        &["help"],
+        &["which-source", "--help"],
+        &["start", "--help"],
+        &["run", "--help"],
+    ] {
+        assert_exact(&call(args), MOVIE_HELP, "", 0);
+    }
+    // The movie CLI has no version flag; anything else is an unknown command
+    // that repeats the usage on stderr.
+    for command in ["--version", "-v", "bogus", "--bogus"] {
+        assert_exact(
+            &call(&[command]),
+            "",
+            &format!("error: unknown command: {command}\n\n{MOVIE_HELP}"),
+            1,
+        );
+    }
+    // `astroshot movie` forwards everything to the same CLI.
+    assert_exact(&movie_in(dir.path(), &[]), MOVIE_HELP, "", 0);
+    assert_exact(&movie_in(dir.path(), &["--help"]), MOVIE_HELP, "", 0);
+}

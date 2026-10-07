@@ -594,3 +594,65 @@ fn usage_errors_print_the_ts_message_and_exit_1() {
     assert_eq!(help.status.code(), Some(0));
     assert!(text(&help.stdout).contains("tui-shot pty <fixture.yaml|json> -o <out.png> [options]"));
 }
+
+/// Help text `tui-shot --help` printed, captured from the TS bin.
+const TUI_SHOT_HELP: &str = include_str!("fixtures/help/tui-shot.txt");
+
+#[track_caller]
+fn assert_exact(output: &Output, stdout: &str, stderr: &str, code: i32) {
+    assert_eq!(text(&output.stdout), stdout, "stdout");
+    assert_eq!(text(&output.stderr), stderr, "stderr");
+    assert_eq!(output.status.code(), Some(code), "exit code");
+}
+
+/// `packages/tui-shot/bin/tui-shot.mjs` ran `cli.ts` with the raw arguments;
+/// the binary does the same when it is named `tui-shot`.
+#[cfg(unix)]
+#[test]
+fn tui_shot_bin_help_and_usage_errors_match_the_ts_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    let alias = dir.path().join("tui-shot");
+    std::os::unix::fs::symlink(BIN, &alias).unwrap();
+    let call = |args: &[&str]| run_with(&alias, args, dir.path(), &[]);
+
+    // No arguments: help, but a usage error.
+    assert_exact(&call(&[]), TUI_SHOT_HELP, "", 1);
+    // Help as the command, or as a flag after any command (known or not).
+    for args in [
+        &["--help"][..],
+        &["-h"],
+        &["help"],
+        &["shot", "--help"],
+        &["pty", "--help"],
+        &["batch", "--help"],
+        &["install-browser", "--help"],
+        &["bogus", "--help"],
+    ] {
+        assert_exact(&call(args), TUI_SHOT_HELP, "", 0);
+    }
+    // tui-shot has no version flag: the first argument is always the command.
+    assert_exact(&call(&["--version"]), "", "Unknown command: --version\n", 1);
+    assert_exact(&call(&["-v"]), "", "Unknown command: -v\n", 1);
+    assert_exact(&call(&["bogus"]), "", "Unknown command: bogus\n", 1);
+    assert_exact(&call(&["--bogus"]), "", "Unknown command: --bogus\n", 1);
+    // Flags after the command are parsed before the command is checked.
+    assert_exact(&call(&["bogus", "--nope"]), "", "Unknown flag: --nope\n", 1);
+    assert_exact(&call(&["pty", "-o"]), "", "-o requires a value\n", 1);
+    // A bare fixture path is not a command here; `astroshot ink` adds `shot`.
+    assert_exact(&call(&["x.tsx"]), "", "Unknown command: x.tsx\n", 1);
+    assert_exact(&call(&["shot"]), "", "shot requires a fixture path\n", 1);
+    assert_exact(&call(&["pty"]), "", "pty requires a fixture path\n", 1);
+    assert_exact(&call(&["batch"]), "", "batch requires a manifest path\n", 1);
+    assert_exact(
+        &call(&["shot", "x.tsx"]),
+        "",
+        "shot requires -o <out.png>\n",
+        1,
+    );
+    assert_exact(
+        &call(&["install-browser", "extra"]),
+        "",
+        "install-browser does not accept arguments\n",
+        1,
+    );
+}

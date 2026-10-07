@@ -1,0 +1,21 @@
+react-shot - deterministic React component screenshots
+
+Usage:
+  react-shot shot <fixture.tsx> -o <out.png> [options]
+  react-shot batch <manifest.yaml|json> [options]
+  react-shot <fixture.tsx> -o <out.png> [options]
+  react-shot install-browser [--with-deps]
+
+Options:
+  -o, --out <path>       Output PNG path
+  --root <dir>           Package root for imports and aliases
+  --config <path>        Config path; otherwise discovered from the fixture
+  --width <px>           Override viewport width
+  --height <px>          Override viewport height
+  --headed               Show Chromium for debugging
+  --with-deps            Install Chromium OS dependencies too
+  -v, --version          Print the installed version
+  -h, --help             Show this help
+
+Run "react-shot install-browser" once before the first capture.
+
