@@ -691,13 +691,14 @@ fn pty_png_for_a_twenty_row_grid_at_scale_two_matches_the_ts_size() {
 
 /// What node-pty's child leaves on the terminal when it cannot execute the
 /// program: nothing on macOS (`spawn-helper` exits 1 silently), the
-/// `perror("execvp(3) failed.")` line elsewhere.
+/// `perror("execvp(3) failed.")` line elsewhere, wrapped by the fixture's 40
+/// columns.
 #[cfg(unix)]
 fn failed_exec_frame() -> &'static str {
     if cfg!(target_os = "macos") {
         ""
     } else {
-        "execvp(3) failed.: No such file or directory"
+        "execvp(3) failed.: No such file or direc\ntory"
     }
 }
 

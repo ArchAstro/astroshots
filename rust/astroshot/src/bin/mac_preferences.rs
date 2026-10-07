@@ -186,25 +186,60 @@ pub struct ExtractedKey {
 /// real failure, so absence is matched explicitly. Everything else (plutil
 /// missing, spawn error, unrecognized non-zero exit) is a tool failure.
 pub fn extract_preference_key(plist: &[u8], key: &str, format: &str) -> ExtractedKey {
+    // Before macOS 26, `plutil -extract <key> json` refuses a plist that
+    // holds anything JSON cannot express anywhere in it, and a real
+    // preferences domain does (`NSOSPLastRootDirectory` is `<data>`). Extract
+    // the value as XML, which always works, and convert that alone to JSON.
+    if format == "json" {
+        let fragment = match run_plutil(&["-extract", key, "xml1", "-o", "-", "-"], plist) {
+            Ok(fragment) => fragment,
+            Err(outcome) => return outcome,
+        };
+        return match run_plutil(&["-convert", "json", "-o", "-", "-"], &fragment) {
+            Ok(json) => found_key(&json),
+            // The key exists; only its value could not be converted.
+            Err(outcome) => ExtractedKey {
+                failed: true,
+                error: outcome
+                    .error
+                    .or(Some("plutil could not convert the value".into())),
+                ..Default::default()
+            },
+        };
+    }
+    match run_plutil(&["-extract", key, format, "-o", "-", "-"], plist) {
+        Ok(raw) => found_key(&raw),
+        Err(outcome) => outcome,
+    }
+}
+
+fn found_key(stdout: &[u8]) -> ExtractedKey {
+    ExtractedKey {
+        present: true,
+        raw: Some(String::from_utf8_lossy(stdout).into_owned()),
+        ..Default::default()
+    }
+}
+
+/// Run `plutil` with `input` on stdin. `Err` is the [`ExtractedKey`] for a
+/// run that did not succeed: absent for a missing key, failed otherwise.
+fn run_plutil(args: &[&str], input: &[u8]) -> Result<Vec<u8>, ExtractedKey> {
     let failure = |error: String| ExtractedKey {
         failed: true,
         error: Some(error),
         ..Default::default()
     };
-    let mut child = match Command::new(PLUTIL_BIN)
-        .args(["-extract", key, format, "-o", "-", "-"])
+    let mut child = Command::new(PLUTIL_BIN)
+        .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-    {
-        Ok(child) => child,
-        Err(error) => return failure(error.to_string()),
-    };
+        .map_err(|error| failure(error.to_string()))?;
     // Feed stdin from a thread so a large plist cannot deadlock against the
     // child filling its stdout pipe.
     let stdin = child.stdin.take();
-    let input = plist.to_vec();
+    let input = input.to_vec();
     let writer = std::thread::spawn(move || {
         if let Some(mut stdin) = stdin {
             // A broken pipe means plutil exited early; its status reports why.
@@ -213,30 +248,24 @@ pub fn extract_preference_key(plist: &[u8], key: &str, format: &str) -> Extracte
     });
     let output = child.wait_with_output();
     let _ = writer.join();
-    let output = match output {
-        Ok(output) => output,
-        Err(error) => return failure(error.to_string()),
-    };
+    let output = output.map_err(|error| failure(error.to_string()))?;
+    if output.status.code() == Some(0) {
+        return Ok(output.stdout);
+    }
+    // plutil before macOS 26 writes its errors to stdout.
     let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.code() != Some(0) {
-        if is_missing_key_message(&stderr) {
-            return ExtractedKey::default();
-        }
-        let trimmed = stderr.trim();
-        return failure(if trimmed.is_empty() {
-            match output.status.code() {
-                Some(code) => format!("plutil exited {code}"),
-                None => "plutil exited null".to_string(),
-            }
-        } else {
-            trimmed.to_string()
-        });
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if is_missing_key_message(&stderr) || is_missing_key_message(&stdout) {
+        return Err(ExtractedKey::default());
     }
-    ExtractedKey {
-        present: true,
-        raw: Some(String::from_utf8_lossy(&output.stdout).into_owned()),
-        ..Default::default()
-    }
+    let message = [stderr.trim(), stdout.trim()]
+        .into_iter()
+        .find(|text| !text.is_empty());
+    Err(failure(match (message, output.status.code()) {
+        (Some(message), _) => message.to_string(),
+        (None, Some(code)) => format!("plutil exited {code}"),
+        (None, None) => "plutil exited null".to_string(),
+    }))
 }
 
 #[derive(Debug, Default)]

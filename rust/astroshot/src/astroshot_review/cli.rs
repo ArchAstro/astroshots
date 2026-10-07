@@ -297,29 +297,39 @@ impl Pictures {
 
 /// Resolves with the exit code of the first termination signal: `kill <pid>`
 /// or a closing terminal must not leave pictures or the alternate screen behind.
+///
+/// The handlers are installed by the call, not by the first poll of the
+/// returned future: `select!` does not poll its other branches while one is
+/// ready, so a signal arriving during a busy stretch of the loop would still
+/// have had its default action and killed the process mid-screen.
 #[cfg(unix)]
-async fn termination_signal() -> i32 {
+fn termination_signal() -> impl Future<Output = i32> {
     use tokio::signal::unix::{SignalKind, signal};
-    let (Ok(mut term), Ok(mut hup), Ok(mut quit), Ok(mut int)) = (
+    let signals = (
         signal(SignalKind::terminate()),
         signal(SignalKind::hangup()),
         signal(SignalKind::quit()),
         signal(SignalKind::interrupt()),
-    ) else {
-        return std::future::pending().await;
-    };
-    tokio::select! {
-        _ = hup.recv() => 129,
-        _ = term.recv() => 143,
-        _ = quit.recv() => 143,
-        _ = int.recv() => 143,
+    );
+    async move {
+        let (Ok(mut term), Ok(mut hup), Ok(mut quit), Ok(mut int)) = signals else {
+            return std::future::pending().await;
+        };
+        tokio::select! {
+            _ = hup.recv() => 129,
+            _ = term.recv() => 143,
+            _ = quit.recv() => 143,
+            _ = int.recv() => 143,
+        }
     }
 }
 
 #[cfg(not(unix))]
-async fn termination_signal() -> i32 {
-    let _ = tokio::signal::ctrl_c().await;
-    143
+fn termination_signal() -> impl Future<Output = i32> {
+    async {
+        let _ = tokio::signal::ctrl_c().await;
+        143
+    }
 }
 
 /// Inside herdr, raw Kitty escapes are dropped; render through its socket
