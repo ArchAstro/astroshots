@@ -1,0 +1,1471 @@
+# Port progress. Maintained by `rustify start|done|skip`; edit notes by hand.
+
+[[module]]
+ts = "packages/astroshot-review/src/cli.ts"
+status = "ported"
+rust = "astroshot_review/cli.rs"
+module = "astroshot::astroshot_review::cli"
+ported_at = "2026-10-06T23:41:05Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+test_provenance = [
+    "packages/astroshot-review/src/capture.e2e.test.ts",
+    "packages/astroshot-review/src/review.e2e.test.ts",
+]
+notes = "Version flag prints CARGO_PKG_VERSION; Ink render to crossterm/ratatui loop; signals return 129/143 after restoring the terminal; store dispose and runtime shutdown are bounded; e2e cases live in tests/review_cli.rs"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/capture.e2e.test.ts" = "e74f4a04e44fd6f976192acca7eb3cb07ed165b3"
+"packages/astroshot-review/src/cli.ts" = "041fe255fd80fb6134bbb37ce0418df569a9e651"
+"packages/astroshot-review/src/review.e2e.test.ts" = "59cab8d54c0b173fe67eb15953fab719902f72cd"
+
+[module.symbols]
+ParsedArgs = "astroshot::astroshot_review::cli::ParsedArgs"
+main = "astroshot::astroshot_review::cli::run"
+parseArgs = "astroshot::astroshot_review::cli::parse_args"
+reviewHelp = "astroshot::astroshot_review::cli::review_help"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/friction.ts"
+status = "ported"
+rust = "astroshot_review/data/friction.rs"
+module = "astroshot::astroshot_review::data::friction"
+ported_at = "2026-10-06T22:04:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/friction.test.ts"]
+notes = "loaders return io::Result; Date.parse ISO forms only; FrictionContext struct; byte-sorted dir listings like libuv readdir"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/friction.test.ts" = "f3ef71785e22e84eaf2c14ff009dfecb928b70ae"
+"packages/astroshot-review/src/data/friction.ts" = "a933e5207e1d3bb800dcf9d577befe3876570b04"
+
+[module.symbols]
+LOG_FILE = "astroshot::astroshot_review::data::friction::LOG_FILE"
+META_FILE = "astroshot::astroshot_review::data::friction::META_FILE"
+PROMPT_FILE = "astroshot::astroshot_review::data::friction::PROMPT_FILE"
+RUNS_DIR = "astroshot::astroshot_review::data::friction::RUNS_DIR"
+frictionStatusLabel = "astroshot::astroshot_review::data::friction::friction_status_label"
+loadFrictionLog = "astroshot::astroshot_review::data::friction::load_friction_log"
+loadFrictionLogs = "astroshot::astroshot_review::data::friction::load_friction_logs"
+loadRun = "astroshot::astroshot_review::data::friction::load_run"
+loadRuns = "astroshot::astroshot_review::data::friction::load_runs"
+parseJsonl = "astroshot::astroshot_review::data::friction::parse_jsonl"
+runDisplayTitle = "astroshot::astroshot_review::data::friction::run_display_title"
+stepCountLabel = "astroshot::astroshot_review::data::friction::step_count_label"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/hash-cache.ts"
+status = "ported"
+rust = "astroshot_review/data/hash_cache.rs"
+module = "astroshot::astroshot_review::data::hash_cache"
+ported_at = "2026-10-06T21:53:25Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "key-sorted BTreeMap (as index_cache); FileStat replaces fs.Stats; shared in-flight future"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/hash-cache.ts" = "55a29f34690aaaae9b016a0dc8b4c7df5ca36c46"
+
+[module.symbols]
+HashCache = "astroshot::astroshot_review::data::hash_cache::HashCache"
+HashRecord = "astroshot::astroshot_review::data::hash_cache::HashRecord"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/index-cache.ts"
+status = "ported"
+rust = "astroshot_review/data/index_cache.rs"
+module = "astroshot::astroshot_review::data::index_cache"
+ported_at = "2026-10-06T21:47:36Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/index-cache.test.ts"]
+notes = "hash records in path order (BTreeMap), cache only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/index-cache.test.ts" = "ca0755c973ddf9e7370f5eba6f01572e0cdfe6f6"
+"packages/astroshot-review/src/data/index-cache.ts" = "039e0902193039db5d02cda0c6ac942098bebea8"
+
+[module.symbols]
+IndexDocument = "astroshot::astroshot_review::data::index_cache::IndexDocument"
+indexCachePath = "astroshot::astroshot_review::data::index_cache::index_cache_path"
+loadIndex = "astroshot::astroshot_review::data::index_cache::load_index"
+reconcileArrivalOrder = "astroshot::astroshot_review::data::index_cache::reconcile_arrival_order"
+saveIndex = "astroshot::astroshot_review::data::index_cache::save_index"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/manifest.ts"
+status = "ported"
+rust = "astroshot_review/data/manifest.rs"
+module = "astroshot::astroshot_review::data::manifest"
+ported_at = "2026-10-06T21:47:33Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/manifest.test.ts"]
+notes = "lenient Value reads; parseIsoDate: ES ISO + RFC2822 only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/manifest.test.ts" = "54b90a6af8d993012601cd6e40336b05ad142167"
+"packages/astroshot-review/src/data/manifest.ts" = "28c6a65e318b8688b8a9708773e301488f9dea79"
+
+[module.symbols]
+FeatureManifest = "astroshot::astroshot_review::data::manifest::FeatureManifest"
+ManifestChapter = "astroshot::astroshot_review::data::manifest::ManifestChapter"
+ManifestShot = "astroshot::astroshot_review::data::manifest::ManifestShot"
+chapterTimeLabel = "astroshot::astroshot_review::data::manifest::chapter_time_label"
+chaptersOf = "astroshot::astroshot_review::data::manifest::chapters_of"
+durationLabel = "astroshot::astroshot_review::data::manifest::duration_label"
+matchManifestShot = "astroshot::astroshot_review::data::manifest::match_manifest_shot"
+parseFeatureStatus = "astroshot::astroshot_review::data::manifest::parse_feature_status"
+parseIsoDate = "astroshot::astroshot_review::data::manifest::parse_iso_date"
+readManifest = "astroshot::astroshot_review::data::manifest::read_manifest"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/model.ts"
+status = "ported"
+rust = "astroshot_review/data/model.rs"
+module = "astroshot::astroshot_review::data::model"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/model.ts" = "e8a165784ac0653959cae0a74b454cbfe7f914c6"
+
+[module.symbols]
+AstroshotTree = "astroshot::astroshot_review::data::model::AstroshotTree"
+Chapter = "astroshot::astroshot_review::data::model::Chapter"
+FeatureStatus = "astroshot::astroshot_review::data::model::FeatureStatus"
+FrictionLog = "astroshot::astroshot_review::data::model::FrictionLog"
+FrictionRun = "astroshot::astroshot_review::data::model::FrictionRun"
+FrictionStep = "astroshot::astroshot_review::data::model::FrictionStep"
+ReviewComment = "astroshot::astroshot_review::data::model::ReviewComment"
+ReviewSnapshot = "astroshot::astroshot_review::data::model::ReviewSnapshot"
+ReviewState = "astroshot::astroshot_review::data::model::ReviewState"
+Shot = "astroshot::astroshot_review::data::model::Shot"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/paths.ts"
+status = "ported"
+rust = "astroshot_review/data/paths.rs"
+module = "astroshot::astroshot_review::data::paths"
+ported_at = "2026-10-06T21:32:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/paths.test.ts"]
+notes = "POSIX path semantics on &str (node dirname quirks kept); worktree_short counts UTF-16 units"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/paths.test.ts" = "bbd9a687a05af017fb07255a045dcb9ef02cdde8"
+"packages/astroshot-review/src/data/paths.ts" = "9ab5d64eba354945e4dadee627a40ce0a33d0f88"
+
+[module.symbols]
+ASTROSHOT_DIR = "astroshot::astroshot_review::data::paths::ASTROSHOT_DIR"
+FRICTION_DIR = "astroshot::astroshot_review::data::paths::FRICTION_DIR"
+IMAGE_EXTENSIONS = "astroshot::astroshot_review::data::paths::IMAGE_EXTENSIONS"
+MAX_SCAN_DEPTH = "astroshot::astroshot_review::data::paths::MAX_SCAN_DEPTH"
+SKIP_DIRECTORIES = "astroshot::astroshot_review::data::paths::SKIP_DIRECTORIES"
+ShotPath = "astroshot::astroshot_review::data::paths::ShotPath"
+VIDEO_EXTENSIONS = "astroshot::astroshot_review::data::paths::VIDEO_EXTENSIONS"
+abbreviateHome = "astroshot::astroshot_review::data::paths::abbreviate_home"
+extensionOf = "astroshot::astroshot_review::data::paths::extension_of"
+frictionLogsDir = "astroshot::astroshot_review::data::paths::friction_logs_dir"
+humanize = "astroshot::astroshot_review::data::paths::humanize"
+isImageFile = "astroshot::astroshot_review::data::paths::is_image_file"
+isInsideFrictionLogs = "astroshot::astroshot_review::data::paths::is_inside_friction_logs"
+parseShotPath = "astroshot::astroshot_review::data::paths::parse_shot_path"
+sequenceAndSlug = "astroshot::astroshot_review::data::paths::sequence_and_slug"
+worktreeShort = "astroshot::astroshot_review::data::paths::worktree_short"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/review-store.ts"
+status = "ported"
+rust = "astroshot_review/data/review_store.rs"
+module = "astroshot::astroshot_review::data::review_store"
+ported_at = "2026-10-06T21:47:31Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/review-store.test.ts"]
+notes = "review.json bytes pinned against TS serializer; random ids from /dev/urandom"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/review-store.test.ts" = "eff6fa430ca2fc5afa2f4553b5a893a91d3f998f"
+"packages/astroshot-review/src/data/review-store.ts" = "54cfa265ce43d6d7a770d5345ba6c1dcf790665a"
+
+[module.symbols]
+REVIEW_FILE = "astroshot::astroshot_review::data::review_store::REVIEW_FILE"
+ReviewDocument = "astroshot::astroshot_review::data::review_store::ReviewDocument"
+ReviewEntry = "astroshot::astroshot_review::data::review_store::ReviewEntry"
+ReviewWriteRequest = "astroshot::astroshot_review::data::review_store::ReviewWriteRequest"
+UnsupportedReviewVersion = "astroshot::astroshot_review::data::review_store::UnsupportedReviewVersion"
+addComment = "astroshot::astroshot_review::data::review_store::add_comment"
+emptyDocument = "astroshot::astroshot_review::data::review_store::empty_document"
+entryNeedsHash = "astroshot::astroshot_review::data::review_store::entry_needs_hash"
+markSeen = "astroshot::astroshot_review::data::review_store::mark_seen"
+newCommentId = "astroshot::astroshot_review::data::review_store::new_comment_id"
+nowIso = "astroshot::astroshot_review::data::review_store::now_iso"
+parseReviewDocument = "astroshot::astroshot_review::data::review_store::parse_review_document"
+readReviewDocument = "astroshot::astroshot_review::data::review_store::read_review_document"
+resetReviewsIfNeeded = "astroshot::astroshot_review::data::review_store::reset_reviews_if_needed"
+scopedEntry = "astroshot::astroshot_review::data::review_store::scoped_entry"
+serializeReviewDocument = "astroshot::astroshot_review::data::review_store::serialize_review_document"
+sha256Bytes = "astroshot::astroshot_review::data::review_store::sha256_bytes"
+sha256File = "astroshot::astroshot_review::data::review_store::sha256_file"
+snapshotFromEntry = "astroshot::astroshot_review::data::review_store::snapshot_from_entry"
+writeReviewDocument = "astroshot::astroshot_review::data::review_store::write_review_document"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/scan.ts"
+status = "ported"
+rust = "astroshot_review/data/scan.rs"
+module = "astroshot::astroshot_review::data::scan"
+ported_at = "2026-10-06T22:17:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/scan.test.ts"]
+notes = "AbortSignal is Arc<AtomicBool>; FileStat for fs.Stats; FrictionContext; byte-sorted listings; JoinSet walk with a cap, results sorted by UTF-16 units like Array#sort"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/scan.test.ts" = "4960a4e5093a61d2eb99b6464d02695a1e16c547"
+"packages/astroshot-review/src/data/scan.ts" = "e57deff9653ea9fad17251f4e65a4dd0cb35fbec"
+
+[module.symbols]
+FindOptions = "astroshot::astroshot_review::data::scan::FindOptions"
+ShotContext = "astroshot::astroshot_review::data::scan::ShotContext"
+buildShot = "astroshot::astroshot_review::data::scan::build_shot"
+findAstroshotDirs = "astroshot::astroshot_review::data::scan::find_astroshot_dirs"
+rebuildShot = "astroshot::astroshot_review::data::scan::rebuild_shot"
+scanFeatureDir = "astroshot::astroshot_review::data::scan::scan_feature_dir"
+scanTree = "astroshot::astroshot_review::data::scan::scan_tree"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/store.ts"
+status = "ported"
+rust = "astroshot_review/data/store.rs"
+module = "astroshot::astroshot_review::data::store"
+ported_at = "2026-10-06T22:38:45Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Arc-shared store: state+listeners and scan data behind two std mutexes, TS promise queue = fair tokio Mutex; watcher events go through a channel to one task that calls handle_event in order; subscribe returns a Subscription guard; publish is publish_with(closure); new ReviewStore(options) = ReviewStore::with_options (new(roots) kept for the UI); trees map is a Vec-backed insertion-ordered map; log text after the 'scan <dir>: '/'event <kind>: '/'index save: ' prefixes is the Rust error's; StoreEvent.kind is the StoreEventKind enum; index.json hashes object is key-sorted where TS writes insertion order"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/store.ts" = "5229a0feda51257be99926cd0265529977f34f0c"
+
+[module.symbols]
+FULL_SCAN_TTL_MS = "astroshot::astroshot_review::data::store::FULL_SCAN_TTL_MS"
+ReviewStore = "astroshot::astroshot_review::data::store::ReviewStore"
+SHALLOW_DEPTH = "astroshot::astroshot_review::data::store::SHALLOW_DEPTH"
+ScanPhase = "astroshot::astroshot_review::data::store::ScanPhase"
+StoreEvent = "astroshot::astroshot_review::data::store::StoreEvent"
+StoreOptions = "astroshot::astroshot_review::data::store::StoreOptions"
+StoreState = "astroshot::astroshot_review::data::store::StoreState"
+
+[[module]]
+ts = "packages/astroshot-review/src/data/watcher.ts"
+status = "ported"
+rust = "astroshot_review/data/watcher.rs"
+module = "astroshot::astroshot_review::data::watcher"
+ported_at = "2026-10-06T21:47:34Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/data/watcher.test.ts"]
+notes = "notify, one watcher per target, single debounce worker; paths rebased under the given root"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/data/watcher.test.ts" = "a277dd257cd671473a5a691d847d5d3b5bdb5e95"
+"packages/astroshot-review/src/data/watcher.ts" = "e563651cab7e81531c16c539c6a186d5689500ed"
+
+[module.symbols]
+RootWatcher = "astroshot::astroshot_review::data::watcher::RootWatcher"
+WatchEvent = "astroshot::astroshot_review::data::watcher::WatchEvent"
+WatchOptions = "astroshot::astroshot_review::data::watcher::WatchOptions"
+classifyPath = "astroshot::astroshot_review::data::watcher::classify_path"
+eventKey = "astroshot::astroshot_review::data::watcher::event_key"
+watchRoots = "astroshot::astroshot_review::data::watcher::watch_roots"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/halfblocks.ts"
+status = "ported"
+rust = "astroshot_review/images/halfblocks.rs"
+module = "astroshot::astroshot_review::images::halfblocks"
+ported_at = "2026-10-06T21:32:24Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/images/halfblocks.test.ts"]
+notes = "out-of-range rgb reads are 0 instead of the string undefined"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/halfblocks.test.ts" = "bbdefa643665983a01cdcb8e04f22de8b5802fa7"
+"packages/astroshot-review/src/images/halfblocks.ts" = "5fa6fb59ec7e7b9f2407de3bafb32e542ad1351e"
+
+[module.symbols]
+CellArtOptions = "astroshot::astroshot_review::images::halfblocks::CellArtOptions"
+rgbToHalfBlockLines = "astroshot::astroshot_review::images::halfblocks::rgb_to_half_block_lines"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/png.ts"
+status = "ported"
+rust = "astroshot_review/images/png.rs"
+module = "astroshot::astroshot_review::images::png"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/png.ts" = "55d81458633c83f2f0d37d9782b3cf86f67bd4f6"
+
+[module.symbols]
+ImageSize = "astroshot::astroshot_review::images::png::ImageSize"
+fitInside = "astroshot::astroshot_review::images::png::fit_inside"
+isPngPath = "astroshot::astroshot_review::images::png::is_png_path"
+readPngSize = "astroshot::astroshot_review::images::png::read_png_size"
+readPngSizeFromFile = "astroshot::astroshot_review::images::png::read_png_size_from_file"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/scale.ts"
+status = "ported"
+rust = "astroshot_review/images/scale.rs"
+module = "astroshot::astroshot_review::images::scale"
+ported_at = "2026-10-06T21:43:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/images/scale.test.ts"]
+notes = "keeps the TS premultiplied area-average (identical pixels); PNG compression differs from zlib level 6"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/scale.test.ts" = "0174da5f344e906f581eb4da05a2ec38256c9ef9"
+"packages/astroshot-review/src/images/scale.ts" = "6d80481e949a2040e7671df0d5198d6a3f069e9b"
+
+[module.symbols]
+Rect = "astroshot::astroshot_review::images::scale::Rect"
+ScaleRequest = "astroshot::astroshot_review::images::scale::ScaleRequest"
+ScaledFormat = "astroshot::astroshot_review::images::scale::ScaledFormat"
+ScaledImage = "astroshot::astroshot_review::images::scale::ScaledImage"
+cropRgba = "astroshot::astroshot_review::images::scale::crop_rgba"
+resampleRgba = "astroshot::astroshot_review::images::scale::resample_rgba"
+rgbaToRgb = "astroshot::astroshot_review::images::scale::rgba_to_rgb"
+scaleImage = "astroshot::astroshot_review::images::scale::scale_image"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/service.ts"
+status = "ported"
+rust = "astroshot_review/images/service.rs"
+module = "astroshot::astroshot_review::images::service"
+ported_at = "2026-10-06T22:03:41Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TS class ImageService is ImageServiceImpl (the trait owns the name); worker pool = worker::run_job_async with a semaphore; in-flight dedupe via Shared futures"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/service.ts" = "b52c5ba7f172ed57ccce797089fb47412a1b339a"
+
+[module.symbols]
+ImageService = "astroshot::astroshot_review::images::service::ImageServiceImpl"
+ImageServiceOptions = "astroshot::astroshot_review::images::service::ImageServiceOptions"
+PreparedImage = "astroshot::astroshot_review::images::service::PreparedImage"
+
+[[module]]
+ts = "packages/astroshot-review/src/images/worker.ts"
+status = "ported"
+rust = "astroshot_review/images/worker.rs"
+module = "astroshot::astroshot_review::images::worker"
+ported_at = "2026-10-06T21:53:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "worker_threads loop → run_job/run_job_async/run_jobs (spawn_blocking/rayon); job ids and buffer transfer dropped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/images/worker.ts" = "e6f0ca4d78208606b4e5245f122fa605ef343dec"
+
+[module.symbols]
+WorkerRequest = "astroshot::astroshot_review::images::worker::WorkerRequest"
+WorkerResponse = "astroshot::astroshot_review::images::worker::WorkerResponse"
+
+[[module]]
+ts = "packages/astroshot-review/src/index.ts"
+status = "ported"
+rust = "astroshot_review/mod.rs"
+module = "astroshot::astroshot_review"
+ported_at = "2026-10-06T23:41:06Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "re-exports only"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/index.ts" = "bfdbe7a46c96019e0a7f79af8607745868c13103"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/graphics-stdout.ts"
+status = "ported"
+rust = "astroshot_review/terminal/graphics_stdout.rs"
+module = "astroshot::astroshot_review::terminal::graphics_stdout"
+ported_at = "2026-10-06T21:57:15Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/graphics-stdout.test.ts"]
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/graphics-stdout.test.ts" = "6fd8f7ee6e8bb5e7b8fc6604413a6f7f8df1ba87"
+"packages/astroshot-review/src/terminal/graphics-stdout.ts" = "2af2a7e9db346cc1f7a0cb2f2cf88cdb43e04514"
+
+[module.symbols]
+createGraphicsStdout = "astroshot::astroshot_review::terminal::graphics_stdout::create_graphics_stdout"
+hasPrintableText = "astroshot::astroshot_review::terminal::graphics_stdout::has_printable_text"
+spliceGraphics = "astroshot::astroshot_review::terminal::graphics_stdout::splice_graphics"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/herdr.ts"
+status = "ported"
+rust = "astroshot_review/terminal/herdr.rs"
+module = "astroshot::astroshot_review::terminal::herdr"
+ported_at = "2026-10-06T21:35:45Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/herdr.test.ts"]
+notes = "unix only; per-layer stream is a tokio task aborted by clear/dispose; backpressure keeps only the newest pending frame; connect-error text from io::Error"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/herdr.test.ts" = "a4b6655ed3a6708c3a3563ae0668a7e246b2d468"
+"packages/astroshot-review/src/terminal/herdr.ts" = "539c2ad87a6be4f1cdded0ae171333b3893199da"
+
+[module.symbols]
+HerdrAddress = "astroshot::astroshot_review::terminal::herdr::HerdrAddress"
+HerdrDiscovery = "astroshot::astroshot_review::terminal::herdr::HerdrDiscovery"
+HerdrPlacement = "astroshot::astroshot_review::terminal::herdr::HerdrPlacement"
+HerdrSink = "astroshot::astroshot_review::terminal::herdr::HerdrSink"
+discoverHerdr = "astroshot::astroshot_review::terminal::herdr::discover_herdr"
+herdrAddress = "astroshot::astroshot_review::terminal::herdr::herdr_address"
+probeHerdrSet = "astroshot::astroshot_review::terminal::herdr::probe_herdr_set"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/image-layer.ts"
+status = "ported"
+rust = "astroshot_review/terminal/image_layer.rs"
+module = "astroshot::astroshot_review::terminal::image_layer"
+ported_at = "2026-10-06T21:58:27Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Ink DOMElement + measureElement become CellBox passed by the UI; ImageService/PreparedImage declared types-first in images::service; herdr cfg(unix) with a non-unix stub; Arc handle created inside a tokio runtime"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/image-layer.ts" = "647baa0ccb5f5551ef61030d4e8dffa57f9abbf9"
+
+[module.symbols]
+FrameHandle = "astroshot::astroshot_review::terminal::image_layer::FrameHandle"
+ImageHandle = "astroshot::astroshot_review::terminal::image_layer::ImageHandle"
+ImageLayer = "astroshot::astroshot_review::terminal::image_layer::ImageLayer"
+ImageLayerOptions = "astroshot::astroshot_review::terminal::image_layer::ImageLayerOptions"
+Placement = "astroshot::astroshot_review::terminal::image_layer::Placement"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/kitty.ts"
+status = "ported"
+rust = "astroshot_review/terminal/kitty.rs"
+module = "astroshot::astroshot_review::terminal::kitty"
+ported_at = "2026-10-06T21:35:43Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/kitty.test.ts"]
+notes = "Buffer → &[u8]; ImageFormat enum; chunk_payload takes an explicit size"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/kitty.test.ts" = "867144f5bcb5745f5b51be4f06dc6c886d7ec95d"
+"packages/astroshot-review/src/terminal/kitty.ts" = "5a192b64d2e2dc2a70eea4c8ce6b3eb8a299fd57"
+
+[module.symbols]
+APC = "astroshot::astroshot_review::terminal::kitty::APC"
+CHUNK_SIZE = "astroshot::astroshot_review::terminal::kitty::CHUNK_SIZE"
+DeleteRequest = "astroshot::astroshot_review::terminal::kitty::DeleteRequest"
+ImageFormat = "astroshot::astroshot_review::terminal::kitty::ImageFormat"
+ParsedGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::ParsedGraphicsCommand"
+PlaceRequest = "astroshot::astroshot_review::terminal::kitty::PlaceRequest"
+RESTORE_CURSOR = "astroshot::astroshot_review::terminal::kitty::RESTORE_CURSOR"
+SAVE_CURSOR = "astroshot::astroshot_review::terminal::kitty::SAVE_CURSOR"
+ST = "astroshot::astroshot_review::terminal::kitty::ST"
+TransmitRequest = "astroshot::astroshot_review::terminal::kitty::TransmitRequest"
+chunkPayload = "astroshot::astroshot_review::terminal::kitty::chunk_payload"
+cursorTo = "astroshot::astroshot_review::terminal::kitty::cursor_to"
+encodeDelete = "astroshot::astroshot_review::terminal::kitty::encode_delete"
+encodeFileQuery = "astroshot::astroshot_review::terminal::kitty::encode_file_query"
+encodePlace = "astroshot::astroshot_review::terminal::kitty::encode_place"
+encodeQuery = "astroshot::astroshot_review::terminal::kitty::encode_query"
+encodeTransmit = "astroshot::astroshot_review::terminal::kitty::encode_transmit"
+parseGraphicsCommand = "astroshot::astroshot_review::terminal::kitty::parse_graphics_command"
+
+[[module]]
+ts = "packages/astroshot-review/src/terminal/probe.ts"
+status = "ported"
+rust = "astroshot_review/terminal/probe.rs"
+module = "astroshot::astroshot_review::terminal::probe"
+ported_at = "2026-10-06T21:54:36Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/terminal/probe.test.ts"]
+notes = "ProbeStreams is a trait; stdin read polls with rustix so a timeout never swallows later input"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/terminal/probe.test.ts" = "bc77c200f3adc3da22f24d7738edd25a4b1ad33d"
+"packages/astroshot-review/src/terminal/probe.ts" = "6e5bf20954e2af2f7e505141cdda4e693f41db41"
+
+[module.symbols]
+FALLBACK_CELL = "astroshot::astroshot_review::terminal::probe::FALLBACK_CELL"
+GraphicsProtocol = "astroshot::astroshot_review::terminal::probe::GraphicsProtocol"
+ProbeOptions = "astroshot::astroshot_review::terminal::probe::ProbeOptions"
+ProbeReport = "astroshot::astroshot_review::terminal::probe::ProbeReport"
+ProbeStreams = "astroshot::astroshot_review::terminal::probe::ProbeStreams"
+TerminalCapabilities = "astroshot::astroshot_review::terminal::probe::TerminalCapabilities"
+parseCellSizeEnv = "astroshot::astroshot_review::terminal::probe::parse_cell_size_env"
+parseProbeResponse = "astroshot::astroshot_review::terminal::probe::parse_probe_response"
+probeTerminal = "astroshot::astroshot_review::terminal::probe::probe_terminal"
+supportsTrueColor = "astroshot::astroshot_review::terminal::probe::supports_true_color"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/app.tsx"
+status = "ported"
+rust = "astroshot_review/ui/app.rs"
+module = "astroshot::astroshot_review::ui::app"
+ported_at = "2026-10-06T23:40:51Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "useState→UiState, ui.playback→shared Playback handle; effects run in App::sync; store writes and desktop opens go through injectable ReviewActions/Desktop traits; no TS unit test, frames replayed from an Ink capture (tests/fixtures/review_app_frames.json)"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/app.tsx" = "21d845a79321334320210580f8958ab0ce32b19c"
+
+[module.symbols]
+App = "astroshot::astroshot_review::ui::app::App"
+AppProps = "astroshot::astroshot_review::ui::app::AppProps"
+frictionLogDirectory = "astroshot::astroshot_review::ui::app::friction_log_directory"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/chrome.tsx"
+status = "ported"
+rust = "astroshot_review/ui/chrome.rs"
+module = "astroshot::astroshot_review::ui::chrome"
+ported_at = "2026-10-06T21:47:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "inline Text components are fns returning Span; block components are Widgets; greedy word wrap, not wrap-ansi"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/chrome.tsx" = "c2efcbbc846de3174490c3b285833a84aeefe70a"
+
+[module.symbols]
+EmptyState = "astroshot::astroshot_review::ui::chrome::EmptyState"
+ExecutionPill = "astroshot::astroshot_review::ui::chrome::execution_pill"
+HintBar = "astroshot::astroshot_review::ui::chrome::HintBar"
+KeyHint = "astroshot::astroshot_review::ui::chrome::KeyHint"
+Line = "-"
+MetaRow = "astroshot::astroshot_review::ui::chrome::MetaRow"
+MovieBadge = "astroshot::astroshot_review::ui::chrome::movie_badge"
+ReviewBadge = "astroshot::astroshot_review::ui::chrome::review_badge"
+Rule = "astroshot::astroshot_review::ui::chrome::rule"
+SectionLabel = "astroshot::astroshot_review::ui::chrome::section_label"
+StatusPill = "astroshot::astroshot_review::ui::chrome::status_pill"
+Toast = "astroshot::astroshot_review::ui::chrome::Toast"
+WorktreeChip = "astroshot::astroshot_review::ui::chrome::worktree_chip"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/context.tsx"
+status = "ported"
+rust = "astroshot_review/ui/context.rs"
+module = "astroshot::astroshot_review::ui::context"
+ported_at = "2026-10-06T22:05:47Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "React context becomes an AppServices struct passed by reference"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/context.tsx" = "a71ea2d817c4b90412d2c3f6650d71aae9b51844"
+
+[module.symbols]
+AppServices = "astroshot::astroshot_review::ui::context::AppServices"
+ServicesContext = "-"
+useServices = "astroshot::astroshot_review::ui::context::use_services"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/detail.tsx"
+status = "ported"
+rust = "astroshot_review/ui/detail.rs"
+module = "astroshot::astroshot_review::ui::detail"
+ported_at = "2026-10-06T22:41:27Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "width/height = Rect; playback/onPlayback = Playback handle in DetailPaneState; onComposerSubmit/Cancel = Outcome from DetailPaneState::handle; heading row keeps badges whole and cuts the heading where Ink wraps the badge onto the next row; narrow page header and widths under 22 are clipped where Ink spills"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/detail.tsx" = "840c12bda26b7f3a41a8fadd358086c9a8927acc"
+
+[module.symbols]
+CommentList = "astroshot::astroshot_review::ui::detail::CommentList"
+DetailPane = "astroshot::astroshot_review::ui::detail::DetailPane"
+DetailPaneProps = "astroshot::astroshot_review::ui::detail::DetailPaneProps"
+previewHeight = "astroshot::astroshot_review::ui::detail::preview_height"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/friction.tsx"
+status = "ported"
+rust = "astroshot_review/ui/friction.rs"
+module = "astroshot::astroshot_review::ui::friction"
+ported_at = "2026-10-06T22:42:50Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "counts prop split into pending/seen; mode is enum StepMode; step views share FrictionStepState; content that does not fit is clipped at the bottom where Ink shrinks and overlaps rows"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/friction.tsx" = "0764a6261f0162f1d9d4c1e183d93c07205fadea"
+
+[module.symbols]
+FRICTION_ROW_HEIGHT = "astroshot::astroshot_review::ui::friction::FRICTION_ROW_HEIGHT"
+FrictionFilterBar = "astroshot::astroshot_review::ui::friction::FrictionFilterBar"
+FrictionList = "astroshot::astroshot_review::ui::friction::FrictionList"
+FrictionListProps = "astroshot::astroshot_review::ui::friction::FrictionListProps"
+FrictionLogDetail = "astroshot::astroshot_review::ui::friction::FrictionLogDetail"
+FrictionLogDetailProps = "astroshot::astroshot_review::ui::friction::FrictionLogDetailProps"
+FrictionStepDetail = "astroshot::astroshot_review::ui::friction::FrictionStepDetail"
+FrictionStepDetailProps = "astroshot::astroshot_review::ui::friction::FrictionStepDetailProps"
+FrictionStepTakeover = "astroshot::astroshot_review::ui::friction::FrictionStepTakeover"
+frictionScroll = "astroshot::astroshot_review::ui::friction::friction_scroll"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/help.tsx"
+status = "ported"
+rust = "astroshot_review/ui/help.rs"
+module = "astroshot::astroshot_review::ui::help"
+ported_at = "2026-10-06T21:47:29Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "flex-wrap computed manually; columns clipped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/help.tsx" = "087b9d24d2de53f4049f414eee730d12f8c20ffc"
+
+[module.symbols]
+HelpOverlay = "astroshot::astroshot_review::ui::help::HelpOverlay"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/hooks.ts"
+status = "ported"
+rust = "astroshot_review/ui/hooks.rs"
+module = "astroshot::astroshot_review::ui::hooks"
+ported_at = "2026-10-06T22:05:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "hooks are state structs; subscriptions and timers call a Wake callback; drop is the effect cleanup"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/hooks.ts" = "a5c3a8af0bd3300f114e02d3fed7306433adeb68"
+
+[module.symbols]
+TerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSize"
+useClock = "astroshot::astroshot_review::ui::hooks::ClockHook"
+useStoreState = "astroshot::astroshot_review::ui::hooks::StoreStateHook"
+useTerminalSize = "astroshot::astroshot_review::ui::hooks::TerminalSizeHook"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/movie-player.tsx"
+status = "ported"
+rust = "astroshot_review/ui/movie_player.rs"
+module = "astroshot::astroshot_review::ui::movie_player"
+ported_at = "2026-10-06T22:20:17Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Ink hooks are MoviePlayerState effects run in render; playback prop + onPlayback are the shared Playback handle; ffprobe/FramePlayer behind MovieBackend/FrameSource; callbacks read live playback instead of a stale closure"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/movie-player.tsx" = "d32516f43424f2084ad1e48464fbc3108076c51f"
+
+[module.symbols]
+MoviePlayer = "astroshot::astroshot_review::ui::movie_player::MoviePlayer"
+MoviePlayerProps = "-"
+PlaybackState = "astroshot::astroshot_review::ui::movie_player::PlaybackState"
+ProgressBar = "astroshot::astroshot_review::ui::movie_player::ProgressBar"
+formatClock = "astroshot::astroshot_review::ui::movie_player::format_clock"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/picture.tsx"
+status = "ported"
+rust = "astroshot_review/ui/picture.rs"
+module = "astroshot::astroshot_review::ui::picture"
+ported_at = "2026-10-06T22:05:49Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "StatefulWidget; refs/state/effects live in PictureState; measureElement becomes the reported CellBox"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/picture.tsx" = "cac52b19497e5b26ce4f150dbd7b433b83034ac4"
+
+[module.symbols]
+Picture = "astroshot::astroshot_review::ui::picture::Picture"
+PictureProps = "astroshot::astroshot_review::ui::picture::PictureProps"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/selectors.ts"
+status = "ported"
+rust = "astroshot_review/ui/selectors.rs"
+module = "astroshot::astroshot_review::ui::selectors"
+ported_at = "2026-10-06T21:47:24Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/ui/selectors.test.ts"]
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/selectors.test.ts" = "99c8b86bd67b6eef800be59b30b1576edea7f890"
+"packages/astroshot-review/src/ui/selectors.ts" = "7ebab7b19aa57e59ce511c479657989ac22a6e8e"
+
+[module.symbols]
+StreamCounts = "astroshot::astroshot_review::ui::selectors::StreamCounts"
+StreamFilter = "astroshot::astroshot_review::ui::selectors::StreamFilter"
+StreamGroup = "astroshot::astroshot_review::ui::selectors::StreamGroup"
+contiguousGroups = "astroshot::astroshot_review::ui::selectors::contiguous_groups"
+filterFrictionLogs = "astroshot::astroshot_review::ui::selectors::filter_friction_logs"
+filterShots = "astroshot::astroshot_review::ui::selectors::filter_shots"
+frictionState = "astroshot::astroshot_review::ui::selectors::friction_state"
+frictionSummary = "astroshot::astroshot_review::ui::selectors::friction_summary"
+latestRun = "astroshot::astroshot_review::ui::selectors::latest_run"
+reviewSiblings = "astroshot::astroshot_review::ui::selectors::review_siblings"
+reviewStateOf = "astroshot::astroshot_review::ui::selectors::review_state_of"
+streamCounts = "astroshot::astroshot_review::ui::selectors::stream_counts"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/settings.tsx"
+status = "ported"
+rust = "astroshot_review/ui/settings.rs"
+module = "astroshot::astroshot_review::ui::settings"
+ported_at = "2026-10-06T22:20:18Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "SettingsPane takes borrowed props; home and index cache paths injectable via with_paths; rows past the height are clipped"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/settings.tsx" = "4865688916b472d2d3da84e1e66edc3d308e32a1"
+
+[module.symbols]
+SettingsPane = "astroshot::astroshot_review::ui::settings::SettingsPane"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/stream.tsx"
+status = "ported"
+rust = "astroshot_review/ui/stream.rs"
+module = "astroshot::astroshot_review::ui::stream"
+ported_at = "2026-10-06T22:42:49Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/ui/selectors.test.ts"]
+notes = "StreamItem.height is a method; per-shot PictureState lives in StreamListState; an overfull group header keeps arrow and chip and cuts the count text"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/selectors.test.ts" = "99c8b86bd67b6eef800be59b30b1576edea7f890"
+"packages/astroshot-review/src/ui/stream.tsx" = "462a14b1ff29b20071d7bf73a1a03f0e1ba8ed70"
+
+[module.symbols]
+FilterBar = "astroshot::astroshot_review::ui::stream::FilterBar"
+SHOT_ROW_HEIGHT = "astroshot::astroshot_review::ui::stream::SHOT_ROW_HEIGHT"
+StreamItem = "astroshot::astroshot_review::ui::stream::StreamItem"
+StreamList = "astroshot::astroshot_review::ui::stream::StreamList"
+StreamProps = "astroshot::astroshot_review::ui::stream::StreamProps"
+flattenStream = "astroshot::astroshot_review::ui::stream::flatten_stream"
+isNavigable = "astroshot::astroshot_review::ui::stream::is_navigable"
+nextNavigable = "astroshot::astroshot_review::ui::stream::next_navigable"
+scrollWindow = "astroshot::astroshot_review::ui::stream::scroll_window"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/system.ts"
+status = "ported"
+rust = "astroshot_review/ui/system.rs"
+module = "astroshot::astroshot_review::ui::system"
+ported_at = "2026-10-06T21:32:26Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/system.ts" = "c0e94fdefcb0dad3fc142c62a283f16e69657c3e"
+
+[module.symbols]
+copyImageToClipboard = "astroshot::astroshot_review::ui::system::copy_image_to_clipboard"
+openWithDefaultApp = "astroshot::astroshot_review::ui::system::open_with_default_app"
+revealInFileManager = "astroshot::astroshot_review::ui::system::reveal_in_file_manager"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/takeover.tsx"
+status = "ported"
+rust = "astroshot_review/ui/takeover.rs"
+module = "astroshot::astroshot_review::ui::takeover"
+ported_at = "2026-10-06T22:57:59Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "width/height = Rect; playback/onPlayback = Playback handle in ReviewTakeoverState; composer callbacks = text_input::Outcome. Rail layout reproduces Yoga shrink passes + rounding (incl. composer hint landing on the box border). Divergences: rail and comment list are clipped as overflow=hidden asks (Ink 7 applies only the innermost clip, so clipped rows bleed through); header title yields to the paging text when both do not fit; widths under 39 clip to the screen. Added TakeoverLayout (no TS export)."
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/takeover.tsx" = "21ec4d837cdb7f618a3979ed537f4f7ad4437d9e"
+
+[module.symbols]
+RAIL_WIDTH = "astroshot::astroshot_review::ui::takeover::RAIL_WIDTH"
+ReviewTakeover = "astroshot::astroshot_review::ui::takeover::ReviewTakeover"
+ReviewTakeoverProps = "astroshot::astroshot_review::ui::takeover::ReviewTakeoverProps"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/text-input.tsx"
+status = "ported"
+rust = "astroshot_review/ui/text_input.rs"
+module = "astroshot::astroshot_review::ui::text_input"
+ported_at = "2026-10-06T21:49:18Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TextInputState handle(KeyEvent)/handle_paste -> Outcome; scroll keeps caret in view (width-4; TS width-2 let it wrap out)"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/text-input.tsx" = "d6c72abf1abf7a5ce37510ab7d3c0e6b08a52e42"
+
+[module.symbols]
+TextInput = "astroshot::astroshot_review::ui::text_input::TextInput"
+TextInputProps = "astroshot::astroshot_review::ui::text_input::TextInput"
+
+[[module]]
+ts = "packages/astroshot-review/src/ui/theme.ts"
+status = "ported"
+rust = "astroshot_review/ui/theme.rs"
+module = "astroshot::astroshot_review::ui::theme"
+ported_at = "2026-10-06T21:32:28Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "relative_time(from, now_ms) + now_ms(); abbreviated_date_time takes DateInput; truncate counts chars, not UTF-16 units; clock_time uses Local tz"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/ui/theme.ts" = "e73541aedb41da9cd6ac98a6105956a1e34efe3b"
+
+[module.symbols]
+abbreviatedDateTime = "astroshot::astroshot_review::ui::theme::abbreviated_date_time"
+clockTime = "astroshot::astroshot_review::ui::theme::clock_time"
+isoDateTime = "astroshot::astroshot_review::ui::theme::iso_date_time"
+relativeTime = "astroshot::astroshot_review::ui::theme::relative_time"
+theme = "astroshot_review::ui::theme::THEME"
+truncate = "astroshot::astroshot_review::ui::theme::truncate"
+
+[[module]]
+ts = "packages/astroshot-review/src/video/ffmpeg.ts"
+status = "ported"
+rust = "astroshot_review/video/ffmpeg.rs"
+module = "astroshot::astroshot_review::video::ffmpeg"
+ported_at = "2026-10-06T21:43:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/astroshot-review/src/video/ffmpeg.test.ts"]
+notes = "FramePlayer needs a tokio runtime; spawn errors carry io::Error text; stderr cut by chars; FramePlayer/probe_video untested, as in TS"
+
+[module.ts_blobs]
+"packages/astroshot-review/src/video/ffmpeg.test.ts" = "74c412821db7109335760422e908a711ee284651"
+"packages/astroshot-review/src/video/ffmpeg.ts" = "7374525fa5ca4565e38e4f9af44a8fafbb47cddd"
+
+[module.symbols]
+FfmpegInfo = "astroshot::astroshot_review::video::ffmpeg::FfmpegInfo"
+FramePlayer = "astroshot::astroshot_review::video::ffmpeg::FramePlayer"
+FramePlayerOptions = "astroshot::astroshot_review::video::ffmpeg::FramePlayerOptions"
+VideoFrame = "astroshot::astroshot_review::video::ffmpeg::VideoFrame"
+VideoInfo = "astroshot::astroshot_review::video::ffmpeg::VideoInfo"
+detectFfmpeg = "astroshot::astroshot_review::video::ffmpeg::detect_ffmpeg"
+probeVideo = "astroshot::astroshot_review::video::ffmpeg::probe_video"
+resetFfmpegCache = "astroshot::astroshot_review::video::ffmpeg::reset_ffmpeg_cache"
+splitPngStream = "astroshot::astroshot_review::video::ffmpeg::split_png_stream"
+
+[[module]]
+ts = "packages/astroshot/bin/astroshot.mjs"
+status = "ported"
+rust = "bin/astroshot.rs"
+module = "astroshot::bin::astroshot"
+ported_at = "2026-10-06T22:03:42Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "astroshot <mode> dispatches to each package CLI (review/movie/react/ink/pty); install-browser forwards to the react-shot CLI, which reports find_chrome() instead of running Playwright's installer; an npm bin name in argv0 (react-shot, tui-shot, astroshot-movie, astroshot-review) passes the raw argv straight to that package CLI; hidden __pty-exit-wrapper in main.rs; binary-level cases from cli.test.mjs live in tests/cli.rs"
+
+[module.ts_blobs]
+"packages/astroshot/bin/astroshot.mjs" = "11658d6333faa89fd67ac0cb6a2fb8cbb854b16d"
+
+[[module]]
+ts = "packages/astroshot/bin/demo.mjs"
+status = "ported"
+rust = "bin/demo.rs"
+module = "astroshot::bin::demo"
+ported_at = "2026-10-06T21:44:01Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "fixture bytes embedded via include_bytes! from packages/astroshot/fixtures/demo; run_demo(argv, log) -> Result<i32>; PlanOptions struct replaces JS defaults"
+
+[module.ts_blobs]
+"packages/astroshot/bin/demo.mjs" = "d17652fa28dd27a0febd7447276aa9e17217577b"
+
+[module.symbols]
+DEFAULT_DEMO_FEATURE = "astroshot::bin::demo::DEFAULT_DEMO_FEATURE"
+demoHelp = "astroshot::bin::demo::demo_help"
+loadDemoFixtures = "astroshot::bin::demo::load_demo_fixtures"
+planDemo = "astroshot::bin::demo::plan_demo"
+runDemo = "astroshot::bin::demo::run_demo"
+writeDemo = "astroshot::bin::demo::write_demo"
+
+[[module]]
+ts = "packages/astroshot/bin/doctor.mjs"
+status = "ported"
+rust = "bin/doctor.rs"
+module = "astroshot::bin::doctor"
+ported_at = "2026-10-06T21:56:07Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "checks run through a Host trait; new checks astroshot (binary version) and node-helper; node optional; chromium via browser::find_chrome; the demo-fixtures remediation points at the releases URL instead of npm install --global @archastro/astroshot; binary-level cases from demo-doctor.test.mjs live in tests/demo_doctor.rs; screen-recording re-execs astroshot movie check-screen-access"
+
+[module.ts_blobs]
+"packages/astroshot/bin/doctor.mjs" = "07456644f2df2c203fef694f27071c11112e77e9"
+
+[module.symbols]
+checkWatchCoverage = "astroshot::bin::doctor::check_watch_coverage"
+collectDoctorChecks = "astroshot::bin::doctor::collect_doctor_checks"
+doctorHelp = "astroshot::bin::doctor::doctor_help"
+runDoctor = "astroshot::bin::doctor::run_doctor"
+summarizeDoctor = "astroshot::bin::doctor::summarize_doctor"
+
+[[module]]
+ts = "packages/astroshot/bin/mac-preferences.mjs"
+status = "ported"
+rust = "bin/mac_preferences.rs"
+module = "astroshot::bin::mac_preferences"
+ported_at = "2026-10-06T21:33:02Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "platform strings are std::env::consts::OS ('macos', not 'darwin'); spawn-error text is Rust's io::Error; read_domain seam on ReadWatchConfigurationOptions"
+
+[module.ts_blobs]
+"packages/astroshot/bin/mac-preferences.mjs" = "528f72478bab9dded2383f3bbda3aac066350c57"
+
+[module.symbols]
+ASTROSHOTS_DOMAIN = "astroshot::bin::mac_preferences::ASTROSHOTS_DOMAIN"
+evaluateWatchCoverage = "astroshot::bin::mac_preferences::evaluate_watch_coverage"
+extractPreferenceKey = "astroshot::bin::mac_preferences::extract_preference_key"
+normalizePath = "astroshot::bin::mac_preferences::normalize_path"
+normalizeWatchRootPaths = "astroshot::bin::mac_preferences::normalize_watch_root_paths"
+pathIsInside = "astroshot::bin::mac_preferences::path_is_inside"
+preferenceToolsAvailable = "astroshot::bin::mac_preferences::preference_tools_available"
+readPreferenceDomain = "astroshot::bin::mac_preferences::read_preference_domain"
+readWatchConfiguration = "astroshot::bin::mac_preferences::read_watch_configuration"
+
+[[module]]
+ts = "packages/astroshot/bin/templates.mjs"
+status = "ported"
+rust = "bin/templates.rs"
+module = "astroshot::bin::templates"
+ported_at = "2026-10-06T21:33:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "anyhow errors with identical messages; options as a struct; lexical path resolution"
+
+[module.ts_blobs]
+"packages/astroshot/bin/templates.mjs" = "545fa42a759bfadcb36cc66d4ccd267b7e101cdd"
+
+[module.symbols]
+canonicalTemplateMode = "astroshot::bin::templates::canonical_template_mode"
+writeFixtureTemplate = "astroshot::bin::templates::write_fixture_template"
+
+[[module]]
+ts = "packages/movie-harness/src/cli.ts"
+status = "ported"
+rust = "movie_harness/cli.rs"
+module = "astroshot::movie_harness::cli"
+ported_at = "2026-10-06T22:47:14Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "run_cli(argv)->i32; --status on stop/run is validated (TS cast any string into the manifest); --size components must fit u32; list-windows prints via desktop_macos::list_desktop_windows_json; binary-level cases live in tests/movie_cli.rs"
+
+[module.ts_blobs]
+"packages/movie-harness/src/cli.ts" = "6e4237f83510b6b64e212d83a70c120336fde254"
+
+[module.symbols]
+runCli = "astroshot::movie_harness::cli::run_cli"
+
+[[module]]
+ts = "packages/movie-harness/src/encode.ts"
+status = "ported"
+rust = "movie_harness/encode.rs"
+module = "astroshot::movie_harness::encode"
+ported_at = "2026-10-06T21:54:03Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "Playwright recordVideo → crate::browser::record_webm; returns EncodedVideo; fractional fps rounded for the browser fallback"
+
+[module.ts_blobs]
+"packages/movie-harness/src/encode.ts" = "df3341c926e4e4c0e3a5b84f429bcf5dc868834b"
+
+[module.symbols]
+encodeFrames = "astroshot::movie_harness::encode::encode_frames"
+posterFromFrames = "astroshot::movie_harness::encode::poster_from_frames"
+
+[[module]]
+ts = "packages/movie-harness/src/index.ts"
+status = "ported"
+rust = "movie_harness/mod.rs"
+module = "astroshot::movie_harness"
+ported_at = "2026-10-06T22:47:15Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "terminal-paint exports replaced by crate::raster::HeadlessTerminal; other names re-exported from movie_harness"
+
+[module.ts_blobs]
+"packages/movie-harness/src/index.ts" = "c631d4c0233aaa860e4dac3cec296ef02c7b264f"
+
+[[module]]
+ts = "packages/movie-harness/src/paths.ts"
+status = "ported"
+rust = "movie_harness/paths.rs"
+module = "astroshot::movie_harness::paths"
+ported_at = "2026-10-06T21:33:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "lexical resolve_root; JS-exact trim"
+
+[module.ts_blobs]
+"packages/movie-harness/src/paths.ts" = "065b4fe26e0b6a51031c1194cbecf485fbf06068"
+
+[module.symbols]
+assertKebabCase = "astroshot::movie_harness::paths::assert_kebab_case"
+assertSlug = "astroshot::movie_harness::paths::assert_slug"
+defaultRunId = "astroshot::movie_harness::paths::default_run_id"
+ensureDir = "astroshot::movie_harness::paths::ensure_dir"
+featureDir = "astroshot::movie_harness::paths::feature_dir"
+humanize = "astroshot::movie_harness::paths::humanize"
+movieStateDir = "astroshot::movie_harness::paths::movie_state_dir"
+nextSequence = "astroshot::movie_harness::paths::next_sequence"
+resolveRoot = "astroshot::movie_harness::paths::resolve_root"
+
+[[module]]
+ts = "packages/movie-harness/src/png.ts"
+status = "ported"
+rust = "movie_harness/png.rs"
+module = "astroshot::movie_harness::png"
+ported_at = "2026-10-06T21:33:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "same pixels and chunks; deflate bytes come from flate2 and may differ from node zlib"
+
+[module.ts_blobs]
+"packages/movie-harness/src/png.ts" = "91901f5a40aacc2bb6686c9f7035d8ae491c691b"
+
+[module.symbols]
+encodeRgbPng = "astroshot::movie_harness::png::encode_rgb_png"
+encodeSolidPng = "astroshot::movie_harness::png::encode_solid_png"
+
+[[module]]
+ts = "packages/movie-harness/src/session.ts"
+status = "ported"
+rust = "movie_harness/session.rs"
+module = "astroshot::movie_harness::session"
+ported_at = "2026-10-06T22:18:40Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/session.test.ts"]
+notes = "session.test.ts pty/terminal-paint cases ported under sources::pty"
+
+[module.ts_blobs]
+"packages/movie-harness/src/session.test.ts" = "98111c88f3d000934ec235e847b3e297a90f1a1d"
+"packages/movie-harness/src/session.ts" = "4ea000e75193241d7985e9555b5d047468ad3d98"
+
+[module.symbols]
+MovieSession = "astroshot::movie_harness::session::MovieSession"
+
+[[module]]
+ts = "packages/movie-harness/src/sink.ts"
+status = "ported"
+rust = "movie_harness/sink.rs"
+module = "astroshot::movie_harness::sink"
+ported_at = "2026-10-06T21:54:04Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "manifest edited as an order-preserving serde_json Map for byte-identical output"
+
+[module.ts_blobs]
+"packages/movie-harness/src/sink.ts" = "da5eaa385b2f4263156c896a96fffb6ca80dab59"
+
+[module.symbols]
+finalizeManifest = "astroshot::movie_harness::sink::finalize_manifest"
+sinkMovie = "astroshot::movie_harness::sink::sink_movie"
+
+[[module]]
+ts = "packages/movie-harness/src/source-help.ts"
+status = "ported"
+rust = "movie_harness/source_help.rs"
+module = "astroshot::movie_harness::source_help"
+ported_at = "2026-10-06T21:33:21Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/source-help.test.ts"]
+notes = "catalog is a static array; 'kind in SOURCE_CATALOG' no longer matches prototype keys"
+
+[module.ts_blobs]
+"packages/movie-harness/src/source-help.test.ts" = "7cf02e12ddcbbcf5175a7578bf43eb0695c2bf3d"
+"packages/movie-harness/src/source-help.ts" = "99f5180370f9f9a63897fd49b346a3f48ebb2212"
+
+[module.symbols]
+SOURCE_CATALOG = "astroshot::movie_harness::source_help::SOURCE_CATALOG"
+SOURCE_DECISION_TABLE = "astroshot::movie_harness::source_help::SOURCE_DECISION_TABLE"
+SourceAdvice = "astroshot::movie_harness::source_help::SourceAdvice"
+SourceKindHelp = "astroshot::movie_harness::source_help::SourceKindHelp"
+formatSourceCatalog = "astroshot::movie_harness::source_help::format_source_catalog"
+recommendSource = "astroshot::movie_harness::source_help::recommend_source"
+sourceHintForError = "astroshot::movie_harness::source_help::source_hint_for_error"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/browser.ts"
+status = "ported"
+rust = "movie_harness/sources/browser.rs"
+module = "astroshot::movie_harness::sources::browser"
+ported_at = "2026-10-06T22:15:33Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "recordVideo → CDP screencast through browser::record (port of Playwright FfmpegVideoRecorder: 25 fps, ≥1 s closing hold, VP8); durationMs = session.elapsedMs() as TS; window fitted to viewport; without ffmpeg the frames are resampled to session fps and encoded by session.stop; scriptPath runs in the node helper via playwright-core connectOverCDP (browser-script); options are {session, browser}"
+
+[module.ts_blobs]
+"packages/movie-harness/src/sources/browser.ts" = "48670fdb2e26cd1cf13beebfb021f5e506743b43"
+
+[module.symbols]
+BrowserMovieSessionOptions = "astroshot::movie_harness::sources::browser::BrowserMovieSessionOptions"
+recordBrowserMovie = "astroshot::movie_harness::sources::browser::record_browser_movie"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/desktop-macos.ts"
+status = "ported"
+rust = "movie_harness/sources/desktop_macos.rs"
+module = "astroshot::movie_harness::sources::desktop_macos"
+ported_at = "2026-10-06T22:18:41Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = [
+    "packages/movie-harness/src/desktop-macos.test.ts",
+    "packages/movie-harness/src/desktop-quality.test.ts",
+]
+notes = "WindowTools.swift embedded via include_str!; titleRegex uses the regex crate (no lookaround); capture on spawn_blocking; 2 tests #[ignore] (GUI session / Screen Recording)"
+
+[module.ts_blobs]
+"packages/movie-harness/src/desktop-macos.test.ts" = "101a9368466b31039fea72e22a2e4d0143a5b886"
+"packages/movie-harness/src/desktop-quality.test.ts" = "d08d5372e977c87637977ad3e34bbb3ea0b3e587"
+"packages/movie-harness/src/sources/desktop-macos.ts" = "ce20523f085aad3f8f9401de3365f8bfb19d6661"
+
+[module.symbols]
+DesktopWindowInfo = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowInfo"
+DesktopWindowMatch = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowMatch"
+DesktopWindowMovieOptions = "astroshot::movie_harness::sources::desktop_macos::DesktopWindowMovieOptions"
+ScreenAccessReport = "astroshot::movie_harness::sources::desktop_macos::ScreenAccessReport"
+assertDesktopToolchain = "astroshot::movie_harness::sources::desktop_macos::assert_desktop_toolchain"
+checkScreenRecordingAccess = "astroshot::movie_harness::sources::desktop_macos::check_screen_recording_access"
+describeDesktopWindow = "astroshot::movie_harness::sources::desktop_macos::describe_desktop_window"
+desktopMatchFromFlags = "astroshot::movie_harness::sources::desktop_macos::desktop_match_from_flags"
+ensureScreenRecordingAccess = "astroshot::movie_harness::sources::desktop_macos::ensure_screen_recording_access"
+formatScreenRecordingDeniedHelp = "astroshot::movie_harness::sources::desktop_macos::format_screen_recording_denied_help"
+isNearlyBlankPng = "astroshot::movie_harness::sources::desktop_macos::is_nearly_blank_png"
+listDesktopWindows = "astroshot::movie_harness::sources::desktop_macos::list_desktop_windows"
+matchDesktopWindow = "astroshot::movie_harness::sources::desktop_macos::match_desktop_window"
+openScreenRecordingSettings = "astroshot::movie_harness::sources::desktop_macos::open_screen_recording_settings"
+recordDesktopWindowMovie = "astroshot::movie_harness::sources::desktop_macos::record_desktop_window_movie"
+resolveEnableAppName = "astroshot::movie_harness::sources::desktop_macos::resolve_enable_app_name"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/frames-store.ts"
+status = "ported"
+rust = "movie_harness/sources/frames_store.rs"
+module = "astroshot::movie_harness::sources::frames_store"
+ported_at = "2026-10-06T22:02:55Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "state JSON pretty + newline, atomic .tmp rename; TS version-check message kept; 12-hex session id"
+
+[module.ts_blobs]
+"packages/movie-harness/src/sources/frames-store.ts" = "af70de5d46d639bda5509b89c2fbfca970326fb3"
+
+[module.symbols]
+loadFrameSession = "astroshot::movie_harness::sources::frames_store::load_frame_session"
+markFrameSession = "astroshot::movie_harness::sources::frames_store::mark_frame_session"
+pushFrameToSession = "astroshot::movie_harness::sources::frames_store::push_frame_to_session"
+startFrameSession = "astroshot::movie_harness::sources::frames_store::start_frame_session"
+stopFrameSession = "astroshot::movie_harness::sources::frames_store::stop_frame_session"
+
+[[module]]
+ts = "packages/movie-harness/src/sources/pty.ts"
+status = "ported"
+rust = "movie_harness/sources/pty.rs"
+module = "astroshot::movie_harness::sources::pty"
+ported_at = "2026-10-06T22:18:39Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/movie-harness/src/session.test.ts"]
+notes = "node-pty → portable-pty; chromium paint → astroshot::raster (bundled font); sampler thread; PtyMovieSessionOptions wraps MovieSessionOptions"
+
+[module.ts_blobs]
+"packages/movie-harness/src/session.test.ts" = "98111c88f3d000934ec235e847b3e297a90f1a1d"
+"packages/movie-harness/src/sources/pty.ts" = "29aa3a4bf8df8b89c25d940092692c7da14a18f0"
+
+[module.symbols]
+PtyMovieSessionOptions = "astroshot::movie_harness::sources::pty::PtyMovieSessionOptions"
+loadPtyMovieFixture = "astroshot::movie_harness::sources::pty::load_pty_movie_fixture"
+recordPtyMovie = "astroshot::movie_harness::sources::pty::record_pty_movie"
+recordTruecolorDemoMovie = "astroshot::movie_harness::sources::pty::record_truecolor_demo_movie"
+
+[[module]]
+ts = "packages/movie-harness/src/terminal-paint.ts"
+status = "replaced"
+module = "astroshot::raster (alacritty_terminal grid → native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:54:37Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/movie-harness/src/terminal-paint.ts" = "415eb944d99542b21279b9bc4fe0626c14894590"
+
+[[module]]
+ts = "packages/movie-harness/src/types.ts"
+status = "ported"
+rust = "movie_harness/types.rs"
+module = "astroshot::movie_harness::types"
+ported_at = "2026-10-06T21:33:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "camelCase serde in TS order; js_number helper writes JS-style numbers; PtyMovieFixture.env is a BTreeMap (read-only)"
+
+[module.ts_blobs]
+"packages/movie-harness/src/types.ts" = "18434caffe53e6432344cf96c3d7baa23f335c28"
+
+[module.symbols]
+BrowserMovieOptions = "astroshot::movie_harness::types::BrowserMovieOptions"
+EncodeFramesRequest = "astroshot::movie_harness::types::EncodeFramesRequest"
+ManifestStatus = "astroshot::movie_harness::types::ManifestStatus"
+MovieArtifact = "astroshot::movie_harness::types::MovieArtifact"
+MovieChapter = "astroshot::movie_harness::types::MovieChapter"
+MovieFormat = "astroshot::movie_harness::types::MovieFormat"
+MovieSessionOptions = "astroshot::movie_harness::types::MovieSessionOptions"
+MovieSourceKind = "astroshot::movie_harness::types::MovieSourceKind"
+PersistedFrameSession = "astroshot::movie_harness::types::PersistedFrameSession"
+PtyAction = "astroshot::movie_harness::types::PtyAction"
+PtyKey = "astroshot::movie_harness::types::PtyKey"
+PtyMovieFixture = "astroshot::movie_harness::types::PtyMovieFixture"
+SinkMovieRequest = "astroshot::movie_harness::types::SinkMovieRequest"
+SinkMovieResult = "astroshot::movie_harness::types::SinkMovieResult"
+Size = "astroshot::movie_harness::types::Size"
+
+[[module]]
+ts = "packages/react-shot/src/batch-paths.ts"
+status = "ported"
+rust = "react_shot/batch_paths.rs"
+module = "astroshot::react_shot::batch_paths"
+ported_at = "2026-10-06T21:54:35Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/react-shot/src/batch-paths.test.ts"]
+notes = "NFC + lowercase collision key, as TS"
+
+[module.ts_blobs]
+"packages/react-shot/src/batch-paths.test.ts" = "28790a6424973f953ba97b5c2508fc91b93f1b2d"
+"packages/react-shot/src/batch-paths.ts" = "e85f9a987f9caeeb5831e6bf466e2f59797d2552"
+
+[module.symbols]
+resolveBatchOutputPaths = "astroshot::react_shot::batch_paths::resolve_batch_output_paths"
+
+[[module]]
+ts = "packages/react-shot/src/cli.ts"
+status = "ported"
+rust = "react_shot/cli.rs"
+module = "astroshot::react_shot::cli"
+ported_at = "2026-10-06T22:18:22Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "--version prints CARGO_PKG_VERSION; install-browser reports find_chrome(); run(argv) returns the exit code; binary-level e2e ported to tests/react_shot_cli.rs"
+
+[module.ts_blobs]
+"packages/react-shot/src/cli.ts" = "4c62c3bfd80cf55cbb48b0a624af0228643f2830"
+
+[[module]]
+ts = "packages/react-shot/src/config.ts"
+status = "replaced"
+module = "node helper: load-config / react-serve (resolved configPath, packageRoot)"
+ported_at = "2026-10-06T21:37:10Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/config.ts" = "3da6e96d30b22d832149cbaca2212254331a9155"
+
+[[module]]
+ts = "packages/react-shot/src/create-server.ts"
+status = "replaced"
+module = "node helper: react-serve (rust/node-helper/helper.mjs)"
+ported_at = "2026-10-06T21:37:09Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/create-server.ts" = "1dbd9d7cd4fdbe30997972baf8fd83ebb8b29a79"
+
+[[module]]
+ts = "packages/react-shot/src/index.ts"
+status = "ported"
+rust = "react_shot/mod.rs"
+module = "astroshot::react_shot"
+ported_at = "2026-10-06T22:18:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/index.ts" = "88e56e7ffc98a1049e20172440d3c2513812a005"
+
+[[module]]
+ts = "packages/react-shot/src/meta.ts"
+status = "ported"
+rust = "react_shot/meta.rs"
+module = "astroshot::react_shot::meta"
+ported_at = "2026-10-06T21:45:08Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/react-shot/src/meta.test.ts"]
+notes = "resolve_shot_meta returns a ResolvedShotMeta struct; ShotMeta aliases ReactShotFixtureMeta"
+
+[module.ts_blobs]
+"packages/react-shot/src/meta.test.ts" = "261f481088fa2830d7f9324fb0a48e5d96aa2e0d"
+"packages/react-shot/src/meta.ts" = "6b013b9f10192e5f72a79f19e3fb39b1e8656b12"
+
+[module.symbols]
+ShotMeta = "astroshot::react_shot::meta::ShotMeta"
+isDialogSelector = "astroshot::react_shot::meta::is_dialog_selector"
+resolveShotMeta = "astroshot::react_shot::meta::resolve_shot_meta"
+
+[[module]]
+ts = "packages/react-shot/src/shot.ts"
+status = "ported"
+rust = "react_shot/shot.rs"
+module = "astroshot::react_shot::shot"
+ported_at = "2026-10-06T22:01:51Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "shot queue is one async mutex; readFixtureMeta = node helper nodeMeta; take_shot_detailed also returns the resolved meta; browser ignores Chrome's favicon 404 that Playwright's headless shell never requested"
+
+[module.ts_blobs]
+"packages/react-shot/src/shot.ts" = "ba3374f83a29cb536776f2dd73522d2843f71581"
+
+[module.symbols]
+closeSharedBrowser = "astroshot::react_shot::shot::close_shared_browser"
+takeShot = "astroshot::react_shot::shot::take_shot"
+
+[[module]]
+ts = "packages/react-shot/src/stubs.ts"
+status = "replaced"
+module = "node helper: react-serve (rust/node-helper/helper.mjs)"
+ported_at = "2026-10-06T21:35:48Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/react-shot/src/stubs.ts" = "dca16db6e5e57b5c55aa2c7698248d2718b22533"
+
+[[module]]
+ts = "packages/react-shot/src/types.ts"
+status = "ported"
+rust = "react_shot/types.rs"
+module = "astroshot::react_shot::types"
+ported_at = "2026-10-06T21:35:46Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "plain-data subset; the React component itself stays in the node helper"
+
+[module.ts_blobs]
+"packages/react-shot/src/types.ts" = "26e66c44568735de5d073d87a3f116b8fe37f487"
+
+[module.symbols]
+BatchEntry = "astroshot::react_shot::types::BatchEntry"
+BatchManifest = "astroshot::react_shot::types::BatchManifest"
+ReactShotConfig = "astroshot::react_shot::types::ReactShotConfig"
+ReactShotFixture = "react_shot::types::ReactShotFixtureMeta"
+ShotRequest = "astroshot::react_shot::types::ShotRequest"
+
+[[module]]
+ts = "packages/tui-shot/src/batch-paths.ts"
+status = "ported"
+rust = "tui_shot/batch_paths.rs"
+module = "astroshot::tui_shot::batch_paths"
+ported_at = "2026-10-06T21:54:35Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/batch-paths.test.ts"]
+notes = "NFC + lowercase collision key, as TS"
+
+[module.ts_blobs]
+"packages/tui-shot/src/batch-paths.test.ts" = "62624f5919c757c90ba1d6273a65a4c7d10d57e8"
+"packages/tui-shot/src/batch-paths.ts" = "5bd4fd06738964082a9fabb62baf733c187f4579"
+
+[module.symbols]
+resolveBatchOutputPaths = "astroshot::tui_shot::batch_paths::resolve_batch_output_paths"
+
+[[module]]
+ts = "packages/tui-shot/src/cli.ts"
+status = "ported"
+rust = "tui_shot/cli.rs"
+module = "astroshot::tui_shot::cli"
+ported_at = "2026-10-06T22:36:52Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+test_provenance = [
+    "packages/tui-shot/src/cli.e2e.test.ts",
+    "packages/tui-shot/src/pty-cli.e2e.test.ts",
+]
+notes = "run(argv)->i32 instead of process.argv/exitCode; install-browser reports find_chrome() instead of running Playwright's installer; --headed accepted but unused (native raster); manifest JSON/YAML syntax errors carry the Rust parser's wording; e2e cases live in tests/tui_shot_cli.rs and check PNGs with the image crate"
+
+[module.ts_blobs]
+"packages/tui-shot/src/cli.e2e.test.ts" = "a5943ca9d8e63a92f0720f3c3489fb2d3a81c1bd"
+"packages/tui-shot/src/cli.ts" = "d60bf630669e67d52b9994c7c77c8a6ecf69fdf1"
+"packages/tui-shot/src/pty-cli.e2e.test.ts" = "f1e2b9a97ff193f73b81e560a1edac0f242cb13b"
+
+[[module]]
+ts = "packages/tui-shot/src/index.ts"
+status = "ported"
+rust = "tui_shot/mod.rs"
+module = "astroshot::tui_shot"
+ported_at = "2026-10-06T22:36:47Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "re-exports only"
+
+[module.ts_blobs]
+"packages/tui-shot/src/index.ts" = "b7fa1682ec28824d25616a1c722e6c27f31d32b1"
+
+[[module]]
+ts = "packages/tui-shot/src/kitty-graphics.ts"
+status = "ported"
+rust = "tui_shot/kitty_graphics.rs"
+module = "astroshot::tui_shot::kitty_graphics"
+ported_at = "2026-10-06T21:56:08Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/kitty-graphics.test.ts"]
+notes = "sync write; tracker owns the HeadlessTerminal; GraphicsOverlay carries png bytes"
+
+[module.ts_blobs]
+"packages/tui-shot/src/kitty-graphics.test.ts" = "d5d15202413db55517dbc8f1d519168bf2ce42ea"
+"packages/tui-shot/src/kitty-graphics.ts" = "bd92c31693ee06b1f233873cdd16f37d145c23f5"
+
+[module.symbols]
+GraphicsOverlay = "astroshot::tui_shot::kitty_graphics::GraphicsOverlay"
+KittyGraphicsTracker = "astroshot::tui_shot::kitty_graphics::KittyGraphicsTracker"
+KittyTrackerOptions = "astroshot::tui_shot::kitty_graphics::KittyTrackerOptions"
+encodePng = "astroshot::tui_shot::kitty_graphics::encode_png"
+overlaysToHtml = "astroshot::tui_shot::kitty_graphics::overlays_to_html"
+
+[[module]]
+ts = "packages/tui-shot/src/pty-exit-wrapper.ts"
+status = "ported"
+rust = "tui_shot/pty_exit_wrapper.rs"
+module = "astroshot::tui_shot::pty_exit_wrapper"
+ported_at = "2026-10-06T21:38:25Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "node script becomes pty_exit_wrapper::run(args, stdout) -> i32, run from a hidden subcommand of the astroshot binary"
+
+[module.ts_blobs]
+"packages/tui-shot/src/pty-exit-wrapper.ts" = "29f896026c52bf48185e8014d961ed6422f7b4dc"
+
+[[module]]
+ts = "packages/tui-shot/src/pty-shot.ts"
+status = "ported"
+rust = "tui_shot/pty_shot.rs"
+module = "astroshot::tui_shot::pty_shot"
+ported_at = "2026-10-06T22:09:00Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+tests = ["packages/tui-shot/src/shot.test.ts"]
+notes = "portable-pty + native raster replace node-pty and xterm+Chromium; exit wrapper = current binary re-exec'd as __pty-exit-wrapper; signal death reports exit 0 like node-pty; graphics mode answers DA1/DSR like xterm; headed/fontFamily ignored"
+
+[module.ts_blobs]
+"packages/tui-shot/src/pty-shot.ts" = "432359ec1b6f91e08bd7efba2eb880df7cfebc92"
+"packages/tui-shot/src/shot.test.ts" = "8dc97f7da8d23a2ff67c247b51b2b03f2694045c"
+
+[module.symbols]
+takePtyShot = "astroshot::tui_shot::pty_shot::take_pty_shot"
+
+[[module]]
+ts = "packages/tui-shot/src/render-ink.ts"
+status = "replaced"
+module = "node helper: ink-render"
+ported_at = "2026-10-06T21:37:13Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/tui-shot/src/render-ink.ts" = "3562008a2a961c48ba08bd37752313611628f454"
+
+[[module]]
+ts = "packages/tui-shot/src/shot.ts"
+status = "ported"
+rust = "tui_shot/shot.rs"
+module = "astroshot::tui_shot::shot"
+ported_at = "2026-10-06T21:56:09Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "loadFixture + Ink render in node helper; HTML+Playwright replaced by raster; helper spawned per shot; fontFamily/headed ignored"
+
+[module.ts_blobs]
+"packages/tui-shot/src/shot.ts" = "f31571b529ab20160b941c150647518e57044205"
+
+[module.symbols]
+TerminalCaptureRequest = "-"
+captureTerminalHtml = "astroshot::raster::render_png"
+closeSharedBrowser = "astroshot::tui_shot::shot::close_shared_browser"
+queueTerminalShot = "astroshot::tui_shot::shot::queue_terminal_shot"
+takeTuiShot = "astroshot::tui_shot::shot::take_tui_shot"
+validPositive = "astroshot::tui_shot::shot::valid_positive"
+
+[[module]]
+ts = "packages/tui-shot/src/terminal-html.ts"
+status = "replaced"
+module = "astroshot::raster (alacritty_terminal grid → native rasterizer; rust/PORTING.md decision 2)"
+ported_at = "2026-10-06T21:54:37Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+
+[module.ts_blobs]
+"packages/tui-shot/src/terminal-html.ts" = "15d5c7ddf5a6126f6217813ab1fe235769de382a"
+
+[[module]]
+ts = "packages/tui-shot/src/types.ts"
+status = "ported"
+rust = "tui_shot/types.rs"
+module = "astroshot::tui_shot::types"
+ported_at = "2026-10-06T21:38:23Z"
+ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
+notes = "TuiShotFixture drops the React component (Ink renders in the node helper); numbers are f64 — switch to js_number where written"
+
+[module.ts_blobs]
+"packages/tui-shot/src/types.ts" = "0880414e5d3e8fdf7fdd47f0dcf5cf851f1a8a90"
+
+[module.symbols]
+BatchEntry = "astroshot::tui_shot::types::BatchEntry"
+BatchManifest = "astroshot::tui_shot::types::BatchManifest"
+PtyAction = "astroshot::tui_shot::types::PtyAction"
+PtyKey = "astroshot::tui_shot::types::PtyKey"
+PtyShotFixture = "astroshot::tui_shot::types::PtyShotFixture"
+PtyShotRequest = "astroshot::tui_shot::types::PtyShotRequest"
+TuiShotFixture = "-"
+TuiShotRequest = "astroshot::tui_shot::types::TuiShotRequest"

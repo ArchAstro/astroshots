@@ -122,6 +122,68 @@ jobs:
         # Pass the file path after `--` so npm does not swallow vitest args.
         run: npm run test:e2e --workspace @archastro/tui-shot -- src/pty-cli.e2e.test.ts
 
+  rust:
+    name: Rust astroshot on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    env:
+      # Tests that need Node, Chrome, or ffmpeg skip when the tool is missing
+      # on a developer machine. In CI a missing tool fails the test instead.
+      ASTROSHOT_REQUIRE_TOOLS: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
+      # The Node helper (rust/node-helper) loads vite, tsx, ink, react, and
+      # playwright-core from the root node_modules.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace packages the fixtures import
+        run: npm run build --workspaces --if-present
+
+      - name: Install ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+
+      - name: Install ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Format
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy -p astroshot --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: rust
+        run: cargo test -p astroshot --no-fail-fast
+
   test:
     name: macOS app
     # mlx-audio-swift requires Swift tools 6.2 → Xcode 26 on macos-26.

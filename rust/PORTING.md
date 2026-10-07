@@ -1,0 +1,130 @@
+# Porting astroshots to Rust
+
+The TypeScript packages under `packages/` are being ported to one Rust crate,
+`rust/astroshot`, module by module with [rustify](https://github.com/ArchAstro/rustify).
+`rustify.toml` at the repository root defines the scope; port state lives in
+`rust/port/`.
+
+```bash
+rustify status            # progress
+rustify next --brief      # what to port next, and how
+rustify done <ts file> --test <ts test>
+rustify check
+cd rust && cargo test && cargo clippy --all-targets -- -D warnings
+```
+
+## Scope
+
+| Package | Ports to | Notes |
+|---|---|---|
+| `@archastro/astroshot` (`bin/*.mjs`) | `astroshot::bin::*` | The `astroshot` CLI. Lands in `src/bin/` as ordinary modules (`autobins = false`). |
+| `@archastro/astroshot-review` | `astroshot::astroshot_review` | Terminal review tray. Ink → ratatui. |
+| `@archastro/movie-harness` | `astroshot::movie_harness` | Movie capture and encoding. |
+| `@archastro/tui-shot` | `astroshot::tui_shot` | Terminal screenshots. |
+| `@archastro/react-shot` | `astroshot::react_shot` | Browser component screenshots. |
+| `astroshot-unscoped`, `macos/`, `scripts/`, `skills/` | not ported | npm packaging, the Swift app, repo tooling. |
+
+One binary, `astroshot`, replaces the five npm bins (`astroshot`,
+`astroshot-review`, `astroshot-movie`, `react-shot`, `tui-shot`) as
+subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
+
+## Decisions
+
+1. **User components still render in Node.** `react-shot` and Ink fixtures
+   load the user's own TSX (vite, `tsx/esm/api`, `ink`). That needs a JS
+   runtime, so a small Node helper (`rust/node-helper/`) does only that:
+   load config and fixtures, serve React fixtures with vite, render Ink
+   fixtures to ANSI frames. Rust spawns it and talks JSON over stdio
+   (`astroshot::node_helper`). TS modules whose job moves into the helper are
+   recorded with `rustify replace <file> --with "node helper: <command>"`.
+   Everything else (CLI, orchestration, PTY capture, rasterizing, encoding,
+   review tray, on-disk contract) is Rust. Node is required only for React
+   and Ink shots.
+2. **No Playwright.**
+   - Real browser work (React shots, browser movie sources) uses
+     `chromiumoxide` over CDP (`astroshot::browser`).
+   - Terminal frames are rasterized natively (`astroshot::raster`): a
+     `alacritty_terminal` grid → glyphs with `cosmic-text` → `tiny-skia` → PNG, using a
+     bundled monospace font. TS turned terminals into HTML and screenshotted
+     them in Chromium; the Rust output is a different pixel image of the same
+     cells. Keep the color tables (`ANSI_16`, 256-color, truecolor), cell
+     metrics, padding, and backgrounds from `terminal-html.ts` /
+     `terminal-paint.ts` exactly.
+   - Browser movie `scriptPath` (a user JS module that drives a Playwright
+     `Page`) keeps working: the Node helper runs it with `playwright-core`
+     attached to the Rust-launched Chrome over CDP (`connectOverCDP`). Rust
+     still owns the browser; `playwright-core` is needed only for scripted
+     browser movies.
+   - Encoding uses `ffmpeg` as today. The TS fallback (replay frames in
+     Chromium's recorder) becomes the same replay over CDP. Known gap: the
+     fallback WebM comes from `MediaRecorder`, so it has one frame per pushed
+     frame and no container duration (TS: 25 fps with a duration).
+   - Terminal PNGs use the bundled JetBrains Mono (`fontFamily` is ignored).
+     Text it has no glyph for (CJK, emoji, some symbols) is drawn from the
+     machine's fonts, as Chromium's fallback did.
+   - Capture quality is deliberately above TS (measured with colour bars
+     played in Chrome's `<video>`: TS encodes were off by 25-47 levels per
+     channel and showed dark UI darker; these are within 1):
+     - every ffmpeg encode converts to BT.709 limited range explicitly and
+       tags the stream BT.709 primaries/matrix with the sRGB transfer
+       (`video_encode.rs`); TS left it to ffmpeg's defaults, untagged;
+     - constant quality (VP9 `-crf 15`, H.264 `-crf 14 -preset slow`)
+       instead of VP9 at 2 Mbit/s, x264 defaults, and realtime VP8 at
+       1 Mbit/s for browser recordings; Lanczos instead of nearest-neighbour
+       when frames are resized; odd sizes are made even;
+     - browser movies are recorded at 2 device pixels per CSS pixel from
+       lossless PNG screencast frames (TS: 1x, quality-90 JPEG), so the video
+       and poster are twice `--size`;
+     - PTY movies are the frames' own pixel size (TS shrank each 2x frame to
+       the CSS size plus margin, unevenly, with nearest neighbour), so the
+       manifest `viewport` is that pixel size;
+     - desktop captures are converted from the display's colour profile to
+       sRGB with `sips`; the blank-frame check decodes the PNG instead of
+       reading filtered bytes;
+     - review playback scales with Lanczos instead of `fast_bilinear`.
+   - Chrome discovery: `ASTROSHOT_CHROME`/`CHROME_PATH`, then an installed
+     Chrome, then Playwright's cache. In the cache a headless launch takes
+     `chromium_headless_shell-<rev>` first (what Playwright launched; Chrome
+     for Testing takes about 1.5 s longer to start), a headed launch
+     `chromium-<rev>`.
+   - Chrome is driven over a websocket, not Playwright's pipe, so a `sh`
+     watchdog (`browser/watchdog.rs`) kills it when the process dies.
+3. **Terminal emulation:** `@xterm/headless` → `alacritty_terminal` (replacing
+   the initial `vt100`, which drops dim, strikethrough, hidden, and
+   autowrap-off). **PTY:** `node-pty` →
+   `portable-pty`. **Ink UI:** ratatui + crossterm; screen state is a struct,
+   input goes through `handle(event)`, the app loop is
+   `crossterm::event::EventStream` + `tokio::select!`. The kitty graphics and
+   halfblock image code ports as written; it writes escape sequences itself.
+4. **Runtime:** tokio multi-thread. Errors: `thiserror` enums where callers
+   match on them, `anyhow` at command boundaries. `node:worker_threads` image
+   work → `rayon` / `spawn_blocking`.
+
+## Compatibility rules
+
+- **On-disk formats are a contract.** The macOS app and agent skills read
+  `.astroshot/**` (`review.json`, manifests, friction logs, movie metadata).
+  Field names, key order, number formatting, and file layout must be
+  byte-identical to what TS writes. serde_json writes `1.0` where JS writes
+  `1`; use a JS-exact number writer where it matters. Declare struct fields in
+  the TS insertion order (`serde_json` has `preserve_order` on).
+- **CLI surface is a contract.** Flags, defaults, help-relevant names, stdout,
+  stderr, and exit codes match the TS bins. The `*.e2e.test.ts` suites and
+  `packages/astroshot/test/*.test.mjs` are the binary-level tests; they will be
+  run against the Rust binary.
+- **Port tests case for case:** same test names (snake_case), same
+  assertions. Record them with `rustify done --test`.
+- Platform checks (`process.platform`) → `cfg!(target_os = ...)` or
+  `std::env::consts::OS`, matching the TS branches.
+
+## Working rules for batch ports
+
+- Do not edit `rust/astroshot/Cargo.toml`. If a crate is missing, say so in
+  your report; the lead adds it.
+- Add `mod` lines for your files to their parent `mod.rs` / `lib.rs`; the lead
+  merges parallel edits.
+- Shared infrastructure (`node_helper`, `browser`, `raster`) is owned by its
+  module; call it, don't re-implement it.
+- Write deliberate divergences from TS into the `notes` of `rustify done`.
+- Before finishing: `cargo test -p astroshot`, `cargo clippy -p astroshot
+  --all-targets -- -D warnings`, `cargo fmt --all`.

@@ -1,0 +1,55 @@
+# Astroshots CLIs, ported from packages/* module by module with rustify.
+# See ../PORTING.md. Dependencies are added by the port lead, not by batch
+# ports, so parallel batches never conflict here.
+[package]
+name = "astroshot"
+description = "Astroshots capture and review tooling, ported from TypeScript"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+# The CLI package's `bin/*.mjs` ports to `src/bin/` as ordinary modules.
+autobins = false
+
+[[bin]]
+name = "astroshot"
+path = "src/main.rs"
+
+[dependencies]
+alacritty_terminal = "0.25"
+anyhow = "1"
+base64 = "0.22"
+chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"] }
+chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+cosmic-text = "0.12"
+crossterm = { version = "0.28", features = ["event-stream"] }
+dirs = "6"
+flate2 = "1"
+futures = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+notify = "8"
+png = "0.17"
+portable-pty = "0.9"
+ratatui = "0.29"
+rayon = "1"
+regex = "1"
+rustix = { version = "1", features = ["event", "stdio", "termios", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+tiny-skia = "0.11"
+tokio = { version = "1", features = ["full"] }
+unicode-normalization = "0.1"
+url = "2"
+walkdir = "2"
+which = "7"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
