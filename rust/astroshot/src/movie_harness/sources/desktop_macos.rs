@@ -1145,10 +1145,12 @@ mod tests {
         assert!(window_rows_json("not json").is_err());
     }
 
-    // Listing windows needs a logged-in GUI session (CGWindowList).
+    // The TS suite's only run condition is `describe.skipIf(!isMac)`, so these
+    // two run on every Mac, as they do in TS. They need what TS needs: a
+    // logged-in GUI session with a visible window (CGWindowList), the swift
+    // toolchain, and Screen Recording permission for the host app.
     #[cfg(target_os = "macos")]
     #[test]
-    #[ignore = "needs a macOS GUI session with visible windows and the swift toolchain"]
     fn lists_windows_with_ids() {
         let windows = list_desktop_windows().unwrap();
         assert!(!windows.is_empty());
@@ -1157,7 +1159,6 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[tokio::test]
-    #[ignore = "needs Screen Recording permission for the host app and a visible window"]
     async fn matches_by_window_id_and_records_a_short_movie() {
         // Prefer a normal on-screen app window (layer 0), not floating system chrome.
         let windows: Vec<DesktopWindowInfo> = list_desktop_windows()

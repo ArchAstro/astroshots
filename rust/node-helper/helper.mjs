@@ -32,9 +32,24 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const PROTOCOL = 1;
 const HELPER_DIR = path.dirname(fileURLToPath(import.meta.url));
 
+// True when Node runs this file as the helper process. `helper.test.mjs`
+// imports it as a library instead, to test the exported functions; then the
+// protocol loop below must not start and stdout must stay untouched.
+const IS_MAIN = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      fs.realpathSync(process.argv[1]) ===
+      fs.realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+})();
+
 // Keep stdout for the protocol only.
 const protocolWrite = process.stdout.write.bind(process.stdout);
-process.stdout.write = (...args) => process.stderr.write(...args);
+if (IS_MAIN) process.stdout.write = (...args) => process.stderr.write(...args);
 function send(message) {
   protocolWrite(`${JSON.stringify(message)}\n`);
 }
@@ -798,25 +813,30 @@ async function handle(line) {
   return true;
 }
 
-const lines = readline.createInterface({ input: process.stdin });
-let queue = Promise.resolve();
-let running = true;
-lines.on("line", (line) => {
-  if (!line.trim()) return;
-  queue = queue.then(async () => {
-    if (!running) return;
-    running = await handle(line);
-    if (!running) process.exit(0);
-  });
-});
-lines.on("close", () => {
-  queue = queue.then(async () => {
-    await closeAll();
-    process.exit(0);
-  });
-});
-process.on("unhandledRejection", (error) => {
-  process.stderr.write(`astroshot node helper: unhandled rejection: ${error?.stack ?? error}\n`);
-});
+// Exported for `helper.test.mjs` (ports react-shot/src/create-server.test.ts).
+export { resolveInstalledModule, resolveInstalledPackage };
 
-send({ ready: true, protocol: PROTOCOL, node: process.version });
+if (IS_MAIN) {
+  const lines = readline.createInterface({ input: process.stdin });
+  let queue = Promise.resolve();
+  let running = true;
+  lines.on("line", (line) => {
+    if (!line.trim()) return;
+    queue = queue.then(async () => {
+      if (!running) return;
+      running = await handle(line);
+      if (!running) process.exit(0);
+    });
+  });
+  lines.on("close", () => {
+    queue = queue.then(async () => {
+      await closeAll();
+      process.exit(0);
+    });
+  });
+  process.on("unhandledRejection", (error) => {
+    process.stderr.write(`astroshot node helper: unhandled rejection: ${error?.stack ?? error}\n`);
+  });
+
+  send({ ready: true, protocol: PROTOCOL, node: process.version });
+}
