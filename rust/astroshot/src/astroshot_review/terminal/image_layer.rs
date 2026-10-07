@@ -1511,7 +1511,7 @@ mod tests {
         // Matches the TS: dropFrame() runs after the frame was nulled.
         assert_eq!(writes.lock().unwrap().len(), before);
         // The stale placement is deleted on the next render.
-        assert_eq!(layer.render(), format!("{DELETE_ALL_PLACEMENTS}"));
+        assert_eq!(layer.render(), DELETE_ALL_PLACEMENTS.to_string());
         frames.unregister();
         assert_eq!(writes.lock().unwrap().len(), before);
     }

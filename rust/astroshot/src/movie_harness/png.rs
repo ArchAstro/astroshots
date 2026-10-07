@@ -22,7 +22,7 @@ pub fn encode_solid_png(width: u32, height: u32, rgb: [u8; 3]) -> Vec<u8> {
     let mut raw = vec![0u8; stride * height as usize];
     for row in raw.chunks_exact_mut(stride) {
         // row[0] is the "none" filter byte.
-        for pixel in row[1..].chunks_exact_mut(3) {
+        for pixel in row[1..].as_chunks_mut::<3>().0 {
             pixel.copy_from_slice(&rgb);
         }
     }

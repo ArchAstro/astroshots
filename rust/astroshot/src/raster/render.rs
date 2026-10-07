@@ -475,7 +475,7 @@ fn draw_glyph(pixmap: &mut Pixmap, glyph: &GlyphBitmap, cell_x: i32, cell_y: i32
     let size = glyph.width as usize * glyph.height as usize;
     let mut data = Vec::with_capacity(size * 4);
     if glyph.color {
-        for px in glyph.data.chunks_exact(4) {
+        for px in glyph.data.as_chunks::<4>().0 {
             let a = u32::from(px[3]);
             data.extend([
                 (u32::from(px[0]) * a / 255) as u8,
@@ -519,7 +519,7 @@ fn paint_overlay(
     let size = tiny_skia::IntSize::from_wh(overlay.width, overlay.height)
         .ok_or_else(|| RasterError::Overlay("overlay image is empty".to_string()))?;
     let mut data = Vec::with_capacity(overlay.rgba.len());
-    for px in overlay.rgba.chunks_exact(4) {
+    for px in overlay.rgba.as_chunks::<4>().0 {
         let a = u32::from(px[3]);
         data.extend([
             (u32::from(px[0]) * a / 255) as u8,
