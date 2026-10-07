@@ -9,7 +9,7 @@
 //! are and that `review.json` changes as the macOS app would write it. Every
 //! wait polls the emulated screen (or the disk) against a deadline.
 //!
-//! `herdr.e2e.test.ts` is not ported here.
+//! `herdr.e2e.test.ts` is ported in `tests/review_herdr.rs`.
 
 #![cfg(unix)]
 
