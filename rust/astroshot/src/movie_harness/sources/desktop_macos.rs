@@ -1207,8 +1207,19 @@ mod tests {
                     && w.owner != "Window Server"
             })
             .collect();
-        assert!(!windows.is_empty());
-        let target = &windows[0];
+        // Which windows exist is the machine's business: a CI runner has a
+        // window server but no app window, and a window on another Space is
+        // listed as on-screen yet cannot be captured. Record the first one
+        // that can.
+        let probe_dir = tempfile::tempdir().unwrap();
+        let probe = path_str(&probe_dir.path().join("probe.png"));
+        let Some(target) = windows
+            .iter()
+            .find(|window| capture_window_png(window.id, &probe, false).is_ok())
+        else {
+            eprintln!("SKIP: no capturable on-screen app window to record");
+            return;
+        };
         let matched = match_desktop_window(
             &windows,
             &DesktopWindowMatch {

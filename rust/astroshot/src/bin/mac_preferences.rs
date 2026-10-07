@@ -778,7 +778,7 @@ mod tests {
             return;
         }
         let roots = extract_preference_key(PLIST.as_bytes(), "watchRoots", "json");
-        assert!(roots.present);
+        assert!(roots.present, "{roots:?}");
         let parsed: Vec<String> = serde_json::from_str(roots.raw.as_deref().unwrap()).unwrap();
         assert_eq!(parsed, strings(&["/Users/tester/watched"]));
 
@@ -971,7 +971,7 @@ mod tests {
             read_domain: Some(&read),
             ..Default::default()
         });
-        assert!(configuration.available);
+        assert!(configuration.available, "{configuration:?}");
         assert_eq!(configuration.roots, vec![watched.clone()]);
         assert!(!configuration.used_legacy_key);
         assert!(configuration.has_completed_first_run_setup);

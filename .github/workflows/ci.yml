@@ -182,7 +182,7 @@ jobs:
 
       - name: Test
         working-directory: rust
-        run: cargo test -p astroshot
+        run: cargo test -p astroshot --no-fail-fast
 
   test:
     name: macOS app

@@ -403,10 +403,13 @@ fn doctor_reports_every_check_with_pass_fail_and_a_remediation_line() {
         Err(_) => assert_eq!(chromium["status"], "warn"),
     }
 
-    assert_eq!(
-        check(&report, "screen-recording")["detail"],
+    // The platform is checked before the flag.
+    let screen = if cfg!(target_os = "macos") {
         "skipped with --skip-screen"
-    );
+    } else {
+        "desktop.window is macOS-only; use --source browser, pty, or frames"
+    };
+    assert_eq!(check(&report, "screen-recording")["detail"], screen);
 }
 
 /// Human-mode report lines: every FAIL/WARN has one `fix:` line.
