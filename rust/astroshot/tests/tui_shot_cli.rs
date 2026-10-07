@@ -655,6 +655,7 @@ fn tui_shot_bin_help_and_usage_errors_match_the_ts_bin() {
         "install-browser does not accept arguments\n",
         1,
     );
+}
 
 // ---- Fix pass: sizes and failed program launches measured against TS ----
 
