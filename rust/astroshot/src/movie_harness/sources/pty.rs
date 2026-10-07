@@ -155,11 +155,11 @@ pub async fn record_pty_movie(options: PtyMovieSessionOptions) -> Result<MovieAr
     let settle_ms = fixture.settle_ms.unwrap_or(80) as f64;
 
     let mut raster = RasterOptions::movie(cols, rows).with_css_colors(foreground, background)?;
-    raster.font_size = fixture.font_size.unwrap_or(DEFAULT_FONT_SIZE) as f32;
-    raster.line_height = fixture.line_height.unwrap_or(DEFAULT_LINE_HEIGHT) as f32;
-    raster.padding = fixture.padding.unwrap_or(DEFAULT_PADDING) as f32;
-    raster.border_radius = fixture.border_radius.unwrap_or(DEFAULT_BORDER_RADIUS) as f32;
-    raster.scale = fixture.scale.unwrap_or(DEFAULT_SCALE) as f32;
+    raster.font_size = fixture.font_size.unwrap_or(DEFAULT_FONT_SIZE);
+    raster.line_height = fixture.line_height.unwrap_or(DEFAULT_LINE_HEIGHT);
+    raster.padding = fixture.padding.unwrap_or(DEFAULT_PADDING);
+    raster.border_radius = fixture.border_radius.unwrap_or(DEFAULT_BORDER_RADIUS);
+    raster.scale = fixture.scale.unwrap_or(DEFAULT_SCALE);
     let paint = Arc::new(Paint { raster });
     let size = paint.size();
 

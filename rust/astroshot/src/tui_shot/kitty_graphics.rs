@@ -46,13 +46,7 @@ pub struct GraphicsOverlay {
 impl GraphicsOverlay {
     /// The rasterizer overlay for this picture.
     pub fn to_raster_overlay(&self) -> Result<Overlay, RasterError> {
-        Overlay::from_png(
-            self.col as f32,
-            self.row as f32,
-            self.cols as f32,
-            self.rows as f32,
-            &self.png,
-        )
+        Overlay::from_png(self.col, self.row, self.cols, self.rows, &self.png)
     }
 }
 

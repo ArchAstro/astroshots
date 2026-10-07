@@ -41,7 +41,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
-use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
+use portable_pty::{
+    Child, ChildKiller, CommandBuilder, ExitStatus, MasterPty, PtySize, native_pty_system,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -662,6 +664,76 @@ fn read_loop(mut reader: Box<dyn Read + Send>, context: ReaderContext) {
 
 type SharedChild = Arc<Mutex<Box<dyn Child + Send + Sync>>>;
 
+/// Stands in for a PTY child whose program could not be executed.
+///
+/// node-pty starts the program from inside the PTY child (`spawn-helper` on
+/// macOS, the forked child elsewhere), so a missing or non-executable program
+/// is not a spawn error in TS: the child exits with code 1 and the fixture
+/// fails with "PTY program exited with code 1 before capture", or is captured
+/// when `allowNonZeroExit` is set. portable-pty reports the same condition
+/// from `spawn_command`; this child replays node-pty's outcome.
+#[derive(Debug)]
+struct FailedExec;
+
+impl Child for FailedExec {
+    fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        Ok(Some(ExitStatus::with_exit_code(1)))
+    }
+
+    fn wait(&mut self) -> std::io::Result<ExitStatus> {
+        Ok(ExitStatus::with_exit_code(1))
+    }
+
+    fn process_id(&self) -> Option<u32> {
+        None
+    }
+
+    #[cfg(windows)]
+    fn as_raw_handle(&self) -> Option<std::os::windows::io::RawHandle> {
+        None
+    }
+}
+
+impl ChildKiller for FailedExec {
+    fn kill(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn clone_killer(&self) -> Box<dyn ChildKiller + Send + Sync> {
+        Box::new(FailedExec)
+    }
+}
+
+/// What node-pty's child writes to the terminal when it cannot execute the
+/// program. macOS: nothing (`spawn-helper` exits 1 silently). Elsewhere the
+/// forked child runs `perror("execvp(3) failed.")` (node-pty
+/// `src/unix/pty.cc`), so the frame shows the errno text.
+fn failed_exec_output(command: &str, env: &HashMap<String, String>) -> String {
+    if cfg!(target_os = "macos") {
+        return String::new();
+    }
+    // execvp reports EACCES when a candidate exists but cannot be executed,
+    // ENOENT when there is none.
+    let exists = if command.contains('/') {
+        Path::new(command).exists()
+    } else {
+        env.get("PATH")
+            .map(String::as_str)
+            .unwrap_or("/usr/bin:/bin")
+            .split(':')
+            .any(|directory| {
+                let directory = if directory.is_empty() { "." } else { directory };
+                Path::new(directory).join(command).is_file()
+            })
+    };
+    let reason = if exists {
+        "Permission denied"
+    } else {
+        "No such file or directory"
+    };
+    format!("execvp(3) failed.: {reason}\r\n")
+}
+
 /// Waits for the child, lets the reader drain, then publishes the exit.
 fn wait_loop(child: SharedChild, shared: SharedState, exited_flag: Arc<AtomicBool>) {
     let status = loop {
@@ -816,7 +888,7 @@ pub struct PtyCapture {
 }
 
 /// Port of `takePtyShot`. Returns the absolute output path.
-pub fn take_pty_shot(request: &PtyShotRequest) -> impl Future<Output = Result<String>> {
+pub fn take_pty_shot(request: &PtyShotRequest) -> impl Future<Output = Result<String>> + use<> {
     let request = request.clone();
     queue_terminal_shot(move || async move {
         let force_wrapper =
@@ -1007,6 +1079,14 @@ pub async fn take_isolated_pty_shot(
     drop(pair.slave);
     let child = match spawned {
         Ok(child) => child,
+        // node-pty never fails the spawn call for a program that cannot be
+        // executed: the PTY child exits with code 1 and the capture goes on
+        // (see `FailedExec`). The wrapper itself failing to start is an error.
+        Err(_) if cfg!(unix) && !use_exit_wrapper => {
+            let output = failed_exec_output(&command, &child_environment);
+            lock(&shared).emulator.write(&output);
+            Box::new(FailedExec)
+        }
         Err(error) => {
             if let Some(directory) = &status_directory {
                 let _ = fs::remove_dir_all(directory);
@@ -1275,11 +1355,11 @@ struct RenderSettings<'a> {
 fn capture_png(run: &PtyRun<'_>, out_path: &str, settings: RenderSettings<'_>) -> Result<String> {
     let mut options = RasterOptions::new(settings.cols, settings.rows)
         .with_css_colors(settings.foreground, settings.background)?;
-    options.font_size = settings.font_size as f32;
-    options.line_height = settings.line_height as f32;
-    options.padding = settings.padding as f32;
-    options.border_radius = settings.border_radius as f32;
-    options.scale = settings.scale as f32;
+    options.font_size = settings.font_size;
+    options.line_height = settings.line_height;
+    options.padding = settings.padding;
+    options.border_radius = settings.border_radius;
+    options.scale = settings.scale;
 
     let frame = {
         let mut shared = lock(run.shared);

@@ -81,8 +81,9 @@ where
     }
 }
 
-/// Port of `takeTuiShot`.
-pub fn take_tui_shot(request: &TuiShotRequest) -> impl Future<Output = Result<String>> {
+/// Port of `takeTuiShot`. The request is cloned and the queue slot is taken
+/// by this call, so the future borrows nothing and can be spawned.
+pub fn take_tui_shot(request: &TuiShotRequest) -> impl Future<Output = Result<String>> + use<> {
     let request = request.clone();
     queue_terminal_shot(move || async move { take_isolated_tui_shot(&request).await })
 }
@@ -228,11 +229,11 @@ pub fn render_tui_shot(request: &TuiShotRequest, frame: &InkRenderReply) -> Resu
 
     let mut options =
         RasterOptions::new(cols as u16, rows as u16).with_css_colors(foreground, background)?;
-    options.font_size = font_size as f32;
-    options.line_height = line_height as f32;
-    options.padding = padding as f32;
-    options.border_radius = border_radius as f32;
-    options.scale = scale as f32;
+    options.font_size = font_size;
+    options.line_height = line_height;
+    options.padding = padding;
+    options.border_radius = border_radius;
+    options.scale = scale;
 
     let out_path = resolve_path(&request.out_path);
     let is_png = out_path
