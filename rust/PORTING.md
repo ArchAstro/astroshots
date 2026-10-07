@@ -44,7 +44,7 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
    - Real browser work (React shots, browser movie sources) uses
      `chromiumoxide` over CDP (`astroshot::browser`).
    - Terminal frames are rasterized natively (`astroshot::raster`): a
-     `vt100` screen → glyphs with `cosmic-text` → `tiny-skia` → PNG, using a
+     `alacritty_terminal` grid → glyphs with `cosmic-text` → `tiny-skia` → PNG, using a
      bundled monospace font. TS turned terminals into HTML and screenshotted
      them in Chromium; the Rust output is a different pixel image of the same
      cells. Keep the color tables (`ANSI_16`, 256-color, truecolor), cell

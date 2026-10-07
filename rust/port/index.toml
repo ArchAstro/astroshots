@@ -836,7 +836,7 @@ rust = "bin/astroshot.rs"
 module = "astroshot::bin::astroshot"
 ported_at = "2026-10-06T22:03:42Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
-notes = "engines review/movie/react/ink/pty dispatch to bin::astroshot::pending until ported; install-browser reports find_chrome(); argv0 multi-call and hidden __pty-exit-wrapper in main.rs"
+notes = "astroshot <mode> dispatches to each package CLI (review/movie/react/ink/pty); install-browser forwards to the react-shot CLI, which reports find_chrome() instead of running Playwright's installer; an npm bin name in argv0 (react-shot, tui-shot, astroshot-movie, astroshot-review) passes the raw argv straight to that package CLI; hidden __pty-exit-wrapper in main.rs; binary-level cases from cli.test.mjs live in tests/cli.rs"
 
 [module.ts_blobs]
 "packages/astroshot/bin/astroshot.mjs" = "11658d6333faa89fd67ac0cb6a2fb8cbb854b16d"
@@ -868,7 +868,7 @@ rust = "bin/doctor.rs"
 module = "astroshot::bin::doctor"
 ported_at = "2026-10-06T21:56:07Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
-notes = "checks run through a Host trait; new checks astroshot (binary version) and node-helper; node optional; chromium via browser::find_chrome; screen-recording re-execs astroshot movie check-screen-access"
+notes = "checks run through a Host trait; new checks astroshot (binary version) and node-helper; node optional; chromium via browser::find_chrome; the demo-fixtures remediation points at the releases URL instead of npm install --global @archastro/astroshot; binary-level cases from demo-doctor.test.mjs live in tests/demo_doctor.rs; screen-recording re-execs astroshot movie check-screen-access"
 
 [module.ts_blobs]
 "packages/astroshot/bin/doctor.mjs" = "07456644f2df2c203fef694f27071c11112e77e9"
