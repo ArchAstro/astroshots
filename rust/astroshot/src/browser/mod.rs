@@ -21,7 +21,7 @@
 //! | `page.waitForTimeout(ms)` | [`Page::wait_for_timeout`] |
 //! | `locator.screenshot({omitBackground})` | [`Page::screenshot_element`] |
 //! | `page.screenshot({fullPage, omitBackground})` | [`Page::screenshot`] |
-//! | `recordVideo` (browser movie source) | [`Page::start_screencast`] + [`resample_frames`] + an encoder |
+//! | `recordVideo` (browser movie source) | [`Page::start_recording`] + [`Page::finish_screencast`] + [`write_recorder_webm`] |
 //! | `recordVideo` (encode fallback, no ffmpeg) | [`record_webm`] |
 //! | `page.close()` / `browser.close()` | [`Page::close`] / [`Browser::close`] |
 //!
@@ -38,6 +38,7 @@
 //! The shared browser notices when that runtime has gone away and relaunches.
 
 mod discover;
+mod record;
 mod webm;
 
 use std::path::PathBuf;
@@ -47,10 +48,13 @@ use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use chromiumoxide::browser::{BrowserConfig, HeadlessMode};
+use chromiumoxide::cdp::browser_protocol::browser::{
+    Bounds, GetWindowForTargetParams, SetWindowBoundsParams,
+};
 use chromiumoxide::cdp::browser_protocol::dom::Rgba;
 use chromiumoxide::cdp::browser_protocol::emulation::{
-    MediaFeature, SetDefaultBackgroundColorOverrideParams, SetDeviceMetricsOverrideParams,
-    SetEmulatedMediaParams,
+    ClearDeviceMetricsOverrideParams, MediaFeature, SetDefaultBackgroundColorOverrideParams,
+    SetDeviceMetricsOverrideParams, SetEmulatedMediaParams,
 };
 use chromiumoxide::cdp::browser_protocol::log::{EventEntryAdded, LogEntryLevel};
 use chromiumoxide::cdp::browser_protocol::page::{
@@ -66,6 +70,9 @@ use serde::de::DeserializeOwned;
 use tokio::task::JoinHandle;
 
 pub use discover::{CHROME_ENV_VARS, find_chrome};
+pub use record::{
+    RECORDER_FPS, RecordedVideo, recorder_ffmpeg_args, recorder_repeats, write_recorder_webm,
+};
 pub use webm::record_webm;
 
 /// Playwright's default action timeout is 30s; React shot overrides per call.
@@ -433,9 +440,13 @@ fn running_as_root() -> bool {
     cfg!(target_os = "linux") && std::env::var("USER").is_ok_and(|u| u == "root")
 }
 
+/// Playwright's `recordVideo` screencast quality.
+const RECORDER_JPEG_QUALITY: u8 = 90;
+
 struct Screencast {
     frames: Arc<Mutex<Vec<ScreencastFrame>>>,
     task: JoinHandle<()>,
+    started: Instant,
 }
 
 /// One frame from [`Page::stop_screencast`].
@@ -443,8 +454,39 @@ struct Screencast {
 pub struct ScreencastFrame {
     /// Encoded image (PNG or JPEG, per the requested format).
     pub data: Vec<u8>,
-    /// Milliseconds since [`Page::start_screencast`].
+    /// Milliseconds since [`Page::start_screencast`] when the frame arrived.
     pub at_ms: u128,
+    /// Chrome's frame swap time in seconds since the epoch
+    /// (`metadata.timestamp`; the arrival wall clock when Chrome omits it).
+    pub timestamp: f64,
+}
+
+/// What [`Page::finish_screencast`] returns.
+#[derive(Debug, Clone)]
+pub struct ScreencastRecording {
+    pub frames: Vec<ScreencastFrame>,
+    /// Milliseconds from [`Page::start_screencast`] to the stop, on the same
+    /// clock as [`ScreencastFrame::at_ms`].
+    pub stopped_at_ms: u128,
+}
+
+impl ScreencastRecording {
+    /// Drop each frame whose image is byte-identical to the one before it.
+    ///
+    /// Chrome re-sends the unchanged surface when something forces a redraw
+    /// (`Page.captureScreenshot` does); Playwright's headless shell does not.
+    /// Left in, such a frame would count as page activity and move the start
+    /// of the recorder's closing hold ([`recorder_repeats`]).
+    pub fn drop_unchanged_frames(&mut self) {
+        self.frames.dedup_by(|frame, kept| frame.data == kept.data);
+    }
+
+    /// Seconds between the last frame's arrival and the stop (the whole
+    /// recording when no frame arrived).
+    pub fn idle_secs(&self) -> f64 {
+        let last = self.frames.last().map_or(0, |frame| frame.at_ms);
+        self.stopped_at_ms.saturating_sub(last) as f64 / 1000.0
+    }
 }
 
 /// A page (tab). Close it with [`Page::close`]; dropping leaves the tab open
@@ -455,6 +497,12 @@ pub struct Page {
     tasks: Vec<JoinHandle<()>>,
     options: Mutex<PageOptions>,
     screencast: Mutex<Option<Screencast>>,
+}
+
+fn epoch_secs() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |elapsed| elapsed.as_secs_f64())
 }
 
 impl Page {
@@ -470,6 +518,82 @@ impl Page {
             .await
             .map_err(cdp)?;
         Ok(())
+    }
+
+    /// Grow or shrink the browser window so its content area is the viewport,
+    /// and return the content size reached (the window has a minimum size, so
+    /// a small viewport leaves it larger).
+    ///
+    /// The screencast captures the window's content area, not the emulated
+    /// viewport: a larger viewport is cropped to the window and a smaller one
+    /// shows the window around it. Playwright's headless shell has no window;
+    /// headed, it sizes the window the same way (`Browser.setWindowBounds`).
+    async fn fit_window_to_viewport(&self) -> Result<Size> {
+        let viewport = self.viewport();
+        let window = self
+            .page
+            .execute(GetWindowForTargetParams::default())
+            .await
+            .map_err(cdp)?;
+        // Emulation hides the real content size; measure without it, and
+        // restore it only once the resize has landed (a resize after the
+        // override would put the view back at the window's size).
+        self.page
+            .execute(ClearDeviceMetricsOverrideParams::default())
+            .await
+            .map_err(cdp)?;
+        let fitted = self.resize_window(&window.result, viewport).await;
+        self.apply_metrics().await?;
+        fitted
+    }
+
+    async fn resize_window(
+        &self,
+        window: &chromiumoxide::cdp::browser_protocol::browser::GetWindowForTargetReturns,
+        viewport: Size,
+    ) -> Result<Size> {
+        let content = self.window_content_size().await?;
+        if content == viewport {
+            return Ok(content);
+        }
+        // The window's own chrome is its bounds minus its content.
+        let grow = |outer: Option<i64>, inner: u32, want: u32| {
+            let inner = i64::from(inner);
+            (outer.unwrap_or(inner) - inner + i64::from(want)).max(1)
+        };
+        let bounds = Bounds::builder()
+            .width(grow(window.bounds.width, content.width, viewport.width))
+            .height(grow(window.bounds.height, content.height, viewport.height))
+            .build();
+        self.page
+            .execute(SetWindowBoundsParams::new(window.window_id, bounds))
+            .await
+            .map_err(cdp)?;
+        // The resize reaches the renderer a little later; wait for a content
+        // size that covers the viewport (bounded: then record what we have).
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let now = self.window_content_size().await?;
+            let changed = now != content;
+            let covers = now.width >= viewport.width && now.height >= viewport.height;
+            if (changed && covers) || Instant::now() >= deadline {
+                return Ok(now);
+            }
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+    }
+
+    async fn window_content_size(&self) -> Result<Size> {
+        let inner = self
+            .evaluate::<Vec<f64>>("[window.innerWidth, window.innerHeight]")
+            .await?;
+        match inner[..] {
+            [width, height] => Ok(Size {
+                width: width as u32,
+                height: height as u32,
+            }),
+            _ => Err(BrowserError::Script("window size is unavailable".into())),
+        }
     }
 
     /// The page's CDP target id, to find it again from another CDP client.
@@ -711,10 +835,31 @@ impl Page {
     /// repaints, so a still page yields few frames; feed the result to
     /// [`resample_frames`] to get a constant-fps sequence.
     pub async fn start_screencast(&self, jpeg_quality: Option<u8>) -> Result<()> {
+        self.start_screencast_within(jpeg_quality, self.viewport())
+            .await
+    }
+
+    /// Start a screencast for [`write_recorder_webm`], the way Playwright
+    /// starts `recordVideo`: JPEG frames at quality 90, at the window
+    /// content's own size. The window is first fitted to the viewport so the
+    /// frames show all of it; where the window cannot shrink that far, the
+    /// encoder crops them to the viewport. Stop with
+    /// [`Page::finish_screencast`].
+    pub async fn start_recording(&self) -> Result<()> {
         if self.screencast.lock().unwrap().is_some() {
             return Err(BrowserError::Screencast("already running".into()));
         }
-        let size = self.viewport();
+        let content = self.fit_window_to_viewport().await?;
+        self.start_screencast_within(Some(RECORDER_JPEG_QUALITY), content)
+            .await
+    }
+
+    /// `size` is the largest frame Chrome may send; larger surfaces are
+    /// scaled down to fit it.
+    async fn start_screencast_within(&self, jpeg_quality: Option<u8>, size: Size) -> Result<()> {
+        if self.screencast.lock().unwrap().is_some() {
+            return Err(BrowserError::Screencast("already running".into()));
+        }
         let mut events = self
             .page
             .event_listener::<EventScreencastFrame>()
@@ -729,9 +874,17 @@ impl Page {
                 if let Ok(data) = base64::engine::general_purpose::STANDARD
                     .decode(AsRef::<str>::as_ref(&event.data))
                 {
+                    let timestamp = event
+                        .metadata
+                        .timestamp
+                        .as_ref()
+                        .map(|time| *time.inner())
+                        .filter(|secs| *secs > 0.0)
+                        .unwrap_or_else(epoch_secs);
                     sink.lock().unwrap().push(ScreencastFrame {
                         data,
                         at_ms: started.elapsed().as_millis(),
+                        timestamp,
                     });
                 }
                 let _ = page
@@ -757,25 +910,57 @@ impl Page {
         while frames.lock().unwrap().is_empty() && Instant::now() < first_frame {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        *self.screencast.lock().unwrap() = Some(Screencast { frames, task });
+        *self.screencast.lock().unwrap() = Some(Screencast {
+            frames,
+            task,
+            started,
+        });
+        Ok(())
+    }
+
+    /// Make Chrome send the current surface as a screencast frame.
+    ///
+    /// A navigation that swaps renderers can paint the new document before
+    /// the screencast follows it, and Chrome then sends nothing until the
+    /// next repaint: the recording would show the old page meanwhile. A
+    /// viewport capture forces a redraw, which the screencast picks up. (A
+    /// clipped capture would not do: the frame it produces has the clip's
+    /// size.)
+    pub async fn refresh_screencast(&self) -> Result<()> {
+        let params = CaptureScreenshotParams::builder()
+            .format(CaptureScreenshotFormat::Jpeg)
+            .quality(1)
+            .optimize_for_speed(true)
+            .build();
+        self.page.execute(params).await.map_err(cdp)?;
         Ok(())
     }
 
     /// Stop the screencast and return its frames.
     pub async fn stop_screencast(&self) -> Result<Vec<ScreencastFrame>> {
+        Ok(self.finish_screencast().await?.frames)
+    }
+
+    /// Stop the screencast and return its frames with the stop time, which
+    /// [`recorder_repeats`] needs to hold the last frame like Playwright.
+    pub async fn finish_screencast(&self) -> Result<ScreencastRecording> {
         let running = self
             .screencast
             .lock()
             .unwrap()
             .take()
             .ok_or_else(|| BrowserError::Screencast("not running".into()))?;
+        let stopped_at_ms = running.started.elapsed().as_millis();
         let stopped = self.page.execute(StopScreencastParams::default()).await;
         // Let frames already in flight reach the collector.
         tokio::time::sleep(Duration::from_millis(50)).await;
         running.task.abort();
         stopped.map_err(cdp)?;
         let frames = std::mem::take(&mut *running.frames.lock().unwrap());
-        Ok(frames)
+        Ok(ScreencastRecording {
+            frames,
+            stopped_at_ms,
+        })
     }
 
     pub async fn close(self) -> Result<()> {

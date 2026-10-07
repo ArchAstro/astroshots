@@ -98,6 +98,168 @@ fn video_seconds(video: &str) -> f64 {
     String::from_utf8_lossy(&out.stdout).trim().parse().unwrap()
 }
 
+/// `codec_name`, `r_frame_rate` and decoded frame count of the video stream.
+fn video_stream(video: &str) -> (String, String, u32) {
+    let out = Command::new("ffprobe")
+        .args(["-v", "error", "-count_frames", "-select_streams", "v:0"])
+        .args([
+            "-show_entries",
+            "stream=codec_name,r_frame_rate,nb_read_frames",
+        ])
+        .args(["-of", "default=nw=1:nk=0", video])
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    let field = |name: &str| {
+        text.lines()
+            .find_map(|line| line.strip_prefix(&format!("{name}=")))
+            .unwrap_or_else(|| panic!("no {name} in {text}"))
+            .to_string()
+    };
+    (
+        field("codec_name"),
+        field("r_frame_rate"),
+        field("nb_read_frames").parse().unwrap(),
+    )
+}
+
+/// Every frame of a video as PNG files, in order.
+fn all_frames(video: &str, dir: &Path) -> Vec<std::path::PathBuf> {
+    std::fs::create_dir_all(dir).unwrap();
+    let status = Command::new("ffmpeg")
+        .args(["-y", "-loglevel", "error", "-i", video])
+        .arg(dir.join("%04d.png"))
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let mut frames: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    frames.sort();
+    frames
+}
+
+/// The TS source records with Playwright `recordVideo`: 25 fps whatever the
+/// session fps, VP8, and a page that stops repainting is held for
+/// `max(time since its last frame, 1 s)`. The manifest duration is the
+/// session wall clock (`session.elapsedMs()`), not the video's length.
+/// Observed from TS on this kind of page: 24 frames (0.96 s) with no settle,
+/// 35-37 frames (about 1.44 s) with `settleMs: 1500`.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_static_page_is_recorded_on_playwrights_timeline() {
+    if let Some(reason) = skip_reason() {
+        eprintln!("SKIP: {reason}");
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    let html = "<body style=\"margin:0;background:#2040c0\"><p>static</p></body>";
+    let record = |slug: &'static str, settle_ms: Option<u64>| {
+        let request = options(
+            root.path(),
+            slug,
+            BrowserMovieOptions {
+                url: Some(data_url(html)),
+                settle_ms,
+                ..Default::default()
+            },
+        );
+        async move {
+            let started = std::time::Instant::now();
+            let artifact = record_browser_movie(request).await.unwrap();
+            (artifact, started.elapsed().as_millis() as f64)
+        }
+    };
+
+    // No settle: the page's last frame is held for the 1 s minimum.
+    let (still, still_wall_ms) = record("still", None).await;
+    let (codec, rate, frames) = video_stream(&still.video_path);
+    assert_eq!(codec, "vp8");
+    assert_eq!(rate, "25/1", "the session fps (10) does not set the rate");
+    assert!((24..=32).contains(&frames), "{frames} frames");
+    let seconds = video_seconds(&still.video_path);
+    assert!(
+        (seconds - f64::from(frames) / 25.0).abs() < 0.05,
+        "{seconds}"
+    );
+    // Wall clock from session creation: includes the browser launch, so it is
+    // unrelated to the video's length and bounded by the whole call.
+    assert!(still.duration_ms > 0.0 && still.duration_ms <= still_wall_ms);
+    assert_eq!(still.duration_ms.fract(), 0.0);
+
+    // 1.5 s settle: the hold is the idle time, about 1.5 s, not 1 s + 1.5 s.
+    let (settled, settled_wall_ms) = record("settled", Some(1500)).await;
+    let (_, _, frames) = video_stream(&settled.video_path);
+    assert!((35..=46).contains(&frames), "{frames} frames");
+    assert!(settled.duration_ms >= 1500.0 && settled.duration_ms <= settled_wall_ms);
+
+    let manifest = manifest_for(&settled);
+    let shots = manifest["shots"].as_array().unwrap();
+    for (artifact, slug) in [(&still, "still"), (&settled, "settled")] {
+        let shot = shots.iter().find(|shot| shot["slug"] == slug).unwrap();
+        assert_eq!(shot["duration_ms"].as_f64(), Some(artifact.duration_ms));
+        assert_eq!(shot["source"], "browser");
+    }
+    // The frame is the whole viewport at its own size, not a window-sized
+    // crop padded out by the encoder.
+    let frame = root.path().join("still-last.png");
+    last_frame(&still.video_path, &frame);
+    for (x, y) in [(5, 195), (315, 195), (315, 100)] {
+        let [r, g, b] = pixel(&frame, x, y);
+        assert!(r < 80 && g < 110 && b > 140, "({x},{y}) = {r} {g} {b}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_animating_page_yields_changing_frames() {
+    if let Some(reason) = skip_reason() {
+        eprintln!("SKIP: {reason}");
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    // Red, then green, then blue, 300 ms apart, then still.
+    let html = r##"<body style="margin:0;background:#c00000"><script>
+setTimeout(() => { document.body.style.background = '#00c000'; }, 300);
+setTimeout(() => { document.body.style.background = '#0000c0'; }, 600);
+</script></body>"##;
+    let artifact = record_browser_movie(options(
+        root.path(),
+        "animated",
+        BrowserMovieOptions {
+            url: Some(data_url(html)),
+            settle_ms: Some(900),
+            ..Default::default()
+        },
+    ))
+    .await
+    .unwrap();
+
+    let frames = all_frames(&artifact.video_path, &root.path().join("frames"));
+    let dominant = |path: &std::path::PathBuf| {
+        let [r, g, b] = pixel(path, 160, 100);
+        match (r > 120, g > 120, b > 120) {
+            (true, false, false) => 'r',
+            (false, true, false) => 'g',
+            (false, false, true) => 'b',
+            _ => '?',
+        }
+    };
+    let mut seen: Vec<char> = frames.iter().map(dominant).filter(|c| *c != '?').collect();
+    let total = seen.len();
+    seen.dedup();
+    assert_eq!(seen, ['r', 'g', 'b'], "colour runs across {total} frames");
+    // Each colour is on screen for 300 ms, so it spans several 25 fps frames;
+    // the last one is then held for at least a second.
+    let run = |colour: char| frames.iter().filter(|f| dominant(f) == colour).count();
+    assert!((4..=12).contains(&run('r')), "red for {} frames", run('r'));
+    assert!(
+        (4..=12).contains(&run('g')),
+        "green for {} frames",
+        run('g')
+    );
+    assert!(run('b') >= 24, "blue for {} frames", run('b'));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn records_a_data_url_journey_into_a_movie() {
     if let Some(reason) = skip_reason() {
