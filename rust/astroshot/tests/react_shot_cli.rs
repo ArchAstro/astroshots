@@ -3,6 +3,8 @@
 //! outputs before capturing. Skipped (with a printed reason) when Chrome or
 //! Node is missing.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -20,11 +22,11 @@ fn package_root() -> PathBuf {
 
 fn tools_or_skip() -> bool {
     if let Err(error) = find_chrome() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     true

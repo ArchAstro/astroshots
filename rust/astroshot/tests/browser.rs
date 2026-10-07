@@ -1,6 +1,8 @@
 //! Real-browser tests for `astroshot::browser`. Skipped (with a printed reason)
 //! when no Chrome is installed.
 
+mod common;
+
 use std::time::Duration;
 
 use astroshot::browser::{
@@ -17,7 +19,7 @@ fn chrome_or_skip() -> bool {
             true
         }
         Err(error) => {
-            eprintln!("SKIP: {error}");
+            common::skip(&error);
             false
         }
     }

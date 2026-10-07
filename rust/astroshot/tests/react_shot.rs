@@ -2,6 +2,8 @@
 //! `take_shot` writes the PNG. Skipped (with a printed reason) when Chrome or
 //! Node is missing.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 
 use astroshot::browser::find_chrome;
@@ -20,11 +22,11 @@ fn repo() -> PathBuf {
 
 fn tools_or_skip() -> bool {
     if let Err(error) = find_chrome() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     true

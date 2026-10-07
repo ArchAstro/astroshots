@@ -6,6 +6,8 @@
 //!
 //! Needs `node` >=22 and the workspace `node_modules`; skipped without Node.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 
 use astroshot::node_helper::find_node;
@@ -26,7 +28,7 @@ fn repo() -> PathBuf {
 /// working directory. Every test in this binary sets the same directory.
 fn node_or_skip() -> bool {
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     std::env::set_current_dir(repo().join("packages/tui-shot")).unwrap();

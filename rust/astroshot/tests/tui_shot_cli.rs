@@ -10,6 +10,8 @@
 //! The Rust rasterizer draws the same cells natively, so sizes are compared
 //! with the same lower bounds and the pixel-variation check is kept.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -40,7 +42,7 @@ fn fixture(name: &str) -> String {
 
 fn node_or_skip() -> bool {
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     true

@@ -8,6 +8,8 @@
 //! encode are skipped with a printed reason when neither is installed.
 //! Nothing here needs Screen Recording permission or a visible window.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -75,7 +77,7 @@ fn can_encode() -> bool {
     if ffmpeg || astroshot::browser::find_chrome().is_ok() {
         return true;
     }
-    eprintln!("SKIP: neither ffmpeg nor Chrome is installed");
+    common::skip("neither ffmpeg nor Chrome is installed");
     false
 }
 

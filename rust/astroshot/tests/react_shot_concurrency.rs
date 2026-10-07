@@ -9,6 +9,8 @@
 //! process-wide Chrome that dies with the tokio runtime that launched it, so
 //! everything here runs inside one runtime.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -32,11 +34,11 @@ fn repo() -> PathBuf {
 
 fn tools_or_skip() -> bool {
     if let Err(error) = find_chrome() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return false;
     }
     true

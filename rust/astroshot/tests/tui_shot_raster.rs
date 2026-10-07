@@ -10,6 +10,8 @@
 //! The Ink cases need `node` >=22 and the workspace `node_modules`; they are
 //! skipped without Node.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -39,7 +41,7 @@ fn cell_pixels(row: u32, col: u32) -> impl Iterator<Item = (u32, u32)> {
 #[tokio::test]
 async fn preserves_a_real_ink_components_truecolor_styling() {
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return;
     }
     // Real Ink and chalk render the fixture in Node; the helper raises

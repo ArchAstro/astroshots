@@ -11,6 +11,8 @@
 //!
 //! Needs `node` >=22 and the workspace `node_modules`; skipped without Node.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -44,7 +46,7 @@ fn enter_package_root() {
 async fn spawn_or_skip() -> Option<NodeHelper> {
     enter_package_root();
     if let Err(error) = find_node() {
-        eprintln!("SKIP: {error}");
+        common::skip(&error);
         return None;
     }
     Some(

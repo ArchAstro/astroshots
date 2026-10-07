@@ -15,6 +15,8 @@
 //! - `demo-fixtures` remediation points at the releases page instead of
 //!   `npm install --global @archastro/astroshot`.
 
+mod common;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -121,7 +123,7 @@ fn assert_contract_script(script: &str, argument: &Path) {
     let node = match astroshot::node_helper::find_node() {
         Ok(node) => node,
         Err(error) => {
-            eprintln!("SKIP scripts/{script}: {error}");
+            common::skip(format!("scripts/{script}: {error}"));
             return;
         }
     };
