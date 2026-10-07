@@ -86,6 +86,30 @@ fn load_pty_movie_fixture_validates_the_document() {
     assert_eq!(fixture.cols, Some(30));
 }
 
+/// The TS loader does not type-check fields: node-pty stringifies env values
+/// and timers truncate fractional delays.
+#[test]
+fn load_pty_movie_fixture_accepts_what_js_would_coerce() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("coerced.yaml");
+    fs::write(
+        &path,
+        "version: 1\ncommand: sh\nenv: {PORT: 3000, DEBUG: true, NAME: app}\ntimeoutMs: 2500.5\nsettleMs: -5\n",
+    )
+    .unwrap();
+    let fixture = load_pty_movie_fixture(path.to_str().unwrap()).unwrap();
+    let env = fixture.env.unwrap();
+    assert_eq!(env["PORT"], "3000");
+    assert_eq!(env["DEBUG"], "true");
+    assert_eq!(env["NAME"], "app");
+    assert_eq!(fixture.timeout_ms, Some(2500));
+    assert_eq!(fixture.settle_ms, Some(0));
+
+    fs::write(&path, "version: 1\ncommand: sh\nenv: {LIST: [1]}\n").unwrap();
+    let error = load_pty_movie_fixture(path.to_str().unwrap()).unwrap_err();
+    assert!(error.to_string().contains("env.LIST"), "{error}");
+}
+
 /// Records a scripted shell for about two seconds and checks the published
 /// movie: manifest entry, poster and video on disk, session-sized frames.
 #[cfg(unix)]

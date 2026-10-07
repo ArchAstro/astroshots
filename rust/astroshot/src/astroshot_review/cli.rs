@@ -19,8 +19,9 @@ use std::time::Duration;
 
 use crossterm::event::EventStream;
 use futures::StreamExt;
-use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::layout::Rect;
+use ratatui::{Terminal, TerminalOptions, Viewport};
 use tokio::sync::Notify;
 
 use super::data::store::{ReviewStore, StoreOptions};
@@ -443,7 +444,9 @@ pub async fn run(argv: &[String]) -> i32 {
     } else {
         None
     };
-    log(&debug, || format!("capabilities {capabilities:?}"));
+    log(&debug, || {
+        format!("capabilities {}", capabilities.to_json())
+    });
     let ffmpeg = detect_ffmpeg();
     let service = ImageServiceImpl::new(ImageServiceOptions::default());
     let shared_service: Arc<dyn ImageService> = Arc::new(service.clone());
@@ -526,7 +529,17 @@ async fn run_app(services: &AppServices, pictures: Arc<Pictures>) -> io::Result<
     // cursor and makes the layer re-send its placements.
     writer.out.write_str(ENTER_SCREEN)?;
     writer.out.flush()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(writer))?;
+    let backend = CrosstermBackend::new(writer);
+    let mut terminal = match crossterm::terminal::size() {
+        Ok((columns, rows)) if columns != 0 && rows != 0 => Terminal::new(backend)?,
+        // A terminal that reports no size: Ink draws at 80x24, and ratatui
+        // would otherwise draw into an empty area.
+        _ => {
+            let size = TerminalSize::from_reported(None, None);
+            let viewport = Viewport::Fixed(Rect::new(0, 0, size.columns, size.rows));
+            Terminal::with_options(backend, TerminalOptions { viewport })?
+        }
+    };
 
     let on_quit = pictures.clone();
     let mut app = App::new(

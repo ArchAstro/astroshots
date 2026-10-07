@@ -49,6 +49,9 @@ struct GlyphBitmap {
 pub struct Rasterizer {
     font_system: FontSystem,
     swash: SwashCache,
+    /// The bundled fonts plus the machine's, for text the bundled font has
+    /// no glyph for. Built on first use: scanning system fonts is slow.
+    fallback: Option<(FontSystem, SwashCache)>,
     glyphs: HashMap<GlyphKey, std::rc::Rc<Vec<GlyphBitmap>>>,
 }
 
@@ -60,21 +63,20 @@ impl Default for Rasterizer {
 
 impl Rasterizer {
     pub fn new() -> Self {
-        let mut db = fontdb::Database::new();
-        for data in [FONT_REGULAR, FONT_BOLD, FONT_ITALIC, FONT_BOLD_ITALIC] {
-            db.load_font_data(data.to_vec());
-        }
-        db.set_monospace_family(FONT_FAMILY);
-        db.set_sans_serif_family(FONT_FAMILY);
-        db.set_serif_family(FONT_FAMILY);
         // A fixed locale and only the bundled fonts keep output identical
-        // across machines.
-        let font_system = FontSystem::new_with_locale_and_db("en-US".to_string(), db);
+        // across machines for everything JetBrains Mono covers.
         Self {
-            font_system,
+            font_system: font_system(false),
             swash: SwashCache::new(),
+            fallback: None,
             glyphs: HashMap::new(),
         }
+    }
+
+    /// Whether a render needed the machine's fonts.
+    #[cfg(test)]
+    pub(super) fn used_system_fonts(&self) -> bool {
+        self.fallback.is_some()
     }
 
     pub fn render_png(
@@ -279,55 +281,95 @@ impl Rasterizer {
         if let Some(found) = self.glyphs.get(&key) {
             return found.clone();
         }
-        let attrs = Attrs::new()
-            .family(Family::Name(FONT_FAMILY))
-            .weight(if bold { Weight::BOLD } else { Weight::NORMAL })
-            .style(if italic { Style::Italic } else { Style::Normal });
-        let mut buffer = Buffer::new(
+        let (mut bitmaps, missing) = shape(
             &mut self.font_system,
-            Metrics::new(layout.font_px as f32, layout.row_height as f32),
+            &mut self.swash,
+            text,
+            bold,
+            italic,
+            layout,
         );
-        buffer.set_size(&mut self.font_system, None, None);
-        buffer.set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
-        buffer.shape_until_scroll(&mut self.font_system, false);
-
-        let mut bitmaps = Vec::new();
-        for run in buffer.layout_runs() {
-            for glyph in run.glyphs {
-                // Glyph id 0 is `.notdef`: the font has no glyph, skip tofu.
-                if glyph.glyph_id == 0 {
-                    continue;
-                }
-                let physical = glyph.physical((0.0, run.line_y), 1.0);
-                let Some(image) = self
-                    .swash
-                    .get_image(&mut self.font_system, physical.cache_key)
-                    .clone()
-                else {
-                    continue;
-                };
-                if image.placement.width == 0 || image.placement.height == 0 {
-                    continue;
-                }
-                let color = match image.content {
-                    SwashContent::Mask => false,
-                    SwashContent::Color => true,
-                    SwashContent::SubpixelMask => continue,
-                };
-                bitmaps.push(GlyphBitmap {
-                    left: physical.x + image.placement.left,
-                    top: physical.y - image.placement.top,
-                    width: image.placement.width,
-                    height: image.placement.height,
-                    data: image.data,
-                    color,
-                });
-            }
+        if missing {
+            // Chromium fell back to a system font here (CJK, emoji, symbols).
+            let (font_system, swash) = self
+                .fallback
+                .get_or_insert_with(|| (font_system(true), SwashCache::new()));
+            bitmaps = shape(font_system, swash, text, bold, italic, layout).0;
         }
         let shared = std::rc::Rc::new(bitmaps);
         self.glyphs.insert(key, shared.clone());
         shared
     }
+}
+
+fn font_system(with_system_fonts: bool) -> FontSystem {
+    let mut db = fontdb::Database::new();
+    for data in [FONT_REGULAR, FONT_BOLD, FONT_ITALIC, FONT_BOLD_ITALIC] {
+        db.load_font_data(data.to_vec());
+    }
+    if with_system_fonts {
+        db.load_system_fonts();
+    }
+    db.set_monospace_family(FONT_FAMILY);
+    db.set_sans_serif_family(FONT_FAMILY);
+    db.set_serif_family(FONT_FAMILY);
+    FontSystem::new_with_locale_and_db("en-US".to_string(), db)
+}
+
+/// Rasterize one cell's text. The flag is set when a glyph was missing from
+/// every font in `font_system`; such glyphs are skipped, not drawn as tofu.
+fn shape(
+    font_system: &mut FontSystem,
+    swash: &mut SwashCache,
+    text: &str,
+    bold: bool,
+    italic: bool,
+    layout: &Layout,
+) -> (Vec<GlyphBitmap>, bool) {
+    let attrs = Attrs::new()
+        .family(Family::Name(FONT_FAMILY))
+        .weight(if bold { Weight::BOLD } else { Weight::NORMAL })
+        .style(if italic { Style::Italic } else { Style::Normal });
+    let mut buffer = Buffer::new(
+        font_system,
+        Metrics::new(layout.font_px as f32, layout.row_height as f32),
+    );
+    buffer.set_size(font_system, None, None);
+    buffer.set_text(font_system, text, attrs, Shaping::Advanced);
+    buffer.shape_until_scroll(font_system, false);
+
+    let mut bitmaps = Vec::new();
+    let mut missing = false;
+    for run in buffer.layout_runs() {
+        for glyph in run.glyphs {
+            // Glyph id 0 is `.notdef`.
+            if glyph.glyph_id == 0 {
+                missing = true;
+                continue;
+            }
+            let physical = glyph.physical((0.0, run.line_y), 1.0);
+            let Some(image) = swash.get_image(font_system, physical.cache_key).clone() else {
+                continue;
+            };
+            if image.placement.width == 0 || image.placement.height == 0 {
+                continue;
+            }
+            let color = match image.content {
+                SwashContent::Mask => false,
+                SwashContent::Color => true,
+                SwashContent::SubpixelMask => continue,
+            };
+            bitmaps.push(GlyphBitmap {
+                left: physical.x + image.placement.left,
+                top: physical.y - image.placement.top,
+                width: image.placement.width,
+                height: image.placement.height,
+                data: image.data,
+                color,
+            });
+        }
+    }
+    (bitmaps, missing)
 }
 
 /// Cell grid in device pixels, in f64. The content box starts inside the 1px

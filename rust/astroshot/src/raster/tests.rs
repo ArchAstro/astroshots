@@ -530,3 +530,32 @@ fn cell_grid_edges_are_computed_in_double_precision() {
     };
     assert_eq!(layout.overlay_rect(&overlay), (32.0, 62.0, 27.0, 29.25));
 }
+
+/// JetBrains Mono has no CJK: Chromium drew such text from a system font, and
+/// so does the rasterizer, but only once a frame needs it.
+#[test]
+fn text_the_bundled_font_lacks_is_drawn_from_system_fonts() {
+    let mut rasterizer = Rasterizer::new();
+    let background = [BG[0], BG[1], BG[2], 255];
+    let drawn = |image: &RgbaImage| {
+        content_pixels(image, 8, 1)
+            .into_iter()
+            .filter(|&(x, y)| image.pixel(x, y) != background)
+            .count()
+    };
+
+    let ascii = rasterizer
+        .render_rgba(&frame("hello", 8, 1), &options(8, 1))
+        .unwrap();
+    assert!(drawn(&ascii) > 0);
+    assert!(!rasterizer.used_system_fonts());
+
+    let cjk = rasterizer
+        .render_rgba(&frame("日本", 8, 1), &options(8, 1))
+        .unwrap();
+    assert!(rasterizer.used_system_fonts());
+    // Every Mac ships a CJK font; elsewhere the glyph may be skipped.
+    if cfg!(target_os = "macos") {
+        assert!(drawn(&cjk) > 0, "CJK cells are blank");
+    }
+}

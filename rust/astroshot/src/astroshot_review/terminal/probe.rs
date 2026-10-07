@@ -62,6 +62,40 @@ pub struct TerminalCapabilities {
     pub intercepted: Option<String>,
 }
 
+impl TerminalCapabilities {
+    /// `JSON.stringify(capabilities)`, for the debug log: the TS object's
+    /// keys, with `reason` last and only when set.
+    pub fn to_json(&self) -> String {
+        let graphics = match self.graphics {
+            GraphicsProtocol::Kitty => "kitty",
+            GraphicsProtocol::Herdr => "herdr",
+            GraphicsProtocol::Halfblocks => "halfblocks",
+            GraphicsProtocol::None => "none",
+        };
+        let cell_source = match self.cell_source {
+            CellSource::Query => "query",
+            CellSource::Env => "env",
+            CellSource::Fallback => "fallback",
+        };
+        let mut json = serde_json::json!({
+            "graphics": graphics,
+            "fileMedium": self.file_medium,
+            "cellWidth": self.cell_width,
+            "cellHeight": self.cell_height,
+            "cellSource": cell_source,
+            "insideTmux": self.inside_tmux,
+            "insideSsh": self.inside_ssh,
+            "insideMosh": self.inside_mosh,
+            "insideHerdr": self.inside_herdr,
+            "intercepted": self.intercepted,
+        });
+        if let Some(reason) = &self.reason {
+            json["reason"] = reason.as_str().into();
+        }
+        json.to_string()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CellSize {
     pub width: u32,
@@ -548,6 +582,34 @@ mod tests {
         drop(writer);
         let eof = read_ready_chunk(&reader, Instant::now() + Duration::from_secs(2)).await;
         assert_eq!(eof, None);
+    }
+
+    #[test]
+    fn capabilities_json_has_the_ts_keys_with_reason_last() {
+        let mut capabilities = TerminalCapabilities {
+            graphics: GraphicsProtocol::Halfblocks,
+            file_medium: false,
+            cell_width: 10,
+            cell_height: 20,
+            cell_source: CellSource::Fallback,
+            reason: None,
+            inside_tmux: false,
+            inside_ssh: false,
+            inside_mosh: false,
+            inside_herdr: true,
+            intercepted: Some("herdr".into()),
+        };
+        assert_eq!(
+            capabilities.to_json(),
+            r#"{"graphics":"halfblocks","fileMedium":false,"cellWidth":10,"cellHeight":20,"cellSource":"fallback","insideTmux":false,"insideSsh":false,"insideMosh":false,"insideHerdr":true,"intercepted":"herdr"}"#
+        );
+        capabilities.intercepted = None;
+        capabilities.reason = Some("no socket".into());
+        assert!(
+            capabilities
+                .to_json()
+                .ends_with(r#""intercepted":null,"reason":"no socket"}"#)
+        );
     }
 
     fn env(pairs: &[(&str, &str)]) -> Env {

@@ -14,10 +14,10 @@
 //! box-shadow are outside that element and are not part of the image.
 //!
 //! Known gaps against the Chromium output:
-//! - Font: JetBrains Mono only; `fontFamily` is not honored. Glyphs for
-//!   scripts it lacks (CJK, emoji, most symbols) are skipped, not drawn as
-//!   tofu. Wide cells reserve two columns but draw only if the font has the
-//!   glyph.
+//! - Font: JetBrains Mono; `fontFamily` is not honored. Text it has no
+//!   glyph for (CJK, emoji, some symbols) is drawn from the machine's fonts,
+//!   as Chromium's fallback did, so those cells vary by machine. A glyph no
+//!   installed font has is skipped, not drawn as tofu.
 //! - Block elements (U+2580-259F) are drawn as exact cell fractions; box
 //!   drawing lines come from the font and may leave sub-pixel gaps at other
 //!   line heights.
@@ -309,6 +309,9 @@ pub fn encode_png(image: &RgbaImage) -> Result<Vec<u8>, RasterError> {
     let mut encoder = png::Encoder::new(&mut out, image.width, image.height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
+    // Terminal frames are flat colour: per-row filter selection roughly halves
+    // the file at the same compression level.
+    encoder.set_adaptive_filter(png::AdaptiveFilterType::Adaptive);
     encoder
         .write_header()
         .and_then(|mut writer| writer.write_image_data(&image.data))

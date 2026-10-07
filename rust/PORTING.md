@@ -56,7 +56,19 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
      still owns the browser; `playwright-core` is needed only for scripted
      browser movies.
    - Encoding uses `ffmpeg` as today. The TS fallback (replay frames in
-     Chromium's recorder) becomes the same replay over CDP.
+     Chromium's recorder) becomes the same replay over CDP. Known gap: the
+     fallback WebM comes from `MediaRecorder`, so it has one frame per pushed
+     frame and no container duration (TS: 25 fps with a duration).
+   - Terminal PNGs use the bundled JetBrains Mono (`fontFamily` is ignored).
+     Text it has no glyph for (CJK, emoji, some symbols) is drawn from the
+     machine's fonts, as Chromium's fallback did.
+   - Chrome discovery: `ASTROSHOT_CHROME`/`CHROME_PATH`, then an installed
+     Chrome, then Playwright's cache. In the cache a headless launch takes
+     `chromium_headless_shell-<rev>` first (what Playwright launched; Chrome
+     for Testing takes about 1.5 s longer to start), a headed launch
+     `chromium-<rev>`.
+   - Chrome is driven over a websocket, not Playwright's pipe, so a `sh`
+     watchdog (`browser/watchdog.rs`) kills it when the process dies.
 3. **Terminal emulation:** `@xterm/headless` → `alacritty_terminal` (replacing
    the initial `vt100`, which drops dim, strikethrough, hidden, and
    autowrap-off). **PTY:** `node-pty` →

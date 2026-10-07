@@ -236,7 +236,7 @@ impl Browser {
     pub async fn launch(options: LaunchOptions) -> Result<Browser> {
         let exe = match &options.chrome_path {
             Some(path) => path.clone(),
-            None => find_chrome()?,
+            None => discover::find_chrome_for(options.headed)?,
         };
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

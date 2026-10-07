@@ -52,6 +52,42 @@ pub mod js_number {
     }
 }
 
+/// The TS loader casts a PTY fixture without checking its fields, and the
+/// values then go through JS coercion: node-pty stringifies env values and
+/// timers truncate fractional delays. These accept the same input.
+mod js_coerced {
+    use std::collections::BTreeMap;
+
+    use serde::de::Error as _;
+    use serde::{Deserialize, Deserializer};
+    use serde_json::Value;
+
+    /// `Record<string, string>` whose values may be numbers or booleans.
+    pub fn env<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<BTreeMap<String, String>>, D::Error> {
+        let Some(raw) = Option::<BTreeMap<String, Value>>::deserialize(deserializer)? else {
+            return Ok(None);
+        };
+        raw.into_iter()
+            .map(|(key, value)| match value {
+                Value::String(text) => Ok((key, text)),
+                Value::Number(number) => Ok((key, number.to_string())),
+                Value::Bool(flag) => Ok((key, flag.to_string())),
+                other => Err(D::Error::custom(format!(
+                    "env.{key}: expected a string, number or boolean, got {other}"
+                ))),
+            })
+            .collect::<Result<_, _>>()
+            .map(Some)
+    }
+
+    /// A delay in milliseconds: fractions are dropped, negatives are 0.
+    pub fn millis<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+        Ok(Option::<f64>::deserialize(deserializer)?.map(|ms| ms.max(0.0) as u64))
+    }
+}
+
 /// The literal `1` of `version: 1`; any other value fails to deserialize.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Version1;
@@ -343,15 +379,27 @@ pub struct PtyMovieFixture {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
     /// TS `Record<string, string>`; sorted by key here (fixtures are read-only input).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "js_coerced::env"
+    )]
     pub env: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cols: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rows: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "js_coerced::millis"
+    )]
     pub timeout_ms: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "js_coerced::millis"
+    )]
     pub settle_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allow_non_zero_exit: Option<bool>,

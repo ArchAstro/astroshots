@@ -7,7 +7,10 @@
 //! 2. installed Chrome/Chromium: macOS app bundles, then Linux names via `which`
 //! 3. Playwright's browser cache (`PLAYWRIGHT_BROWSERS_PATH`,
 //!    `~/Library/Caches/ms-playwright`, `~/.cache/ms-playwright`), newest
-//!    `chromium-<rev>` first, then `chromium_headless_shell-<rev>`
+//!    revision first. A headless launch takes `chromium_headless_shell-<rev>`
+//!    before `chromium-<rev>`, as Playwright does: the shell starts in a
+//!    fraction of the time of Chrome for Testing. A headed launch takes
+//!    `chromium-<rev>` first.
 
 use std::path::{Path, PathBuf};
 
@@ -54,10 +57,18 @@ pub struct Probe<'a> {
     pub app_dirs: Vec<PathBuf>,
     /// Looks a command up on `PATH`.
     pub which: &'a dyn Fn(&str) -> Option<PathBuf>,
+    /// Whether the browser will be launched with a window.
+    pub headed: bool,
 }
 
-/// Find a Chrome executable, or an error listing everything searched.
+/// Find a Chrome executable for a headless launch, or an error listing
+/// everything searched.
 pub fn find_chrome() -> Result<PathBuf, BrowserError> {
+    find_chrome_for(false)
+}
+
+/// [`find_chrome`] for a headed or headless launch.
+pub fn find_chrome_for(headed: bool) -> Result<PathBuf, BrowserError> {
     let home = dirs::home_dir();
     let mut app_dirs = vec![PathBuf::from("/Applications")];
     if let Some(home) = &home {
@@ -70,6 +81,7 @@ pub fn find_chrome() -> Result<PathBuf, BrowserError> {
         home,
         app_dirs,
         which: &which,
+        headed,
     })
 }
 
@@ -105,7 +117,7 @@ pub fn find_chrome_with(probe: &Probe<'_>) -> Result<PathBuf, BrowserError> {
     searched.push(format!("PATH: {}", LINUX_NAMES.join(", ")));
 
     for root in playwright_cache_roots(probe) {
-        if let Some(path) = find_in_playwright_cache(&root) {
+        if let Some(path) = find_in_playwright_cache(&root, probe.headed) {
             return Ok(path);
         }
         searched.push(format!("{}/chromium-*", root.display()));
@@ -126,10 +138,15 @@ fn playwright_cache_roots(probe: &Probe<'_>) -> Vec<PathBuf> {
     roots
 }
 
-/// Newest `chromium-<rev>` with a runnable executable, falling back to
-/// `chromium_headless_shell-<rev>`.
-pub fn find_in_playwright_cache(root: &Path) -> Option<PathBuf> {
-    for prefix in ["chromium-", "chromium_headless_shell-"] {
+/// Newest revision with a runnable executable: the headless shell first for
+/// a headless launch, the full browser first for a headed one.
+pub fn find_in_playwright_cache(root: &Path, headed: bool) -> Option<PathBuf> {
+    let prefixes = if headed {
+        ["chromium-", "chromium_headless_shell-"]
+    } else {
+        ["chromium_headless_shell-", "chromium-"]
+    };
+    for prefix in prefixes {
         let mut revisions: Vec<(u64, PathBuf)> = std::fs::read_dir(root)
             .ok()?
             .filter_map(|entry| {
@@ -171,6 +188,7 @@ mod tests {
             home: Some(home.to_path_buf()),
             app_dirs: vec![home.join("Applications")],
             which,
+            headed: false,
         }
     }
 
@@ -204,9 +222,35 @@ mod tests {
         ));
         let env = |_: &str| None;
         let which = |_: &str| None;
+        // Headless: the shell, as Playwright launches. Headed: the full browser.
         let found = find_chrome_with(&probe_in(dir.path(), &env, &which)).unwrap();
         assert!(
+            found
+                .to_string_lossy()
+                .contains("chromium_headless_shell-9999"),
+            "{found:?}"
+        );
+        let headed = Probe {
+            headed: true,
+            ..probe_in(dir.path(), &env, &which)
+        };
+        let found = find_chrome_with(&headed).unwrap();
+        assert!(
             found.to_string_lossy().contains("chromium-1243"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_headless_launch_falls_back_to_the_full_browser() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join(".cache/ms-playwright");
+        touch(&root.join("chromium-1200/chrome-linux/chrome"));
+        let env = |_: &str| None;
+        let which = |_: &str| None;
+        let found = find_chrome_with(&probe_in(dir.path(), &env, &which)).unwrap();
+        assert!(
+            found.to_string_lossy().contains("chromium-1200"),
             "{found:?}"
         );
     }
