@@ -37,7 +37,7 @@ use std::cell::RefCell;
 /// Horizontal advance of one cell in ems. This is the advance width of the
 /// bundled JetBrains Mono (600/1000 em). The TS box width uses 0.62 em per
 /// column ([`RasterOptions::css_size`]); glyph pitch is the real advance.
-pub const CELL_ADVANCE_EM: f32 = 0.6;
+pub const CELL_ADVANCE_EM: f64 = 0.6;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RasterError {
@@ -56,10 +56,10 @@ pub enum RasterError {
 /// `row`/`rows` in line heights, stretched to fill (`object-fit: fill`).
 #[derive(Clone, Debug)]
 pub struct Overlay {
-    pub col: f32,
-    pub row: f32,
-    pub cols: f32,
-    pub rows: f32,
+    pub col: f64,
+    pub row: f64,
+    pub cols: f64,
+    pub rows: f64,
     pub width: u32,
     pub height: u32,
     /// Straight-alpha RGBA8, `width * height * 4` bytes.
@@ -69,10 +69,10 @@ pub struct Overlay {
 impl Overlay {
     /// Decode PNG bytes (what `GraphicsOverlay.dataUrl` carried).
     pub fn from_png(
-        col: f32,
-        row: f32,
-        cols: f32,
-        rows: f32,
+        col: f64,
+        row: f64,
+        cols: f64,
+        rows: f64,
         png: &[u8],
     ) -> Result<Self, RasterError> {
         let decoded = image::load_from_memory_with_format(png, image::ImageFormat::Png)
@@ -108,18 +108,22 @@ impl Cursor {
 
 /// Mirrors `TerminalCaptureRequest` / `TerminalPaintOptions`, minus
 /// `fontFamily` (the font is bundled) and the output path.
+///
+/// The numeric fields are `f64` because they are JS numbers in TS and the
+/// image size depends on the exact double result: `150 * 1.32` is exactly
+/// `198` in f64 but `198.00002` in f32, which moves `ceil` by a pixel.
 #[derive(Clone, Debug)]
 pub struct RasterOptions {
     pub cols: u16,
     pub rows: u16,
     pub foreground: Rgba,
     pub background: Rgba,
-    pub font_size: f32,
-    pub line_height: f32,
-    pub padding: f32,
-    pub border_radius: f32,
+    pub font_size: f64,
+    pub line_height: f64,
+    pub padding: f64,
+    pub border_radius: f64,
     /// Device scale factor (`deviceScaleFactor`).
-    pub scale: f32,
+    pub scale: f64,
     pub cursor: Option<Cursor>,
     pub overlays: Vec<Overlay>,
 }
@@ -177,29 +181,35 @@ impl RasterOptions {
         [self.background[0], self.background[1], self.background[2]]
     }
 
-    /// `cssWidth` / `cssHeight` from `terminalDocument` and `captureTerminalHtml`:
-    /// `ceil(cols * fontSize * 0.62 + padding * 2)` and
-    /// `ceil(rows * fontSize * lineHeight + padding * 2)`.
+    /// `cssWidth` / `cssHeight` from `captureTerminalHtml` (tui-shot
+    /// `shot.ts`) and `terminalDocument` (movie-harness `terminal-paint.ts`):
+    /// `Math.ceil(cols * fontSize * 0.62 + padding * 2)` and
+    /// `Math.ceil(rows * fontSize * lineHeight + padding * 2)`, evaluated in
+    /// f64 in the same left-to-right order as the JS expressions.
     ///
     /// The movie session size is `css_size + 32` (viewport with the 16px body
     /// margin); the frames themselves are [`RasterOptions::pixel_size`].
     pub fn css_size(&self) -> (u32, u32) {
-        let width = f32::from(self.cols) * self.font_size * 0.62 + self.padding * 2.0;
-        let height = f32::from(self.rows) * self.font_size * self.line_height + self.padding * 2.0;
+        let width = f64::from(self.cols) * self.font_size * 0.62 + self.padding * 2.0;
+        let height = f64::from(self.rows) * self.font_size * self.line_height + self.padding * 2.0;
         (width.ceil() as u32, height.ceil() as u32)
     }
 
-    /// Size of the rendered image: `css_size * scale`, rounded.
+    /// Size of the rendered image. The TS screenshots the `[data-tui-shot]`
+    /// element, whose CSS box is the integer [`RasterOptions::css_size`], at
+    /// `deviceScaleFactor: scale`; Chromium writes `css * scale` device
+    /// pixels rounded half up (measured: 519 CSS px at 1.5 is 779, 351 at 1.1
+    /// is 386, 183 at 3.3 is 604).
     pub fn pixel_size(&self) -> (u32, u32) {
         let (width, height) = self.css_size();
         (
-            (width as f32 * self.scale).round() as u32,
-            (height as f32 * self.scale).round() as u32,
+            (f64::from(width) * self.scale + 0.5).floor() as u32,
+            (f64::from(height) * self.scale + 0.5).floor() as u32,
         )
     }
 
     pub(crate) fn validate(&self) -> Result<(), RasterError> {
-        let positive = |name: &str, value: f32, max: f32| {
+        let positive = |name: &str, value: f64, max: f64| {
             if value.is_finite() && value > 0.0 && value <= max {
                 Ok(())
             } else {
@@ -208,7 +218,7 @@ impl RasterOptions {
                 )))
             }
         };
-        let non_negative = |name: &str, value: f32| {
+        let non_negative = |name: &str, value: f64| {
             if value.is_finite() && (0.0..=1_000.0).contains(&value) {
                 Ok(())
             } else {

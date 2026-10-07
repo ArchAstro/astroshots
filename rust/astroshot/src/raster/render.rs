@@ -29,8 +29,8 @@ struct GlyphKey {
     text: String,
     bold: bool,
     italic: bool,
-    size_bits: u32,
-    line_bits: u32,
+    size_bits: u64,
+    line_bits: u64,
 }
 
 /// One rasterized glyph, positioned relative to the top-left of its cell.
@@ -96,15 +96,19 @@ impl Rasterizer {
             .ok_or_else(|| RasterError::InvalidOption("image size is empty".to_string()))?;
         let scale = options.scale;
         let (css_width, css_height) = options.css_size();
+        // Geometry is computed in f64 from the JS-number options and narrowed
+        // to f32 only where tiny-skia and cosmic-text take it.
+        let box_width = f64::from(css_width) * scale;
+        let box_height = f64::from(css_height) * scale;
 
         // Box: background under the border (background-clip: border-box), then
         // the 1px border ring.
         let box_path = rounded_rect(
             0.0,
             0.0,
-            css_width as f32 * scale,
-            css_height as f32 * scale,
-            options.border_radius * scale,
+            box_width as f32,
+            box_height as f32,
+            (options.border_radius * scale) as f32,
         );
         pixmap.fill_path(
             &box_path,
@@ -113,16 +117,16 @@ impl Rasterizer {
             Transform::identity(),
             None,
         );
-        let half = 0.5 * scale;
+        let half = (0.5 * scale) as f32;
         let ring = rounded_rect(
             half,
             half,
-            css_width as f32 * scale - scale,
-            css_height as f32 * scale - scale,
-            (options.border_radius - 0.5).max(0.0) * scale,
+            (box_width - scale) as f32,
+            (box_height - scale) as f32,
+            ((options.border_radius - 0.5).max(0.0) * scale) as f32,
         );
         let stroke = Stroke {
-            width: scale,
+            width: scale as f32,
             ..Stroke::default()
         };
         pixmap.stroke_path(
@@ -133,20 +137,9 @@ impl Rasterizer {
             None,
         );
 
-        // Content box: inside border and padding.
-        let origin = (1.0 + options.padding) * scale;
-        let font_px = options.font_size * scale;
-        let pitch = CELL_ADVANCE_EM * font_px;
-        let row_height = options.line_height * font_px;
         let parent_background = options.background_rgb();
-
         let cursor = options.cursor;
-        let layout = Layout {
-            origin,
-            pitch,
-            row_height,
-            font_px,
-        };
+        let layout = Layout::new(options);
 
         for row in 0..frame.rows.min(options.rows) {
             for col in 0..frame.cols.min(options.cols) {
@@ -234,8 +227,8 @@ impl Rasterizer {
         let first = cell.text.chars().next().unwrap_or(' ');
         let single = cell.text.chars().count() == 1;
         if single && let Some((shapes, alpha)) = block_element(first) {
-            let w = (x1 - x0) as f32;
-            let h = (y1 - y0) as f32;
+            let w = f64::from(x1 - x0);
+            let h = f64::from(y1 - y0);
             for (l, t, r, b) in shapes {
                 fill(
                     pixmap,
@@ -292,7 +285,7 @@ impl Rasterizer {
             .style(if italic { Style::Italic } else { Style::Normal });
         let mut buffer = Buffer::new(
             &mut self.font_system,
-            Metrics::new(layout.font_px, layout.row_height),
+            Metrics::new(layout.font_px as f32, layout.row_height as f32),
         );
         buffer.set_size(&mut self.font_system, None, None);
         buffer.set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
@@ -337,27 +330,51 @@ impl Rasterizer {
     }
 }
 
-struct Layout {
-    origin: f32,
-    pitch: f32,
-    row_height: f32,
-    font_px: f32,
+/// Cell grid in device pixels, in f64. The content box starts inside the 1px
+/// border and the padding; a row is `lineHeight` em tall (`.tui-row`).
+pub(super) struct Layout {
+    origin: f64,
+    pitch: f64,
+    row_height: f64,
+    font_px: f64,
 }
 
 impl Layout {
-    fn edge_x(&self, col: u16) -> i32 {
-        (self.origin + f32::from(col) * self.pitch).round() as i32
+    pub(super) fn new(options: &RasterOptions) -> Self {
+        let font_px = options.font_size * options.scale;
+        Self {
+            origin: (1.0 + options.padding) * options.scale,
+            pitch: CELL_ADVANCE_EM * font_px,
+            row_height: options.line_height * font_px,
+            font_px,
+        }
     }
 
-    fn edge_y(&self, row: u16) -> i32 {
-        (self.origin + f32::from(row) * self.row_height).round() as i32
+    pub(super) fn edge_x(&self, col: u16) -> i32 {
+        (self.origin + f64::from(col) * self.pitch).round() as i32
+    }
+
+    pub(super) fn edge_y(&self, row: u16) -> i32 {
+        (self.origin + f64::from(row) * self.row_height).round() as i32
     }
 
     /// Baseline offset from the top of a row: font ascent plus half-leading
     /// (JetBrains Mono: ascent 1.02 em, descent 0.30 em).
-    fn baseline(&self) -> i32 {
+    pub(super) fn baseline(&self) -> i32 {
         let content = 1.32 * self.font_px;
         ((self.row_height - content) / 2.0 + 1.02 * self.font_px).round() as i32
+    }
+
+    /// Device-pixel rectangle `(left, top, width, height)` of an overlay
+    /// placed in cell units (`left: {col}ch`-equivalent, `top: {row *
+    /// lineHeight}em`).
+    pub(super) fn overlay_rect(&self, overlay: &Overlay) -> (f64, f64, f64, f64) {
+        (
+            self.origin + overlay.col * self.pitch,
+            self.origin + overlay.row * self.row_height,
+            overlay.cols * self.pitch,
+            overlay.rows * self.row_height,
+        )
     }
 }
 
@@ -472,13 +489,12 @@ fn paint_overlay(
     let source = Pixmap::from_vec(data, size).ok_or_else(|| {
         RasterError::Overlay("overlay pixel data has the wrong length".to_string())
     })?;
-    let left = layout.origin + overlay.col * layout.pitch;
-    let top = layout.origin + overlay.row * layout.row_height;
-    let width = overlay.cols * layout.pitch;
-    let height = overlay.rows * layout.row_height;
-    let transform =
-        Transform::from_scale(width / overlay.width as f32, height / overlay.height as f32)
-            .post_translate(left, top);
+    let (left, top, width, height) = layout.overlay_rect(overlay);
+    let transform = Transform::from_scale(
+        (width / f64::from(overlay.width)) as f32,
+        (height / f64::from(overlay.height)) as f32,
+    )
+    .post_translate(left as f32, top as f32);
     let paint = PixmapPaint {
         quality: FilterQuality::Bilinear,
         ..PixmapPaint::default()
@@ -487,7 +503,7 @@ fn paint_overlay(
     Ok(())
 }
 
-type Shape = (f32, f32, f32, f32);
+type Shape = (f64, f64, f64, f64);
 
 /// Block Elements (U+2580-259F) as fractions of the cell, plus alpha. Drawn
 /// exactly so adjacent blocks tile without font-metric gaps.
@@ -511,8 +527,8 @@ fn block_element(ch: char) -> Option<(Vec<Shape>, u8)> {
     };
     let shapes = match code {
         0x2580 => vec![(0.0, 0.0, 1.0, 0.5)],
-        0x2581..=0x2588 => vec![(0.0, 1.0 - (code - 0x2580) as f32 / 8.0, 1.0, 1.0)],
-        0x2589..=0x258F => vec![(0.0, 0.0, (0x2590 - code) as f32 / 8.0, 1.0)],
+        0x2581..=0x2588 => vec![(0.0, 1.0 - f64::from(code - 0x2580) / 8.0, 1.0, 1.0)],
+        0x2589..=0x258F => vec![(0.0, 0.0, f64::from(0x2590 - code) / 8.0, 1.0)],
         0x2590 => vec![(0.5, 0.0, 1.0, 1.0)],
         0x2591..=0x2593 => {
             let alpha = [64, 128, 191][(code - 0x2591) as usize];

@@ -20,12 +20,12 @@ fn options(cols: u16, rows: u16) -> RasterOptions {
 /// Cell origin in pixels for the default metrics at scale 2, padding 22:
 /// origin 46, pitch 18, row height 39.6.
 fn cell_origin(col: u32, row: u32) -> (u32, u32) {
-    (46 + col * 18, (46.0 + row as f32 * 39.6).round() as u32)
+    (46 + col * 18, (46.0 + f64::from(row) * 39.6).round() as u32)
 }
 
 /// Pixels of the content box (inside border and padding) for `cols x rows`.
 fn content_pixels(image: &RgbaImage, cols: u32, rows: u32) -> Vec<(u32, u32)> {
-    let height = (rows as f32 * 39.6).round() as u32;
+    let height = (f64::from(rows) * 39.6).round() as u32;
     (46..46 + cols * 18)
         .flat_map(|x| (46..46 + height).map(move |y| (x, y)))
         .filter(|&(x, y)| x < image.width && y < image.height)
@@ -158,13 +158,8 @@ fn sizes_follow_the_css_box_formula() {
     assert_eq!(defaults.css_size(), (974, 638));
     assert_eq!(defaults.pixel_size(), (1948, 1276));
     let movie = RasterOptions::movie(80, 24);
-    assert_eq!(
-        movie.css_size(),
-        (
-            ((80.0f32 * 14.0 * 0.62) + 32.0).ceil() as u32,
-            ((24.0f32 * 14.0 * 1.35) + 32.0).ceil() as u32
-        )
-    );
+    // ceil(80 * 14 * .62 + 32), ceil(24 * 14 * 1.35 + 32)
+    assert_eq!(movie.css_size(), (727, 486));
     let mut one = RasterOptions::new(100, 30);
     one.scale = 1.0;
     assert_eq!(one.pixel_size(), (974, 638));
@@ -465,4 +460,73 @@ fn autowrap_off_overwrites_the_last_column() {
     let mut wrapped = HeadlessTerminal::new(4, 2);
     wrapped.write(b"abcdefgh");
     assert_eq!(wrapped.plain_text(), "abcd\nefgh");
+}
+
+/// The size and the grid are computed in f64, as the JS numbers were. In f32
+/// `150 * 1.32` is 198.00002, which made a 10-row shot one CSS pixel taller
+/// than the TS one; `tests/tui_shot_sizes.rs` checks the full table.
+#[test]
+fn sizes_use_double_precision_like_the_js_numbers() {
+    let mut ten = RasterOptions::new(52, 10);
+    ten.scale = 1.0;
+    assert_eq!(ten.css_size(), (528, 242));
+    assert_eq!(ten.pixel_size(), (528, 242));
+    assert_eq!(RasterOptions::new(40, 20).pixel_size(), (832, 880));
+    // Movie defaults: f32 came out one pixel short at 50 and 100 rows.
+    // (700 * 1.35 is 945.0000000000001 in f64.)
+    assert_eq!(RasterOptions::movie(80, 50).css_size(), (727, 978));
+    assert_eq!(RasterOptions::movie(80, 100).css_size(), (727, 1923));
+    // Fractional device scale rounds half up, as Chromium's screenshot does.
+    let mut fractional = RasterOptions::new(51, 11);
+    fractional.scale = 1.5;
+    assert_eq!(fractional.css_size(), (519, 262));
+    assert_eq!(fractional.pixel_size(), (779, 393));
+}
+
+/// Row tops, column edges, baselines and overlay rectangles come from the
+/// same f64 values as the size, so they cannot drift from it.
+#[test]
+fn cell_grid_edges_are_computed_in_double_precision() {
+    use super::render::Layout;
+
+    let defaults = RasterOptions::new(100, 100);
+    let layout = Layout::new(&defaults);
+    for row in 0..=100u16 {
+        // 1px border + 22px padding, 19.8px rows, at scale 2.
+        assert_eq!(
+            layout.edge_y(row),
+            (46.0 + f64::from(row) * (1.32 * 30.0)).round() as i32,
+            "row {row}"
+        );
+        assert_eq!(layout.edge_x(row), 46 + i32::from(row) * 18, "col {row}");
+    }
+    // The last row ends at 46 + 3960 of 4048 device pixels: 21 CSS px above
+    // the bottom edge (22px padding, with the border inside the box size).
+    assert_eq!(layout.edge_y(100), 4006);
+    assert_eq!(defaults.pixel_size().1, 4048);
+
+    // A row height that lands on half pixels: 15px * 1.3 = 19.5px at scale 1.
+    // f32 turned 1.3 into 1.29999995 and could round these edges down.
+    let mut half = RasterOptions::new(10, 4);
+    half.line_height = 1.3;
+    half.scale = 1.0;
+    let layout = Layout::new(&half);
+    assert_eq!(
+        (0..=4).map(|row| layout.edge_y(row)).collect::<Vec<_>>(),
+        [23, 43, 62, 82, 101]
+    );
+    // Baseline: half-leading (19.5 - 19.8) / 2 plus the 15.3px ascent.
+    assert_eq!(layout.baseline(), 15);
+
+    // Overlay at cell (1, 2), 3 cells wide, 1.5 rows tall.
+    let overlay = Overlay {
+        col: 1.0,
+        row: 2.0,
+        cols: 3.0,
+        rows: 1.5,
+        width: 1,
+        height: 1,
+        rgba: vec![0; 4],
+    };
+    assert_eq!(layout.overlay_rect(&overlay), (32.0, 62.0, 27.0, 29.25));
 }

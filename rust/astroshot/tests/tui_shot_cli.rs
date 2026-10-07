@@ -454,8 +454,8 @@ fn astroshot_tui_writes_a_png_for_a_bare_ink_fixture_path() {
     ]);
     assert_eq!(result.status.code(), Some(0), "{}", combined(&result));
     // ceil(60*15*.62+44) x ceil(10*15*1.32+44) CSS pixels, doubled
-    // (150*1.32 is 198.00000000000003 in f64, as in JS).
-    assert_eq!(varied_png_size(&scaled), (602 * 2, 243 * 2));
+    // (150*1.32 is exactly 198 in f64, as in JS; TS writes 1204x484).
+    assert_eq!(varied_png_size(&scaled), (602 * 2, 242 * 2));
 }
 
 #[test]
@@ -479,8 +479,8 @@ fn astroshot_tui_pty_writes_a_png_for_a_pty_fixture() {
         text(&result.stdout),
         format!("wrote {}\n", out_path.display())
     );
-    // interactive-pty.yaml: 52x10 cells at scale 1.
-    assert_eq!(varied_png_size(&out_path), (528, 243));
+    // interactive-pty.yaml: 52x10 cells at scale 1. TS writes 528x242.
+    assert_eq!(varied_png_size(&out_path), (528, 242));
 }
 
 #[cfg(unix)]
@@ -655,4 +655,141 @@ fn tui_shot_bin_help_and_usage_errors_match_the_ts_bin() {
         "install-browser does not accept arguments\n",
         1,
     );
+
+// ---- Fix pass: sizes and failed program launches measured against TS ----
+
+/// TS writes 832x880 for a 40x20 grid at scale 2 (`416 x 440` CSS pixels:
+/// `20 * 15 * 1.32` is exactly 396 in f64). f32 arithmetic made it 882 tall.
+#[test]
+fn pty_png_for_a_twenty_row_grid_at_scale_two_matches_the_ts_size() {
+    if !node_or_skip() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let out_path = dir.path().join("pty.png");
+
+    let result = run(&[
+        "tui",
+        "pty",
+        &fixture("interactive-pty.yaml"),
+        "-o",
+        &out_path.to_string_lossy(),
+        "--cols",
+        "40",
+        "--rows",
+        "20",
+        "--scale",
+        "2",
+    ]);
+
+    assert_eq!(result.status.code(), Some(0), "{}", combined(&result));
+    assert_eq!(varied_png_size(&out_path), (832, 880));
+}
+
+/// What node-pty's child leaves on the terminal when it cannot execute the
+/// program: nothing on macOS (`spawn-helper` exits 1 silently), the
+/// `perror("execvp(3) failed.")` line elsewhere.
+#[cfg(unix)]
+fn failed_exec_frame() -> &'static str {
+    if cfg!(target_os = "macos") {
+        ""
+    } else {
+        "execvp(3) failed.: No such file or directory"
+    }
+}
+
+#[cfg(unix)]
+fn write_missing_command_fixture(dir: &Path, extra: &str) -> PathBuf {
+    let path = dir.join("missing.yaml");
+    std::fs::write(
+        &path,
+        format!(
+            "version: 1\ncommand: astroshot-no-such-program\ncols: 40\nrows: 6\nscale: 1\ntimeoutMs: 5000\nsettleMs: 50\n{extra}"
+        ),
+    )
+    .unwrap();
+    path
+}
+
+/// TS (`tui-shot pty` on a fixture whose command is not on PATH) prints
+/// exactly this and exits 1: node-pty starts the program from inside the PTY
+/// child, so the failure is an exit code, not a spawn error.
+#[cfg(unix)]
+#[test]
+fn a_pty_command_that_is_not_on_path_is_reported_as_exit_code_1() {
+    let dir = tempfile::tempdir().unwrap();
+    let fixture = write_missing_command_fixture(dir.path(), "");
+    let out_path = dir.path().join("missing.png");
+
+    let result = run(&[
+        "tui",
+        "pty",
+        &fixture.to_string_lossy(),
+        "-o",
+        &out_path.to_string_lossy(),
+    ]);
+
+    assert_eq!(result.status.code(), Some(1), "{}", combined(&result));
+    assert_eq!(text(&result.stdout), "");
+    assert_eq!(
+        text(&result.stderr),
+        format!(
+            "PTY program exited with code 1 before capture. Set allowNonZeroExit: true only when documenting an intentional failure state. Visible frame:\n{}\n",
+            failed_exec_frame()
+        )
+    );
+    assert!(!out_path.exists());
+}
+
+/// The same fixture while waiting for text: the wait ends on the exit.
+#[cfg(unix)]
+#[test]
+fn waiting_for_text_from_a_pty_command_that_is_not_on_path_reports_the_exit() {
+    let dir = tempfile::tempdir().unwrap();
+    let fixture = write_missing_command_fixture(dir.path(), "actions:\n  - waitFor: Ready\n");
+    let out_path = dir.path().join("missing.png");
+
+    let result = run(&[
+        "tui",
+        "pty",
+        &fixture.to_string_lossy(),
+        "-o",
+        &out_path.to_string_lossy(),
+    ]);
+
+    assert_eq!(result.status.code(), Some(1), "{}", combined(&result));
+    assert_eq!(
+        text(&result.stderr),
+        format!(
+            "Timed out waiting for \"Ready\". The program exited with code 1. Visible frame:\n{}\n",
+            failed_exec_frame()
+        )
+    );
+    assert!(!out_path.exists());
+}
+
+/// With `allowNonZeroExit: true` TS captures the (empty) terminal and exits 0.
+#[cfg(unix)]
+#[test]
+fn a_pty_command_that_is_not_on_path_is_captured_when_non_zero_exit_is_allowed() {
+    let dir = tempfile::tempdir().unwrap();
+    let fixture = write_missing_command_fixture(dir.path(), "allowNonZeroExit: true\n");
+    let out_path = dir.path().join("missing.png");
+
+    let result = run(&[
+        "tui",
+        "pty",
+        &fixture.to_string_lossy(),
+        "-o",
+        &out_path.to_string_lossy(),
+    ]);
+
+    assert_eq!(result.status.code(), Some(0), "{}", combined(&result));
+    assert_eq!(
+        text(&result.stdout),
+        format!("wrote {}\n", out_path.display())
+    );
+    assert_eq!(text(&result.stderr), "");
+    // 40x6 cells at scale 1, the size TS writes for this fixture.
+    assert_eq!(varied_png_size(&out_path), (416, 163));
 }
