@@ -146,3 +146,90 @@ fn react_shot_argv0_alias_prints_the_react_shot_help_and_bare_fixture_form_works
     assert_eq!(unknown.status.code(), Some(1));
     assert_eq!(text(&unknown.stderr).trim(), "Unknown command: nope");
 }
+
+/// Help text `react-shot --help` printed, captured from the TS bin.
+const REACT_SHOT_HELP: &str = include_str!("fixtures/help/react-shot.txt");
+
+#[track_caller]
+fn assert_exact(output: &Output, stdout: &str, stderr: &str, code: i32) {
+    assert_eq!(text(&output.stdout), stdout, "stdout");
+    assert_eq!(text(&output.stderr), stderr, "stderr");
+    assert_eq!(output.status.code(), Some(code), "exit code");
+}
+
+/// `packages/react-shot/bin/react-shot.mjs` ran `cli.ts` with the raw
+/// arguments; the binary does the same when it is named `react-shot`.
+#[cfg(unix)]
+#[test]
+fn react_shot_bin_help_version_and_usage_errors_match_the_ts_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    let alias = dir.path().join("react-shot");
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_astroshot"), &alias).unwrap();
+    let call = |args: &[&str]| {
+        Command::new(&alias)
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap()
+    };
+    let package_json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(package_root().join("package.json")).unwrap(),
+    )
+    .unwrap();
+    let version = format!("{}\n", package_json["version"].as_str().unwrap());
+
+    // No arguments: help, but a usage error.
+    assert_exact(&call(&[]), REACT_SHOT_HELP, "", 1);
+    // Help wins wherever the flag sits, including after a subcommand.
+    for args in [
+        &["--help"][..],
+        &["-h"],
+        &["help"],
+        &["shot", "--help"],
+        &["batch", "--help"],
+        &["install-browser", "--help"],
+        &["x.tsx", "--help"],
+        &["bogus", "-h"],
+    ] {
+        assert_exact(&call(args), REACT_SHOT_HELP, "", 0);
+    }
+    // Version is checked before help.
+    for args in [
+        &["--version"][..],
+        &["-v"],
+        &["-v", "--help"],
+        &["--help", "-v"],
+    ] {
+        assert_exact(&call(args), &version, "", 0);
+    }
+    // Flags are parsed before the command is looked at.
+    assert_exact(&call(&["bogus"]), "", "Unknown command: bogus\n", 1);
+    assert_exact(&call(&["--bogus"]), "", "Unknown option: --bogus\n", 1);
+    assert_exact(
+        &call(&["help", "--bogus"]),
+        "",
+        "Unknown option: --bogus\n",
+        1,
+    );
+    assert_exact(&call(&["--root"]), "", "--root requires a value\n", 1);
+    assert_exact(
+        &call(&["--root", "x"]),
+        "",
+        "Unknown command: undefined\n",
+        1,
+    );
+    assert_exact(&call(&["shot"]), "", "shot requires a fixture path\n", 1);
+    assert_exact(&call(&["batch"]), "", "batch requires a manifest path\n", 1);
+    assert_exact(
+        &call(&["x.tsx"]),
+        "",
+        "A screenshot requires -o <out.png>\n",
+        1,
+    );
+    assert_exact(
+        &call(&["shot", "x.tsx"]),
+        "",
+        "A screenshot requires -o <out.png>\n",
+        1,
+    );
+}

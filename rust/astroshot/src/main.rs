@@ -1,11 +1,11 @@
 //! `astroshot` binary entry point. One executable replaces the npm bins; the
 //! name it is invoked under (`astroshot-review`, `astroshot-movie`,
-//! `react-shot`, `tui-shot`) selects the subcommand.
+//! `react-shot`, `tui-shot`) selects that package's own CLI.
 
 use std::io::Write;
 use std::process::ExitCode;
 
-use astroshot::bin::astroshot::{args_from_argv, run};
+use astroshot::bin::astroshot::{is_review_invocation, run_argv};
 
 fn exit_code(code: i32) -> ExitCode {
     ExitCode::from(u8::try_from(code).unwrap_or(1))
@@ -23,7 +23,6 @@ fn main() -> ExitCode {
         return exit_code(code);
     }
 
-    let args = args_from_argv(&argv);
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -34,8 +33,8 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let code = runtime.block_on(run(&args));
-    if matches!(args.first().map(String::as_str), Some("review" | "tray")) {
+    let code = runtime.block_on(run_argv(&argv));
+    if is_review_invocation(&argv) {
         // The tray has already restored the terminal and flushed its index.
         // Dropping the runtime would wait for blocking work that is still
         // running (a deep scan walking the disk), which is what "quit hangs"

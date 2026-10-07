@@ -680,3 +680,72 @@ fn renders_thumbnails_into_the_png() {
         size.saturating_sub(text_size)
     );
 }
+
+/// Help text `astroshot-review --help` printed, captured from the TS bin.
+const REVIEW_HELP: &str = include_str!("fixtures/help/astroshot-review.txt");
+
+/// `packages/astroshot-review/bin/astroshot-review.mjs` called `main` with the
+/// raw arguments: no default roots, no `help` word, and every argument parsed
+/// before `--help` is honoured. The binary does the same when it is named
+/// `astroshot-review`. Run without a TTY, as the npm bin was for these cases.
+#[test]
+fn astroshot_review_bin_help_version_and_usage_errors_match_the_ts_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    let alias = dir.path().join("astroshot-review");
+    std::os::unix::fs::symlink(BIN, &alias).unwrap();
+    let call = |args: &[&str]| {
+        std::process::Command::new(&alias)
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap()
+    };
+    #[track_caller]
+    fn assert_exact(output: &std::process::Output, stdout: &str, stderr: &str, code: i32) {
+        assert_eq!(String::from_utf8_lossy(&output.stdout), stdout, "stdout");
+        assert_eq!(String::from_utf8_lossy(&output.stderr), stderr, "stderr");
+        assert_eq!(output.status.code(), Some(code), "exit code");
+    }
+    let needs_tty =
+        "astroshot review needs an interactive terminal (stdin and stdout must be a TTY).\n";
+    let package_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../packages/astroshot-review/package.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let version = format!("{}\n", package_json["version"].as_str().unwrap());
+
+    for args in [&["--help"][..], &["-h"], &["x", "--help"], &["-v", "-h"]] {
+        assert_exact(&call(args), REVIEW_HELP, "", 0);
+    }
+    for args in [&["--version"][..], &["-v"], &["--root", "x", "--version"]] {
+        assert_exact(&call(args), &version, "", 0);
+    }
+    // No arguments, `help` and any other word are folders to watch.
+    for args in [&[][..], &["help"], &["bogus"], &["--no-graphics"]] {
+        assert_exact(&call(args), "", needs_tty, 1);
+    }
+    // A parse error wins over --help wherever the flag sits.
+    for (args, message) in [
+        (&["--bogus"][..], "Unknown option: --bogus"),
+        (&["-"], "Unknown option: -"),
+        (&["--root"], "--root requires a directory"),
+        (
+            &["--roots-source"],
+            "--roots-source must be app, cli, or cwd",
+        ),
+        (
+            &["--roots-source", "bogus", "--help"],
+            "--roots-source must be app, cli, or cwd",
+        ),
+        (
+            &["--help", "--roots-source", "bogus"],
+            "--roots-source must be app, cli, or cwd",
+        ),
+    ] {
+        assert_exact(&call(args), "", &format!("{message}\n\n{REVIEW_HELP}"), 1);
+    }
+}

@@ -162,22 +162,6 @@ async fn run_engine(mode: &str, args: &[String]) -> i32 {
     }
 }
 
-/// `astroshot install-browser`: the Rust build drives a system Chrome over
-/// CDP, so there is nothing to download; report what was found.
-fn install_browser() -> i32 {
-    match crate::browser::find_chrome() {
-        Ok(path) => {
-            println!("Chrome found: {}", path.display());
-            0
-        }
-        Err(error) => {
-            eprintln!("{error}");
-            eprintln!("Install Chrome, or set ASTROSHOT_CHROME to a browser executable.");
-            1
-        }
-    }
-}
-
 fn run_init(args: &[String]) -> anyhow::Result<i32> {
     if args.is_empty() || is_help_word(&args[0]) {
         println!("{INIT_HELP}");
@@ -261,7 +245,14 @@ pub async fn run(args: &[String]) -> i32 {
             run_doctor(rest, &mut |line| println!("{line}")),
             doctor_help,
         ),
-        "install-browser" => install_browser(),
+        "install-browser" => {
+            // `runEngine("react", ["install-browser", ...arguments_])`: the
+            // react-shot CLI owns the flags, help and the browser check.
+            let forwarded: Vec<String> = std::iter::once(command.to_string())
+                .chain(rest.iter().cloned())
+                .collect();
+            crate::react_shot::cli::run(&forwarded).await
+        }
         "init" => match run_init(rest) {
             Ok(code) => code,
             Err(error) => {
@@ -299,35 +290,55 @@ fn with_help_on_error(result: anyhow::Result<i32>, help: fn() -> String) -> i32 
     }
 }
 
-/// Subcommand implied by the executable name (the npm bins `astroshot-review`,
-/// `astroshot-movie`, `react-shot`, `tui-shot`), or `None` for `astroshot`.
-pub fn subcommand_for_program(program: &str) -> Option<&'static str> {
+/// The npm bin a program name stands for. Each one ran its own package's
+/// `cli.ts` with the raw arguments; none of them went through the unified
+/// `astroshot` layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageBin {
+    /// `astroshot-review` (`packages/astroshot-review/bin/astroshot-review.mjs`).
+    Review,
+    /// `astroshot-movie` (`packages/movie-harness/bin/astroshot-movie.mjs`).
+    Movie,
+    /// `react-shot` (`packages/react-shot/bin/react-shot.mjs`).
+    ReactShot,
+    /// `tui-shot` (`packages/tui-shot/bin/tui-shot.mjs`).
+    TuiShot,
+}
+
+/// Package bin implied by the executable name, or `None` for `astroshot`.
+pub fn package_bin_for_program(program: &str) -> Option<PackageBin> {
     let name = PathBuf::from(program)
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())?;
     match name.as_str() {
-        "astroshot-review" => Some("review"),
-        "astroshot-movie" => Some("movie"),
-        "react-shot" => Some("react"),
-        "tui-shot" => Some("ink"),
+        "astroshot-review" => Some(PackageBin::Review),
+        "astroshot-movie" => Some(PackageBin::Movie),
+        "react-shot" => Some(PackageBin::ReactShot),
+        "tui-shot" => Some(PackageBin::TuiShot),
         _ => None,
     }
 }
 
-/// Arguments for [`run`] from a full argv, applying argv[0] multi-call.
-pub fn args_from_argv(argv: &[String]) -> Vec<String> {
+/// Whether this argv runs the review tray (`astroshot review|tray` or the
+/// `astroshot-review` bin).
+pub fn is_review_invocation(argv: &[String]) -> bool {
+    let program = argv.first().map(String::as_str).unwrap_or("astroshot");
+    match package_bin_for_program(program) {
+        Some(bin) => bin == PackageBin::Review,
+        None => matches!(argv.get(1).map(String::as_str), Some("review" | "tray")),
+    }
+}
+
+/// Run a full argv (program name first). A package bin's name hands the raw
+/// arguments to that package's CLI; `astroshot` runs the dispatcher.
+pub async fn run_argv(argv: &[String]) -> i32 {
     let program = argv.first().map(String::as_str).unwrap_or("astroshot");
     let rest = argv.get(1..).unwrap_or(&[]);
-    // `tui-shot pty ...` is the PTY mode of the engine bin.
-    if subcommand_for_program(program) == Some("ink") && rest.first().is_some_and(|v| v == "pty") {
-        return std::iter::once("pty".to_string())
-            .chain(rest[1..].iter().cloned())
-            .collect();
-    }
-    match subcommand_for_program(program) {
-        Some(sub) => std::iter::once(sub.to_string())
-            .chain(rest.iter().cloned())
-            .collect(),
-        None => rest.to_vec(),
+    match package_bin_for_program(program) {
+        Some(PackageBin::Review) => crate::astroshot_review::cli::run(rest).await,
+        Some(PackageBin::Movie) => crate::movie_harness::cli::run_cli(rest).await,
+        Some(PackageBin::ReactShot) => crate::react_shot::cli::run(rest).await,
+        Some(PackageBin::TuiShot) => crate::tui_shot::cli::run(rest).await,
+        None => run(rest).await,
     }
 }

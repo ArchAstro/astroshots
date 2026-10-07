@@ -32,6 +32,39 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+/// Help text each npm bin printed, captured from the TS bins (`<bin> --help`).
+const REACT_SHOT_HELP: &str = include_str!("fixtures/help/react-shot.txt");
+const TUI_SHOT_HELP: &str = include_str!("fixtures/help/tui-shot.txt");
+const REVIEW_HELP: &str = include_str!("fixtures/help/astroshot-review.txt");
+const MOVIE_HELP: &str = include_str!("fixtures/help/astroshot-movie.txt");
+const NEEDS_TTY: &str =
+    "astroshot review needs an interactive terminal (stdin and stdout must be a TTY).\n";
+
+/// `version` from `packages/<package>/package.json`, as the TS bins read it.
+fn package_version(package: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages")
+        .join(package)
+        .join("package.json");
+    let json: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).unwrap())
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    json["version"].as_str().unwrap().to_string()
+}
+
+#[track_caller]
+fn assert_exact(output: &Output, expected_stdout: &str, expected_stderr: &str, code: i32) {
+    assert_eq!(stdout(output), expected_stdout, "stdout");
+    assert_eq!(stderr(output), expected_stderr, "stderr");
+    assert_eq!(output.status.code(), Some(code), "exit code");
+}
+
+/// The binary under an npm bin's name, as a package manager links it.
+fn alias(dir: &Path, name: &str) -> std::path::PathBuf {
+    let path = dir.join(name);
+    std::os::unix::fs::symlink(BIN, &path).unwrap();
+    path
+}
+
 #[test]
 fn documents_react_ink_pty_and_movie_modes_from_one_executable() {
     let result = run(&["--help"]);
@@ -62,12 +95,17 @@ fn no_arguments_prints_help_and_exits_1() {
 }
 
 #[test]
-fn reports_the_package_version() {
-    // TS reads packages/astroshot/package.json; the Rust build reports the
-    // crate version.
+fn reports_the_unified_package_version() {
+    // `cli.test.mjs` compares against packages/astroshot/package.json; so does
+    // this, so a crate version that drifts from the npm package fails here.
     let result = run(&["--version"]);
-    assert_eq!(result.status.code(), Some(0));
-    assert_eq!(stdout(&result).trim(), env!("CARGO_PKG_VERSION"));
+    assert_exact(
+        &result,
+        &format!("{}\n", package_version("astroshot")),
+        "",
+        0,
+    );
+    assert_exact(&run(&["-v"]), &stdout(&result), "", 0);
 }
 
 #[test]
@@ -294,55 +332,162 @@ fn review_usage_errors_print_the_message_then_the_help() {
 
     let version = run(&["review", "--root", "x", "--version"]);
     assert_eq!(version.status.code(), Some(0));
-    assert_eq!(stdout(&version), format!("{}\n", env!("CARGO_PKG_VERSION")));
+    assert_eq!(
+        stdout(&version),
+        format!("{}\n", package_version("astroshot-review"))
+    );
 }
 
 #[test]
-fn argv0_selects_the_subcommand_like_the_npm_bins() {
+fn react_shot_alias_runs_the_react_shot_cli_with_its_own_help() {
     let dir = tempfile::tempdir().unwrap();
-    let review = dir.path().join("astroshot-review");
-    std::os::unix::fs::symlink(BIN, &review).unwrap();
-    // `astroshot-review` runs the review CLI: without a TTY it refuses.
-    let result = run_named(&review, dir.path(), &["--root", "x"]);
-    assert_eq!(result.status.code(), Some(1));
-    assert_eq!(
-        stderr(&result),
-        "astroshot review needs an interactive terminal (stdin and stdout must be a TTY).\n"
-    );
-    let help = run_named(&review, dir.path(), &["--help"]);
-    assert_eq!(help.status.code(), Some(0));
-    assert!(stdout(&help).starts_with("astroshot review — the Astroshots tray in your terminal\n"));
+    let react = alias(dir.path(), "react-shot");
+    let call = |args: &[&str]| run_named(&react, dir.path(), args);
 
-    // `astroshot-movie` runs the real movie CLI: its first argument is the
-    // movie command.
-    let movie = dir.path().join("astroshot-movie");
-    std::os::unix::fs::symlink(BIN, &movie).unwrap();
-    let result = run_named(&movie, dir.path(), &["which-source", "ratatui dashboard"]);
+    // Bare is a usage error that prints react-shot's help, not the
+    // dispatcher's "astroshot react" mode help.
+    assert_exact(&call(&[]), REACT_SHOT_HELP, "", 1);
+    for args in [&["--help"][..], &["-h"], &["help"]] {
+        assert_exact(&call(args), REACT_SHOT_HELP, "", 0);
+    }
+    assert!(
+        REACT_SHOT_HELP.starts_with("react-shot - deterministic React component screenshots\n")
+    );
+    for needle in [
+        "react-shot install-browser [--with-deps]",
+        "--with-deps ",
+        "-v, --version ",
+    ] {
+        assert!(REACT_SHOT_HELP.contains(needle), "{needle}");
+    }
+    assert_exact(
+        &call(&["--version"]),
+        &format!("{}\n", package_version("react-shot")),
+        "",
+        0,
+    );
+    assert_exact(
+        &call(&["--root", "x"]),
+        "",
+        "Unknown command: undefined\n",
+        1,
+    );
+    // The dispatcher's own mode help is unchanged.
+    assert!(stdout(&run(&["react", "--help"])).starts_with("astroshot react — "));
+}
+
+#[test]
+fn tui_shot_alias_runs_the_tui_shot_cli_without_fixture_normalisation() {
+    let dir = tempfile::tempdir().unwrap();
+    let tui = alias(dir.path(), "tui-shot");
+    let call = |args: &[&str]| run_named(&tui, dir.path(), args);
+
+    assert_exact(&call(&[]), TUI_SHOT_HELP, "", 1);
+    for args in [&["--help"][..], &["-h"], &["help"], &["pty", "--help"]] {
+        assert_exact(&call(args), TUI_SHOT_HELP, "", 0);
+    }
+    assert!(TUI_SHOT_HELP.starts_with(
+        "tui-shot — deterministic PNG screenshots of terminal interfaces\n\nUsage:\n"
+    ));
+    assert_eq!(TUI_SHOT_HELP.matches("\n  tui-shot ").count(), 4);
+
+    // `tui-shot pty` is a usage error of the tui-shot CLI, not pty mode help.
+    assert_exact(&call(&["pty"]), "", "pty requires a fixture path\n", 1);
+    assert_exact(
+        &call(&["pty", "a.yaml"]),
+        "",
+        "pty requires -o <out.png>\n",
+        1,
+    );
+    // Only `astroshot ink <fixture.tsx>` inserts `shot`; the bin does not.
+    assert_exact(&call(&["x.tsx"]), "", "Unknown command: x.tsx\n", 1);
+    assert_exact(
+        &run(&["ink", "x.tsx"]),
+        "",
+        "shot requires -o <out.png>\n",
+        1,
+    );
+    assert_exact(&call(&["--root", "x"]), "", "Unknown command: --root\n", 1);
+    assert!(stdout(&run(&["pty", "--help"])).starts_with("astroshot pty — "));
+}
+
+#[test]
+fn astroshot_review_alias_parses_its_arguments_like_the_review_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    let review = alias(dir.path(), "astroshot-review");
+    let call = |args: &[&str]| run_named(&review, dir.path(), args);
+
+    assert_exact(&call(&["--help"]), REVIEW_HELP, "", 0);
+    // `help` is a folder name to the bin; only `astroshot review help` is help.
+    assert_exact(&call(&["help"]), "", NEEDS_TTY, 1);
+    assert_exact(&run(&["review", "help"]), REVIEW_HELP, "", 0);
+    // The bin parses every argument before it honours --help.
+    let invalid = format!("--roots-source must be app, cli, or cwd\n\n{REVIEW_HELP}");
+    assert_exact(
+        &call(&["--roots-source", "bogus", "--help"]),
+        "",
+        &invalid,
+        1,
+    );
+    assert_exact(
+        &run(&["review", "--roots-source", "bogus", "--help"]),
+        REVIEW_HELP,
+        "",
+        0,
+    );
+    assert_exact(&call(&["--root", "x"]), "", NEEDS_TTY, 1);
+}
+
+#[test]
+fn astroshot_movie_alias_runs_the_movie_cli() {
+    let dir = tempfile::tempdir().unwrap();
+    let movie = alias(dir.path(), "astroshot-movie");
+    let call = |args: &[&str]| run_named(&movie, dir.path(), args);
+
+    // No arguments is help with exit 0, as the npm bin behaved.
+    for args in [&[][..], &["--help"], &["-h"], &["help"]] {
+        assert_exact(&call(args), MOVIE_HELP, "", 0);
+    }
+    let result = call(&["which-source", "ratatui dashboard"]);
     assert_eq!(result.status.code(), Some(0), "{}", stderr(&result));
     assert!(stdout(&result).contains("\"recommended\": \"pty\""));
+}
 
-    // `react-shot` runs the real react-shot CLI (no pending stub).
-    let react = dir.path().join("react-shot");
-    std::os::unix::fs::symlink(BIN, &react).unwrap();
-    let result = run_named(&react, dir.path(), &["--root", "x"]);
-    assert_eq!(result.status.code(), Some(1));
-    assert_eq!(stderr(&result), "Unknown command: undefined\n");
+#[test]
+fn install_browser_forwards_its_arguments_to_the_react_shot_cli() {
+    assert_exact(&run(&["install-browser", "--help"]), REACT_SHOT_HELP, "", 0);
+    assert_exact(&run(&["install-browser", "-h"]), REACT_SHOT_HELP, "", 0);
+    assert_exact(
+        &run(&["install-browser", "--bogus"]),
+        "",
+        "Unknown option: --bogus\n",
+        1,
+    );
+    assert_exact(
+        &run(&["install-browser", "--version"]),
+        &format!("{}\n", package_version("react-shot")),
+        "",
+        0,
+    );
+}
 
-    // `tui-shot` runs the real tui-shot CLI; `tui-shot pty ...` is its PTY mode.
-    let tui = dir.path().join("tui-shot");
-    std::os::unix::fs::symlink(BIN, &tui).unwrap();
-    let result = run_named(&tui, dir.path(), &["--root", "x"]);
-    assert_eq!(result.status.code(), Some(1));
-    assert_eq!(stderr(&result), "Unknown command: --root\n");
-    let result = run_named(&tui, dir.path(), &["pty", "a.yaml"]);
-    assert_eq!(result.status.code(), Some(1));
-    assert_eq!(stderr(&result), "pty requires -o <out.png>\n");
-
-    // A symlink named `astroshot` behaves like the binary itself.
-    let plain = dir.path().join("astroshot");
-    std::os::unix::fs::symlink(BIN, &plain).unwrap();
+#[test]
+fn a_symlink_named_astroshot_behaves_like_the_binary_itself() {
+    let dir = tempfile::tempdir().unwrap();
+    let plain = alias(dir.path(), "astroshot");
     let result = run_named(&plain, dir.path(), &["--version"]);
-    assert_eq!(stdout(&result).trim(), env!("CARGO_PKG_VERSION"));
+    assert_exact(
+        &result,
+        &format!("{}\n", package_version("astroshot")),
+        "",
+        0,
+    );
+    assert_exact(
+        &run_named(&plain, dir.path(), &["react", "--help"]),
+        &stdout(&run(&["react", "--help"])),
+        "",
+        0,
+    );
 }
 
 #[test]

@@ -1,0 +1,21 @@
+astroshot review — the Astroshots tray in your terminal
+
+Usage:
+  astroshot review [<dir>...] [options]
+
+Options:
+  --root <dir>       Folder to watch for .astroshot/ trees (repeatable)
+  --no-graphics      Skip terminal pictures (text only)
+  --no-watch         Do not follow filesystem changes
+  --no-index         Ignore the on-disk index (full scan every start)
+  -h, --help         Show this help
+
+Without roots, `astroshot review` uses the folders the Astroshots app
+watches (macOS) and otherwise the current directory. Images render pixel-
+perfect in Kitty-protocol terminals (Ghostty, kitty, WezTerm) and inside
+herdr (enable [experimental] kitty_graphics and reattach the client once);
+elsewhere — mosh, tmux, plain terminals — they render as truecolor
+half-block text. Movie playback needs ffmpeg on PATH.
+
+Keys: ↑↓ move · ⏎ open · f full screen · s seen · c feedback · u history ·
+      m movies · 1/2 tabs · , settings · ? help · q quit

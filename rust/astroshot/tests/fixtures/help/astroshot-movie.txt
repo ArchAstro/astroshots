@@ -1,0 +1,109 @@
+astroshot movie — universal movie harness → .astroshot/ poster + video
+
+Which --source should I use?
+============================
+
+Pick the FIRST row that matches the thing you need to record:
+
+| You need to record…                              | Use --source        | Why |
+|--------------------------------------------------|---------------------|-----|
+| A web page / SPA / agent-browser session         | browser             | Headless Chromium; no Screen Recording TCC; deterministic viewport |
+| An isolated React component (not a full app)     | browser (or still)  | Prefer stills via `astroshot react` unless motion matters |
+| A TUI / CLI / Ink / Ratatui / truecolor terminal | pty                 | SGR→xterm truecolor path; NEVER screenshot Terminal.app |
+| Color-critical terminal (brand purple, etc.)     | pty                 | Host terminal themes remapping 16 colors would lie |
+| A native macOS app window (SwiftUI, Electron…)   | desktop.window      | Real window pixels via screencapture; needs Screen Recording |
+| Menu-bar / tray / status-item / LSUIElement app  | desktop.window      | Real app chrome; list-windows may include popover layers |
+| The whole monitor / multi-window desktop         | desktop.display     | (not implemented yet — use desktop.window or frames) |
+| Frames from any other tool (Unity, remote, custom)| frames              | You push PNG/JPEG; harness only encodes + sinks |
+| You already have PNG frames on disk              | frames              | Multi-process start/push-frame/stop |
+
+Hard rules for agents
+---------------------
+1. Terminal/TUI color → always `pty` (or `pty-demo` for a truecolor smoke test).
+   Do NOT use desktop.window on Terminal.app / iTerm / Ghostty for TUI review.
+2. Web UI → `browser`, not desktop of a browser window (loses headless CI + viewport control).
+3. Native Mac app chrome → `desktop.window` with --bundle-id or --window-id.
+4. Unknown engine that can dump images → `frames`.
+5. Always write into .astroshot/ via this harness (poster PNG + video) so Astroshots can stream posters today.
+
+Permission / environment
+------------------------
+| Source          | Needs                  | CI-friendly? |
+|-----------------|------------------------|--------------|
+| browser         | Playwright Chromium    | yes (headless) |
+| pty / pty-demo  | node-pty (optional)    | yes |
+| frames          | nothing special        | yes |
+| desktop.window  | macOS + Screen Recording TCC + WindowTools (Swift) | hard |
+
+Quick commands
+--------------
+  # Web journey
+  astroshot movie run --source browser --feature f --slug s --url https://…
+
+  # Truecolor TUI fixture
+  astroshot movie run --source pty --feature f --slug s --fixture ./flow.pty.yaml
+
+  # Native app window (largest window of bundle, 3s)
+  astroshot movie run --source desktop.window --feature f --slug s \
+    --bundle-id com.example.App --duration-ms 3000
+
+  # List windows (macOS)
+  astroshot movie list-windows
+
+  # Push your own frames
+  astroshot movie start --feature f --slug s
+  astroshot movie push-frame --feature f --file ./frame.png
+  astroshot movie stop --feature f --status pass
+
+Commands
+--------
+  which-source [intent…]     Recommend a --source for an agent/human intent
+  list-windows               List macOS windows (id, bundle, title) for desktop.window
+  check-screen-access        Detect Screen Recording TCC (optional --request prompt)
+  open-screen-settings       Open System Settings → Screen Recording
+  start / push-frame / mark / stop
+                             Multi-process frames session
+  run                        One-shot recorder (browser | pty | desktop.window | frames | …)
+  finalize                   Set manifest status pass|fail|idle
+
+run --source …
+--------------
+  browser         --url URL | --script path.mjs [--headed] [--settle-ms N]
+  pty             --fixture path.yaml|json   # truecolor TUI — preferred for terminals
+  pty-demo        [--color 7c5cff]           # truecolor smoke, no program
+  desktop.window  --bundle-id ID | --window-id N | --title-regex RE | --owner NAME | --pid N
+                  [--duration-ms 3000] [--fps 10] [--cursor] [--allow-blank]
+  frames          [--demo-frames N]          # or use start/push-frame/stop
+
+Common options
+--------------
+  --feature NAME   kebab-case feature dir under .astroshot/ (required for capture)
+  --slug SLUG      kebab-case movie slug (required for capture)
+  --root DIR       worktree root (default: git root or cwd)
+  --run-id ID      stable run identity (share across movies in one journey)
+  --title TEXT     human title
+  --description T  what the movie proves
+  --size WxH       encode size (desktop defaults to window pixels)
+  --fps N          default 15 (desktop default 10)
+  --format webm|mp4
+  --status running|pass|fail|idle
+  --session ID     frames session id (default: latest)
+  -h, --help
+
+Agent notes
+-----------
+  • Prefer the decision table over improvising OS screen recording for web/TUI.
+  • Always land poster+video under .astroshot/ so Astroshots streams posters.
+  • desktop.window uses macOS screencapture (already on the system) + Swift window list
+    shipped in this package — no extra binary download. Needs Screen Recording TCC.
+  • For full catalog: astroshot movie help-sources
+
+Examples
+--------
+  astroshot movie which-source "record a ratatui TUI with truecolor"
+  astroshot movie run --source browser --feature web --slug home --url https://example.com
+  astroshot movie run --source pty --feature tui --slug flow --fixture ./flow.pty.yaml
+  astroshot movie run --source desktop.window --feature app --slug onboard \
+    --bundle-id com.example.App --duration-ms 4000
+  astroshot movie list-windows
+
