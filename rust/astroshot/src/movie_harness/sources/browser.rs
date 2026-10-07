@@ -3,19 +3,32 @@
 //!
 //! Deliberate divergences from the TS (PORTING.md decision 2):
 //! - TS records with Playwright `recordVideo` and hands the `.webm` to
-//!   `session.stop`. Here the page's CDP screencast is resampled to the
-//!   session fps ([`resample_frames`]) and pushed as frames; `session.stop`
-//!   encodes them, so the reported duration is the encoded video's.
+//!   `session.stop` with `durationMs: session.elapsedMs()`. Here the page's
+//!   CDP screencast (`Page::start_recording`) goes through
+//!   [`write_recorder_webm`], a port of Playwright's recorder: fixed 25 fps
+//!   whatever the session fps, the last frame held for at least a second, VP8
+//!   with Playwright's ffmpeg arguments. The manifest duration is the session
+//!   wall clock, as in TS, not the video's length.
+//! - Playwright bundles its own ffmpeg; this uses the one on PATH. Without
+//!   it, the screencast is resampled to the session fps ([`resample_frames`])
+//!   and `session.stop` encodes it with the Chromium fallback, so the duration
+//!   is then the encoded video's.
+//! - Screencast frames identical to their predecessor are dropped: Chrome
+//!   re-sends the unchanged surface for the poster screenshot, which
+//!   Playwright's headless shell does not, and that would restart the hold.
+//! - A page that produced no screencast frame is recorded from the poster;
+//!   Playwright writes a white frame.
 //! - `scriptPath` runs in the Node helper: `playwright-core` attaches to this
 //!   Chrome over CDP and passes the same page to the user's module.
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
 use crate::browser::{
-    Browser, LaunchOptions, PageOptions, ScreenshotOptions, WaitUntil, resample_frames,
+    Browser, LaunchOptions, PageOptions, RECORDER_FPS, ScreencastFrame, ScreenshotOptions,
+    WaitUntil, recorder_repeats, resample_frames, write_recorder_webm,
 };
 use crate::movie_harness::paths::resolve_lexically;
 use crate::movie_harness::session::{FrameExtension, MovieSession, StopOptions, mkdtemp};
@@ -91,13 +104,13 @@ async fn journey(
     let page = browser
         .new_page(PageOptions::new(size.width, size.height).scale(1.0))
         .await?;
-    page.start_screencast(None).await?;
-    let started = Instant::now();
+    page.start_recording().await?;
 
     let url = opts.url.as_deref().filter(|url| !url.is_empty());
     if let Some(url) = url {
         page.goto(url, WaitUntil::DomContentLoaded, Duration::from_secs(60))
             .await?;
+        page.refresh_screencast().await?;
     }
 
     if let Some(script_path) = opts.script_path.as_deref().filter(|path| !path.is_empty()) {
@@ -116,16 +129,61 @@ async fn journey(
     let poster_path = video_dir.join("poster.png");
     std::fs::write(&poster_path, &poster)?;
 
-    let frames = page.stop_screencast().await?;
-    let duration_ms = started.elapsed().as_millis();
-    let fps = movie.fps.round().max(1.0) as u32;
-    for frame in resample_frames(&frames, fps, duration_ms) {
-        movie.push_frame(&frame, FrameExtension::Png)?;
+    // `context.close()`: the recording ends here, after the poster.
+    let mut recording = page.finish_screencast().await?;
+    recording.drop_unchanged_frames();
+    let idle_secs = recording.idle_secs();
+    let mut frames = recording.frames;
+    if frames.is_empty() {
+        frames.push(ScreencastFrame {
+            data: poster.clone(),
+            at_ms: recording.stopped_at_ms,
+            timestamp: 0.0,
+        });
     }
-    // The final state is always the last frame, and the poster.
-    movie.push_frame(&poster, FrameExtension::Png)?;
     let _ = page.close().await;
 
+    if which::which("ffmpeg").is_err() {
+        return stop_without_ffmpeg(movie, &frames, idle_secs, status, poster_path).await;
+    }
+    // Keep a frame so stop() has a poster fallback even if video path is set.
+    movie.push_frame(&poster, FrameExtension::Png)?;
+    let video_path = path_string(video_dir.join("movie.webm"));
+    let viewport = crate::browser::Size {
+        width: size.width,
+        height: size.height,
+    };
+    write_recorder_webm(&frames, idle_secs, viewport, &video_path).await?;
+
+    let duration_ms = movie.elapsed_ms();
+    movie
+        .stop(StopOptions {
+            status,
+            video_path: Some(video_path),
+            poster_path: Some(path_string(poster_path)),
+            duration_ms: Some(duration_ms),
+        })
+        .await
+}
+
+/// No ffmpeg: push the recording at the session fps, over the length
+/// Playwright's recorder would have given it, and let `stop` encode.
+async fn stop_without_ffmpeg(
+    movie: &mut MovieSession,
+    frames: &[ScreencastFrame],
+    idle_secs: f64,
+    status: Option<ManifestStatus>,
+    poster_path: PathBuf,
+) -> Result<MovieArtifact> {
+    let timestamps: Vec<f64> = frames.iter().map(|frame| frame.timestamp).collect();
+    let recorded: usize = recorder_repeats(&timestamps, idle_secs).iter().sum();
+    let duration_ms = (recorded as u128 * 1000) / u128::from(RECORDER_FPS);
+    let fps = movie.fps.round().max(1.0) as u32;
+    for frame in resample_frames(frames, fps, duration_ms) {
+        movie.push_frame(&frame, frame_extension(&frame))?;
+    }
+    // The final state is the last frame.
+    movie.push_frame(&std::fs::read(&poster_path)?, FrameExtension::Png)?;
     movie
         .stop(StopOptions {
             status,
@@ -133,6 +191,14 @@ async fn journey(
             ..Default::default()
         })
         .await
+}
+
+fn frame_extension(frame: &[u8]) -> FrameExtension {
+    if frame.starts_with(&[0x89, b'P', b'N', b'G']) {
+        FrameExtension::Png
+    } else {
+        FrameExtension::Jpg
+    }
 }
 
 fn path_string(path: PathBuf) -> String {
