@@ -95,12 +95,109 @@ async fn react_serve_serves_the_fixture_page_until_stopped() {
     helper.shutdown().await.unwrap();
 }
 
+/// config.test.ts "resolves filesystem settings relative to a TypeScript
+/// config": an explicit `.ts` config path, loaded through tsx.
+#[tokio::test]
+async fn load_config_resolves_filesystem_settings_relative_to_a_typescript_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let directory = dir.path();
+    let config_path = directory.join("react-shot.config.ts");
+    std::fs::write(
+        &config_path,
+        r#"export default {
+        root: "./app",
+        alias: { "@": "./app/src" },
+        styles: ["./app/global.css"],
+        postcssConfig: "./postcss.config.mjs"
+      };"#,
+    )
+    .unwrap();
+    let mut helper = spawn().await;
+
+    let loaded = helper.load_config(Some(&config_path), None).await.unwrap();
+
+    let text = |path: PathBuf| path.to_string_lossy().into_owned();
+    assert_eq!(loaded.config_path, Some(text(config_path.clone())));
+    let config = loaded.config;
+    assert_eq!(config.root, Some(text(directory.join("app"))));
+    assert_eq!(
+        config.alias,
+        Some(std::collections::BTreeMap::from([(
+            "@".to_string(),
+            text(directory.join("app/src"))
+        )]))
+    );
+    assert_eq!(
+        config.styles,
+        Some(vec![text(directory.join("app/global.css"))])
+    );
+    assert_eq!(
+        config.postcss_config,
+        Some(text(directory.join("postcss.config.mjs")))
+    );
+    // The fields the config does not set stay unset.
+    assert_eq!((config.dedupe, config.stub_modules), (None, None));
+    helper.shutdown().await.unwrap();
+}
+
+/// config.test.ts "uses the nearest package root for a nested fixture".
+/// `resolvePackageRoot` runs inside `react-serve`, which reports the root it
+/// picked and serves from it.
+#[tokio::test]
+async fn react_serve_uses_the_nearest_package_root_for_a_nested_fixture() {
+    let dir = tempfile::tempdir().unwrap();
+    let directory = dir.path();
+    let fixture = directory.join("fixtures/nested/card.tsx");
+    std::fs::create_dir_all(fixture.parent().unwrap()).unwrap();
+    std::fs::write(directory.join("package.json"), "{}").unwrap();
+    std::fs::write(&fixture, "export default {}").unwrap();
+    let mut helper = spawn().await;
+
+    let served = helper.react_serve(&fixture, None, None).await.unwrap();
+
+    assert_eq!(Path::new(&served.package_root), directory);
+    assert_eq!(Path::new(&served.fixture_path), fixture);
+    assert_eq!(served.config_path, None);
+    assert!(helper.react_stop(served.server_id).await.unwrap().stopped);
+
+    // An explicit root wins over the walk, and a config's `root` wins over
+    // the walk too (`resolvePackageRoot(fixture, explicitRoot, config)`).
+    let explicit = directory.join("fixtures");
+    let served = helper
+        .react_serve(&fixture, Some(&explicit), None)
+        .await
+        .unwrap();
+    assert_eq!(Path::new(&served.package_root), explicit);
+    assert!(helper.react_stop(served.server_id).await.unwrap().stopped);
+
+    std::fs::write(
+        directory.join("fixtures/react-shot.config.ts"),
+        r#"export default { root: "./nested" };"#,
+    )
+    .unwrap();
+    let served = helper.react_serve(&fixture, None, None).await.unwrap();
+    assert_eq!(
+        Path::new(&served.package_root),
+        directory.join("fixtures/nested")
+    );
+    assert_eq!(
+        served.config_path.as_deref().map(Path::new),
+        Some(directory.join("fixtures/react-shot.config.ts").as_path())
+    );
+    assert!(helper.react_stop(served.server_id).await.unwrap().stopped);
+    helper.shutdown().await.unwrap();
+}
+
+/// Config discovery (`findConfigPath`) walks up from `startDir`; a config
+/// without `root` gets its own directory as the root.
 #[tokio::test]
 async fn load_config_resolves_paths_against_the_config_directory() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
-        dir.path().join("react-shot.config.mjs"),
-        r#"export default { alias: { "@": "./src" }, styles: ["./a.css"], stubModules: ["x"] };"#,
+        dir.path().join("react-shot.config.ts"),
+        r#"const config: { alias: Record<string, string>; styles: string[]; stubModules: string[] } =
+  { alias: { "@": "./src" }, styles: ["./a.css"], stubModules: ["x"] };
+export default config;"#,
     )
     .unwrap();
     std::fs::create_dir_all(dir.path().join("deep/er")).unwrap();
@@ -111,11 +208,19 @@ async fn load_config_resolves_paths_against_the_config_directory() {
     let loaded = helper.load_config(None, Some(&nested)).await.unwrap();
 
     let config_path = loaded.config_path.unwrap();
-    assert!(config_path.ends_with("react-shot.config.mjs"));
+    assert_eq!(
+        Path::new(&config_path),
+        root.join("react-shot.config.ts").as_path()
+    );
     assert_eq!(
         loaded.config.alias.unwrap()["@"],
         root.join("src").display().to_string()
     );
+    assert_eq!(
+        loaded.config.styles,
+        Some(vec![root.join("a.css").display().to_string()])
+    );
+    assert_eq!(loaded.config.postcss_config, None);
     assert_eq!(loaded.config.stub_modules, Some(vec!["x".to_string()]));
     assert_eq!(loaded.config.root.unwrap(), root.display().to_string());
 
@@ -134,6 +239,37 @@ async fn load_config_resolves_paths_against_the_config_directory() {
             .starts_with("react-shot config not found: ")
     );
     helper.shutdown().await.unwrap();
+}
+
+/// create-server.test.ts, both cases: `resolveInstalledModule` and
+/// `resolveInstalledPackage` live in the helper, so the cases are a
+/// `node --test` file next to it that imports the helper's own functions.
+#[test]
+fn helper_resolves_hoisted_modules_and_packages() {
+    let node = astroshot::node_helper::find_node().expect("node >=22");
+    let test_file = repo().join("rust/node-helper/helper.test.mjs");
+    let output = std::process::Command::new(node)
+        .arg("--test")
+        .arg(&test_file)
+        .output()
+        .expect("spawn node --test");
+    let report = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.status.success(), "{report}");
+    // Both cases ran; a file that matched no tests would also exit 0.
+    for case in [
+        "finds a package hoisted above the fixture package root",
+        "finds a hoisted package root even when its export is nested",
+    ] {
+        assert!(report.contains(case), "missing {case:?} in:\n{report}");
+    }
+    assert!(
+        report.contains("pass 2") && report.contains("fail 0"),
+        "{report}"
+    );
 }
 
 #[tokio::test]
