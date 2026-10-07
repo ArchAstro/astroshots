@@ -275,8 +275,10 @@ impl FramePlayer {
             self.video_path.clone(),
             "-an".into(),
             "-vf".into(),
+            // TS used `fast_bilinear`, which aliases text on the large
+            // downscale to terminal size and rounds colours coarsely.
             format!(
-                "fps={},scale={}:{}:flags=fast_bilinear",
+                "fps={},scale={}:{}:flags=lanczos+accurate_rnd+full_chroma_int",
                 js_number_string(self.fps),
                 self.frame_size.width,
                 self.frame_size.height

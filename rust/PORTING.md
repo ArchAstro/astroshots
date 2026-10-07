@@ -62,6 +62,26 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
    - Terminal PNGs use the bundled JetBrains Mono (`fontFamily` is ignored).
      Text it has no glyph for (CJK, emoji, some symbols) is drawn from the
      machine's fonts, as Chromium's fallback did.
+   - Capture quality is deliberately above TS (measured with colour bars
+     played in Chrome's `<video>`: TS encodes were off by 25-47 levels per
+     channel and showed dark UI darker; these are within 1):
+     - every ffmpeg encode converts to BT.709 limited range explicitly and
+       tags the stream BT.709 primaries/matrix with the sRGB transfer
+       (`video_encode.rs`); TS left it to ffmpeg's defaults, untagged;
+     - constant quality (VP9 `-crf 15`, H.264 `-crf 14 -preset slow`)
+       instead of VP9 at 2 Mbit/s, x264 defaults, and realtime VP8 at
+       1 Mbit/s for browser recordings; Lanczos instead of nearest-neighbour
+       when frames are resized; odd sizes are made even;
+     - browser movies are recorded at 2 device pixels per CSS pixel from
+       lossless PNG screencast frames (TS: 1x, quality-90 JPEG), so the video
+       and poster are twice `--size`;
+     - PTY movies are the frames' own pixel size (TS shrank each 2x frame to
+       the CSS size plus margin, unevenly, with nearest neighbour), so the
+       manifest `viewport` is that pixel size;
+     - desktop captures are converted from the display's colour profile to
+       sRGB with `sips`; the blank-frame check decodes the PNG instead of
+       reading filtered bytes;
+     - review playback scales with Lanczos instead of `fast_bilinear`.
    - Chrome discovery: `ASTROSHOT_CHROME`/`CHROME_PATH`, then an installed
      Chrome, then Playwright's cache. In the cache a headless launch takes
      `chromium_headless_shell-<rev>` first (what Playwright launched; Chrome

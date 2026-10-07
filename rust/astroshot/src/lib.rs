@@ -9,3 +9,4 @@ pub mod node_helper;
 pub mod raster;
 pub mod react_shot;
 pub mod tui_shot;
+pub mod video_encode;

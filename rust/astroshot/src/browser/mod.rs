@@ -448,9 +448,6 @@ fn running_as_root() -> bool {
     cfg!(target_os = "linux") && std::env::var("USER").is_ok_and(|u| u == "root")
 }
 
-/// Playwright's `recordVideo` screencast quality.
-const RECORDER_JPEG_QUALITY: u8 = 90;
-
 struct Screencast {
     frames: Arc<Mutex<Vec<ScreencastFrame>>>,
     task: JoinHandle<()>,
@@ -607,6 +604,16 @@ impl Page {
     /// The page's CDP target id, to find it again from another CDP client.
     pub fn target_id(&self) -> String {
         AsRef::<str>::as_ref(self.page.target_id()).to_string()
+    }
+
+    /// `size` in CSS pixels as device pixels at this page's scale.
+    pub fn device_pixels(&self, size: Size) -> Size {
+        let scale = self.options.lock().unwrap().device_scale_factor;
+        let px = |css: u32| (f64::from(css) * scale).round() as u32;
+        Size {
+            width: px(size.width),
+            height: px(size.height),
+        }
     }
 
     pub fn viewport(&self) -> Size {
@@ -847,18 +854,19 @@ impl Page {
             .await
     }
 
-    /// Start a screencast for [`write_recorder_webm`], the way Playwright
-    /// starts `recordVideo`: JPEG frames at quality 90, at the window
-    /// content's own size. The window is first fitted to the viewport so the
-    /// frames show all of it; where the window cannot shrink that far, the
-    /// encoder crops them to the viewport. Stop with
+    /// Start a screencast for [`write_recorder_webm`]. Playwright's
+    /// `recordVideo` takes quality-90 JPEGs at CSS-pixel size; this takes
+    /// lossless PNG frames at the page's device pixels, so a page opened at
+    /// scale 2 records at twice the viewport. The window is first fitted to
+    /// the viewport so the frames show all of it; where the window cannot
+    /// shrink that far, the encoder crops them to the viewport. Stop with
     /// [`Page::finish_screencast`].
     pub async fn start_recording(&self) -> Result<()> {
         if self.screencast.lock().unwrap().is_some() {
             return Err(BrowserError::Screencast("already running".into()));
         }
         let content = self.fit_window_to_viewport().await?;
-        self.start_screencast_within(Some(RECORDER_JPEG_QUALITY), content)
+        self.start_screencast_within(None, self.device_pixels(content))
             .await
     }
 

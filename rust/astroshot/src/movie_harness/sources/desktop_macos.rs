@@ -25,7 +25,6 @@ use std::process::Command;
 use std::sync::LazyLock;
 
 use anyhow::{Result, anyhow, bail};
-use flate2::read::ZlibDecoder;
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -601,7 +600,8 @@ pub fn is_nearly_blank_png(file_path: &str, options: Option<BlankPngOptions>) ->
         return true;
     }
 
-    // Minimal PNG scan: find IDAT chunks, inflate, average luma on a grid.
+    // Check the header and that there is image data, then average luma on
+    // a grid of decoded pixels.
     let be32 = |at: usize| u32::from_be_bytes([data[at], data[at + 1], data[at + 2], data[at + 3]]);
     let width = be32(16) as usize;
     let height = be32(20) as usize;
@@ -640,36 +640,34 @@ pub fn is_nearly_blank_png(file_path: &str, options: Option<BlankPngOptions>) ->
         return true;
     }
 
-    let mut inflated = Vec::new();
-    if ZlibDecoder::new(idat.as_slice())
-        .read_to_end(&mut inflated)
-        .is_err()
-    {
-        return false; // can't decode — don't claim blank
+    // Decode for real. The TS scan read the inflated bytes without undoing
+    // PNG row filters, which only works for unfiltered rows: a filtered image
+    // (anything `sips` rewrites) is mostly small deltas and looked black.
+    let mut reader = match png::Decoder::new(data.as_slice()).read_info() {
+        Ok(reader) => reader,
+        Err(_) => return false, // can't decode — don't claim blank
+    };
+    let mut pixels = vec![0u8; reader.output_buffer_size()];
+    if reader.next_frame(&mut pixels).is_err() {
+        return false;
     }
-
-    let stride = 1 + width * channels; // filter byte + row
-    let expected = stride * height;
-    if inflated.len() < expected {
+    let stride = width * channels;
+    if pixels.len() < stride * height {
         return false;
     }
 
-    // Only sample rows that use filter type 0 (None) for correct RGB bytes.
-    // For filtered rows, still sample raw bytes as a coarse darkness heuristic.
     let mut samples = 0u64;
     let mut dark = 0u64;
     let mut luma_sum = 0.0f64;
     let step_y = (height / 32).max(1);
     let step_x = (width / 32).max(1);
-    let byte = |at: usize| f64::from(inflated.get(at).copied().unwrap_or(0));
+    let byte = |at: usize| f64::from(pixels[at]);
     let mut y = 0;
     while y < height {
-        let row_start = y * stride;
         let mut x = 0;
         while x < width {
-            let i = row_start + 1 + x * channels;
+            let i = y * stride + x * channels;
             let (r, g, b) = (byte(i), byte(i + 1), byte(i + 2));
-            // filter≠0 means bytes aren't raw RGB; still treat very low triples as dark.
             let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
             luma_sum += luma;
             if luma <= max_mean_luma {
@@ -743,7 +741,24 @@ fn capture_window_png(window_id: i64, out_path: &str, cursor: bool) -> Result<()
             format_screen_recording_denied_help(access.as_ref())
         );
     }
+    convert_to_srgb(out_path);
     Ok(())
+}
+
+const SIPS: &str = "/usr/bin/sips";
+const SRGB_PROFILE: &str = "/System/Library/ColorSync/Profiles/sRGB Profile.icc";
+
+/// `screencapture` writes pixels in the display's colour space (Display P3 on
+/// a Mac's own panel) with that profile embedded. ffmpeg and most viewers
+/// ignore the profile and read the numbers as sRGB, which shifts every
+/// colour, so convert the file to sRGB in place. Best effort: the frame is
+/// kept as captured if `sips` is missing or fails.
+fn convert_to_srgb(png_path: &str) {
+    let _ = Command::new(SIPS)
+        .args(["-m", SRGB_PROFILE, png_path])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
 }
 
 /// Width/height from a PNG's IHDR, or `None` when it is not a PNG.
@@ -1070,6 +1085,25 @@ mod tests {
         assert!(text.contains("on-screen"));
         assert!(!text.contains("desktop.window id="));
         assert_eq!(text, "Astroshots window (400×640, on-screen)");
+    }
+
+    /// A solid colour written with a row filter is all zero deltas after the
+    /// first pixel: the check has to look at pixels, not at filtered bytes.
+    #[test]
+    fn a_filtered_bright_png_is_not_blank() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("filtered.png");
+        let file = fs::File::create(&path).unwrap();
+        let mut encoder = png::Encoder::new(file, 64, 48);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_filter(png::FilterType::Sub);
+        let mut writer = encoder.write_header().unwrap();
+        writer
+            .write_image_data(&[200, 210, 220, 255].repeat(64 * 48))
+            .unwrap();
+        drop(writer);
+        assert!(!is_nearly_blank_png(path.to_str().unwrap(), None));
     }
 
     #[test]

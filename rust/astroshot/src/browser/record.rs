@@ -1,8 +1,13 @@
 //! The video half of Playwright's `recordVideo`, which the TS browser movie
 //! source relies on: screencast frames are laid onto a fixed 25 fps timeline
-//! and piped to ffmpeg as VP8 WebM. This is a port of playwright-core's
+//! and piped to ffmpeg as WebM. The timeline is a port of playwright-core's
 //! `FfmpegVideoRecorder` (`server/videoRecorder.ts`), so a journey recorded
-//! here has the frame count and duration Playwright would have written:
+//! here has the frame count and duration Playwright would have written. The
+//! encode is not Playwright's: it wrote VP8 at 1 Mbit/s in realtime mode,
+//! which smears text, and this crate's ffmpeg turned its full-range JPEG
+//! input into limited range without converting, which made recordings dark.
+//! Frames are encoded as constant-quality VP9 with explicit colour (see
+//! `video_encode`). The timeline rules:
 //!
 //! - frame `i` sits at slot `floor((timestamp_i - timestamp_0) * 25)` and is
 //!   repeated until the next frame's slot;
@@ -15,6 +20,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::{BrowserError, Result, ScreencastFrame, Size};
+use crate::video_encode::{COLOR_FILTER, COLOR_TAGS, VP9_QUALITY, even};
 
 /// Playwright records at a fixed rate, whatever the session fps is.
 pub const RECORDER_FPS: u32 = 25;
@@ -52,24 +58,30 @@ pub fn recorder_repeats(timestamps: &[f64], idle_secs: f64) -> Vec<usize> {
         .collect()
 }
 
-/// Playwright's recorder argv, with one addition: a leading `crop` to at most
-/// the output size. Playwright only ever receives frames no larger than the
-/// video (`pad` rejects larger ones); here a viewport below the window's
-/// minimum size arrives inside a larger frame, top-left aligned.
-/// `input_codec` is `mjpeg` for screencast JPEGs (what Playwright pipes) or
-/// `png`.
+/// The recorder argv: Playwright's input side and frame rate, a leading
+/// `crop` to at most the output size, and this crate's colour and quality
+/// settings. Playwright only ever receives frames no larger than the video
+/// (`pad` rejects larger ones); here a viewport below the window's minimum
+/// size arrives inside a larger frame, top-left aligned. `input_codec` is
+/// `mjpeg` for screencast JPEGs or `png`.
 pub fn recorder_ffmpeg_args(input_codec: &str, size: Size, out_path: &str) -> Vec<String> {
-    let (w, h) = (size.width, size.height);
+    let (w, h) = (even(size.width), even(size.height));
     let fps = RECORDER_FPS;
-    let args = format!(
-        "-loglevel error -f image2pipe -avioflags direct -fpsprobesize 0 -probesize 32 -analyzeduration 0 -c:v {input_codec} -i pipe:0 -y -an -r {fps} -c:v vp8 -qmin 0 -qmax 50 -crf 8 -deadline realtime -speed 8 -b:v 1M -threads 1 -vf crop=min(iw\\,{w}):min(ih\\,{h}):0:0,pad={w}:{h}:0:0:gray,crop={w}:{h}:0:0"
+    let input = format!(
+        "-loglevel error -f image2pipe -avioflags direct -fpsprobesize 0 -probesize 32 -analyzeduration 0 -c:v {input_codec} -i pipe:0 -y -an -r {fps} -vf crop=min(iw\\,{w}):min(ih\\,{h}):0:0,pad={w}:{h}:0:0:gray,crop={w}:{h}:0:0,{COLOR_FILTER}"
     );
-    let mut args: Vec<String> = args.split(' ').map(str::to_string).collect();
+    let mut args: Vec<String> = input.split(' ').map(str::to_string).collect();
+    args.extend(
+        VP9_QUALITY
+            .iter()
+            .chain(&COLOR_TAGS)
+            .map(|arg| arg.to_string()),
+    );
     args.push(out_path.to_string());
     args
 }
 
-/// Encode `frames` to a VP8 WebM at `out_path` on Playwright's timeline (see
+/// Encode `frames` to a VP9 WebM at `out_path` on Playwright's timeline (see
 /// the module docs). `idle_secs` is the time between the last frame's arrival
 /// and the stop. Frames must all be JPEG or all PNG. Needs `ffmpeg` on PATH.
 pub async fn write_recorder_webm(
@@ -165,15 +177,15 @@ mod tests {
     }
 
     #[test]
-    fn ffmpeg_args_are_playwrights_plus_the_leading_crop() {
+    fn ffmpeg_args_keep_playwrights_input_and_rate_with_explicit_colour() {
         let size = Size {
             width: 320,
-            height: 200,
+            height: 201,
         };
         let args = recorder_ffmpeg_args("mjpeg", size, "/o/a.webm");
         assert_eq!(
             args.join(" "),
-            "-loglevel error -f image2pipe -avioflags direct -fpsprobesize 0 -probesize 32 -analyzeduration 0 -c:v mjpeg -i pipe:0 -y -an -r 25 -c:v vp8 -qmin 0 -qmax 50 -crf 8 -deadline realtime -speed 8 -b:v 1M -threads 1 -vf crop=min(iw\\,320):min(ih\\,200):0:0,pad=320:200:0:0:gray,crop=320:200:0:0 /o/a.webm"
+            "-loglevel error -f image2pipe -avioflags direct -fpsprobesize 0 -probesize 32 -analyzeduration 0 -c:v mjpeg -i pipe:0 -y -an -r 25 -vf crop=min(iw\\,320):min(ih\\,202):0:0,pad=320:202:0:0:gray,crop=320:202:0:0,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=color_primaries=bt709:color_trc=iec61966-2-1 -c:v libvpx-vp9 -crf 15 -b:v 0 -row-mt 1 -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc iec61966-2-1 /o/a.webm"
         );
     }
 }

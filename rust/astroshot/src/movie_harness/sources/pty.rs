@@ -121,12 +121,13 @@ struct Paint {
 }
 
 impl Paint {
+    /// The movie's size: the frames' own pixels. TS declared the CSS size
+    /// plus its page margin, so ffmpeg shrank every 2x frame to about half
+    /// with nearest-neighbour sampling, and not by the same factor on each
+    /// axis.
     fn size(&self) -> Size {
-        let (width, height) = self.raster.css_size();
-        Size {
-            width: width + 32,
-            height: height + 32,
-        }
+        let (width, height) = self.raster.pixel_size();
+        Size { width, height }
     }
 
     /// Render with the calling thread's shared rasterizer, so glyphs stay

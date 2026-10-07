@@ -143,7 +143,7 @@ fn all_frames(video: &str, dir: &Path) -> Vec<std::path::PathBuf> {
 }
 
 /// The TS source records with Playwright `recordVideo`: 25 fps whatever the
-/// session fps, VP8, and a page that stops repainting is held for
+/// session fps, and a page that stops repainting is held for
 /// `max(time since its last frame, 1 s)`. The manifest duration is the
 /// session wall clock (`session.elapsedMs()`), not the video's length.
 /// Observed from TS on this kind of page: 24 frames (0.96 s) with no settle,
@@ -176,7 +176,7 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     // No settle: the page's last frame is held for the 1 s minimum.
     let (still, still_wall_ms) = record("still", None).await;
     let (codec, rate, frames) = video_stream(&still.video_path);
-    assert_eq!(codec, "vp8");
+    assert_eq!(codec, "vp9");
     assert_eq!(rate, "25/1", "the session fps (10) does not set the rate");
     // The upper bounds here leave room for a loaded machine: the hold runs
     // until the poster has been captured.
@@ -212,6 +212,62 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     for (x, y) in [(5, 195), (315, 195), (315, 100)] {
         let [r, g, b] = pixel(&frame, x, y);
         assert!(r < 80 && g < 110 && b > 140, "({x},{y}) = {r} {g} {b}");
+    }
+}
+
+/// Picture quality, where this deliberately leaves TS behind: the recording
+/// is 2 device pixels per CSS pixel, its colours are the page's (the TS-era
+/// encode showed dark backgrounds darker), and the stream is tagged so
+/// players do not guess.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_dark_page_is_recorded_at_twice_the_viewport_in_its_own_colours() {
+    if let Some(reason) = skip_reason() {
+        common::skip(&reason);
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    let html = r##"<body style="margin:0;background:#090a12"><div style="width:160px;height:200px;background:#808080"></div></body>"##;
+    let artifact = record_browser_movie(options(
+        root.path(),
+        "dark",
+        BrowserMovieOptions {
+            url: Some(data_url(html)),
+            settle_ms: Some(300),
+            ..Default::default()
+        },
+    ))
+    .await
+    .unwrap();
+
+    let probe = Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", "v:0", "-show_entries"])
+        .arg("stream=width,height,color_range,color_space,color_transfer,color_primaries")
+        .args(["-of", "csv=p=0", &artifact.video_path])
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&probe.stdout).trim(),
+        "640,400,tv,bt709,iec61966-2-1,bt709"
+    );
+    let poster = image::open(&artifact.poster_path).unwrap();
+    assert_eq!((poster.width(), poster.height()), (640, 400));
+
+    let decoded = Command::new("ffmpeg")
+        .args(["-v", "error", "-sseof", "-0.15", "-i", &artifact.video_path])
+        .args(["-frames:v", "1", "-vf"])
+        .arg("scale=flags=accurate_rnd+full_chroma_int,format=rgb24")
+        .args(["-f", "rawvideo", "-"])
+        .output()
+        .unwrap();
+    let at = |x: usize, y: usize| &decoded.stdout[(y * 640 + x) * 3..][..3];
+    for (x, y, want) in [(160, 200, [0x80u8; 3]), (500, 200, [0x09, 0x0a, 0x12])] {
+        let got = at(x, y);
+        for (got_channel, want_channel) in got.iter().zip(want) {
+            assert!(
+                got_channel.abs_diff(want_channel) <= 3,
+                "({x},{y}) = {got:?}, page colour {want:?}"
+            );
+        }
     }
 }
 

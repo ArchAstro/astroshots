@@ -159,7 +159,7 @@ expectText:
         artifact.duration_ms
     );
 
-    // Poster is a frame: session size is css size + 32, frames are css * scale.
+    // Poster is a frame, and the movie is the frames' size (css * scale).
     let raster = RasterOptions::movie(40, 8);
     let (expected_width, expected_height) = raster.pixel_size();
     let poster = image::open(&artifact.poster_path).unwrap();
@@ -175,10 +175,9 @@ expectText:
     let shot = &manifest["shots"][0];
     assert_eq!(shot["source"], "pty");
     assert_eq!(shot["kind"], "movie");
-    let (css_width, css_height) = raster.css_size();
     assert_eq!(
         shot["viewport"],
-        format!("{}x{}", css_width + 32, css_height + 32)
+        format!("{expected_width}x{expected_height}")
     );
 }
 

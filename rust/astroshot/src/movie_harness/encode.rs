@@ -14,6 +14,7 @@ use anyhow::{Result, anyhow, bail};
 use super::paths::{ensure_dir, resolve_lexically};
 use super::types::{EncodeFramesRequest, Size};
 use crate::browser::{Browser, LaunchOptions, record_webm};
+use crate::video_encode::{COLOR_FILTER, COLOR_TAGS, H264_QUALITY, VP9_QUALITY, even};
 
 /// `Math.round`: halves round toward +Infinity.
 pub(crate) fn js_round(value: f64) -> f64 {
@@ -114,23 +115,25 @@ pub fn concat_list(frame_paths: &[String], fps: f64) -> String {
     format!("{}\n", lines.join("\n"))
 }
 
-/// The ffmpeg argv: H.264/MP4 for `.mp4` outputs, VP9/WebM for everything else.
+/// The ffmpeg argv: H.264/MP4 for `.mp4` outputs, VP9/WebM for everything
+/// else. Frames of another size are resampled with Lanczos (TS used nearest
+/// neighbour, which shreds text); colour and quality are in `video_encode`.
 pub fn ffmpeg_args(list_path: &str, out_path: &str, size: Size) -> Vec<String> {
-    let scale = format!("scale={}:{}:flags=neighbor", size.width, size.height);
+    let filter = format!(
+        "scale={}:{}:flags=lanczos,{COLOR_FILTER}",
+        even(size.width),
+        even(size.height)
+    );
     let mut args: Vec<&str> = vec![
-        "-y", "-f", "concat", "-safe", "0", "-i", list_path, "-vf", &scale,
+        "-y", "-f", "concat", "-safe", "0", "-i", list_path, "-vf", &filter,
     ];
     if extname_lower(out_path) == ".mp4" {
-        args.extend([
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-        ]);
+        args.extend(H264_QUALITY);
+        args.extend(COLOR_TAGS);
+        args.extend(["-movflags", "+faststart"]);
     } else {
-        args.extend(["-c:v", "libvpx-vp9", "-b:v", "2M", "-pix_fmt", "yuv420p"]);
+        args.extend(VP9_QUALITY);
+        args.extend(COLOR_TAGS);
     }
     args.push(out_path);
     args.into_iter().map(str::to_string).collect()
@@ -259,62 +262,37 @@ mod tests {
             .collect()
     }
 
+    const COLOR: &str =
+        "-color_range tv -colorspace bt709 -color_primaries bt709 -color_trc iec61966-2-1";
+
     #[test]
     fn ffmpeg_args_for_webm() {
         assert_eq!(
-            ffmpeg_args("/t/frames.txt", "/o/a.webm", size(640, 360)),
-            [
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                "/t/frames.txt",
-                "-vf",
-                "scale=640:360:flags=neighbor",
-                "-c:v",
-                "libvpx-vp9",
-                "-b:v",
-                "2M",
-                "-pix_fmt",
-                "yuv420p",
-                "/o/a.webm"
-            ]
+            ffmpeg_args("/t/frames.txt", "/o/a.webm", size(640, 360)).join(" "),
+            format!(
+                "-y -f concat -safe 0 -i /t/frames.txt -vf scale=640:360:flags=lanczos,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=color_primaries=bt709:color_trc=iec61966-2-1 -c:v libvpx-vp9 -crf 15 -b:v 0 -row-mt 1 {COLOR} /o/a.webm"
+            )
         );
     }
 
     #[test]
     fn ffmpeg_args_for_mp4() {
         assert_eq!(
-            ffmpeg_args("/t/frames.txt", "/o/a.MP4", size(640, 360)),
-            [
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                "/t/frames.txt",
-                "-vf",
-                "scale=640:360:flags=neighbor",
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-movflags",
-                "+faststart",
-                "/o/a.MP4"
-            ]
+            ffmpeg_args("/t/frames.txt", "/o/a.MP4", size(640, 360)).join(" "),
+            format!(
+                "-y -f concat -safe 0 -i /t/frames.txt -vf scale=640:360:flags=lanczos,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=color_primaries=bt709:color_trc=iec61966-2-1 -c:v libx264 -crf 14 -preset slow {COLOR} -movflags +faststart /o/a.MP4"
+            )
         );
     }
 
     #[test]
     fn ffmpeg_args_for_mov_use_the_webm_codec_path() {
         let args = ffmpeg_args("/t/l.txt", "/o/a.mov", size(2, 3));
-        assert_eq!(args[9..12], ["-c:v", "libvpx-vp9", "-b:v"]);
+        assert_eq!(args[9..11], ["-c:v", "libvpx-vp9"]);
         assert_eq!(args.last().unwrap(), "/o/a.mov");
         assert!(!args.contains(&"libx264".to_string()));
+        // 4:2:0 cannot hold an odd height.
+        assert!(args[8].starts_with("scale=2:4:"), "{}", args[8]);
     }
 
     #[test]
@@ -453,6 +431,68 @@ mod tests {
             assert_eq!(outcome.video_path, out);
             let bytes = fs::read(&out).unwrap();
             assert_eq!(&bytes[magic_at..magic_at + magic.len()], magic, "{name}");
+        }
+    }
+
+    /// A dark UI colour must survive the encode, and the stream must say how
+    /// it is encoded: a player that has to guess (BT.601 or BT.709, which
+    /// transfer curve) shows untagged video darker or with shifted hues.
+    #[tokio::test]
+    async fn ffmpeg_output_keeps_dark_colours_and_is_tagged() {
+        let probe = |args: &[&str]| Command::new("ffprobe").args(args).output();
+        if !has_ffmpeg() || probe(&["-version"]).is_err() {
+            eprintln!("skip: ffmpeg/ffprobe not installed");
+            return;
+        }
+        const DARK: [u8; 3] = [0x09, 0x0a, 0x12];
+        let dir = tempfile::tempdir().unwrap();
+        let frame = dir.path().join("dark.png");
+        let file = fs::File::create(&frame).unwrap();
+        let mut encoder = png::Encoder::new(file, 64, 48);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&DARK.repeat(64 * 48)).unwrap();
+        drop(writer);
+        let frames = vec![frame.to_string_lossy().into_owned(); 3];
+
+        for name in ["dark.webm", "dark.mp4"] {
+            let out = dir.path().join(name).to_string_lossy().into_owned();
+            encode_frames(&request(frames.clone(), &out, 10.0))
+                .await
+                .unwrap();
+
+            let tags = probe(&[
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=color_range,color_space,color_transfer,color_primaries",
+                "-of",
+                "csv=p=0",
+                &out,
+            ])
+            .unwrap();
+            assert_eq!(
+                String::from_utf8_lossy(&tags.stdout).trim(),
+                "tv,bt709,iec61966-2-1,bt709",
+                "{name}"
+            );
+
+            let decoded = Command::new("ffmpeg")
+                .args(["-v", "error", "-i", &out, "-frames:v", "1"])
+                .args([
+                    "-vf",
+                    "scale=flags=accurate_rnd+full_chroma_int,format=rgb24",
+                ])
+                .args(["-f", "rawvideo", "-"])
+                .output()
+                .unwrap();
+            let pixel = &decoded.stdout[..3];
+            for (got, want) in pixel.iter().zip(DARK) {
+                assert!(got.abs_diff(want) <= 2, "{name}: {pixel:?} for {DARK:?}");
+            }
         }
     }
 }

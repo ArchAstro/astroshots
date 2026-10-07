@@ -5,10 +5,15 @@
 //! - TS records with Playwright `recordVideo` and hands the `.webm` to
 //!   `session.stop` with `durationMs: session.elapsedMs()`. Here the page's
 //!   CDP screencast (`Page::start_recording`) goes through
-//!   [`write_recorder_webm`], a port of Playwright's recorder: fixed 25 fps
-//!   whatever the session fps, the last frame held for at least a second, VP8
-//!   with Playwright's ffmpeg arguments. The manifest duration is the session
-//!   wall clock, as in TS, not the video's length.
+//!   [`write_recorder_webm`], which keeps Playwright's timeline: fixed 25 fps
+//!   whatever the session fps, the last frame held for at least a second.
+//!   The manifest duration is the session wall clock, as in TS, not the
+//!   video's length.
+//! - Picture quality is deliberately higher than TS: the page is recorded at
+//!   2 device pixels per CSS pixel from lossless screencast frames, as
+//!   constant-quality VP9 with explicit BT.709 colour. The video and poster
+//!   are therefore twice `size` in pixels. (Playwright: 1x, quality-90 JPEG
+//!   frames, realtime VP8 at 1 Mbit/s.)
 //! - Playwright bundles its own ffmpeg; this uses the one on PATH. Without
 //!   it, the screencast is resampled to the session fps ([`resample_frames`])
 //!   and `session.stop` encodes it with the Chromium fallback, so the duration
@@ -51,6 +56,11 @@ const DEMO_HTML: &str = r#"<!doctype html>
           <div>astroshot-movie browser</div>
         </body></html>"#;
 
+/// Device pixels per CSS pixel for the recording and its poster. TS recorded
+/// at 1; stills are captured at 2, and text in a 1x video is soft on any
+/// high-density display.
+const RECORDING_SCALE: f64 = 2.0;
+
 /// Scripts have no time limit in TS; give the helper a generous one.
 const SCRIPT_TIMEOUT: Duration = Duration::from_secs(6 * 60 * 60);
 
@@ -83,8 +93,11 @@ async fn record(
     status: Option<ManifestStatus>,
     video_dir: &Path,
 ) -> Result<MovieArtifact> {
+    // The screencast carries the window's real surface, so the density has
+    // to be the browser's own: an emulated scale only affects screenshots.
     let browser = Browser::launch(LaunchOptions {
         headed: opts.headed.unwrap_or(false),
+        args: vec![format!("--force-device-scale-factor={RECORDING_SCALE}")],
         ..Default::default()
     })
     .await?;
@@ -102,8 +115,12 @@ async fn journey(
     video_dir: &Path,
 ) -> Result<MovieArtifact> {
     let page = browser
-        .new_page(PageOptions::new(size.width, size.height).scale(1.0))
+        .new_page(PageOptions::new(size.width, size.height).scale(RECORDING_SCALE))
         .await?;
+    let page_pixels = page.device_pixels(crate::browser::Size {
+        width: size.width,
+        height: size.height,
+    });
     page.start_recording().await?;
 
     let url = opts.url.as_deref().filter(|url| !url.is_empty());
@@ -149,11 +166,7 @@ async fn journey(
     // Keep a frame so stop() has a poster fallback even if video path is set.
     movie.push_frame(&poster, FrameExtension::Png)?;
     let video_path = path_string(video_dir.join("movie.webm"));
-    let viewport = crate::browser::Size {
-        width: size.width,
-        height: size.height,
-    };
-    write_recorder_webm(&frames, idle_secs, viewport, &video_path).await?;
+    write_recorder_webm(&frames, idle_secs, page_pixels, &video_path).await?;
 
     let duration_ms = movie.elapsed_ms();
     movie
