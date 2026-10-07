@@ -39,6 +39,7 @@
 
 mod discover;
 mod record;
+mod watchdog;
 mod webm;
 
 use std::path::PathBuf;
@@ -203,6 +204,7 @@ struct BrowserInner {
     handler: JoinHandle<()>,
     user_data_dir: PathBuf,
     ws_endpoint: String,
+    watchdog: Mutex<Option<watchdog::Watchdog>>,
 }
 
 impl Drop for BrowserInner {
@@ -263,9 +265,13 @@ impl Browser {
         }
         let config = builder.build().map_err(BrowserError::Launch)?;
 
-        let (browser, mut handler) = chromiumoxide::Browser::launch(config)
+        let (mut browser, mut handler) = chromiumoxide::Browser::launch(config)
             .await
             .map_err(|e| BrowserError::Launch(format!("{e}\nExecutable: {}", exe.display())))?;
+        let watchdog = browser
+            .get_mut_child()
+            .and_then(|child| child.inner.id())
+            .map(|pid| watchdog::Watchdog::spawn(pid, &user_data_dir));
         let ws_endpoint = browser.websocket_address().clone();
         let alive = Arc::new(AtomicBool::new(true));
         let guard = AliveGuard(alive.clone());
@@ -281,6 +287,7 @@ impl Browser {
                 handler,
                 user_data_dir,
                 ws_endpoint,
+                watchdog: Mutex::new(watchdog),
             }),
         })
     }
@@ -430,6 +437,7 @@ impl Browser {
         let closed = browser.close().await.map_err(cdp);
         let _ = browser.wait().await;
         drop(browser);
+        drop(self.inner.watchdog.lock().unwrap().take());
         self.inner.alive.store(false, Ordering::SeqCst);
         let _ = std::fs::remove_dir_all(&self.inner.user_data_dir);
         closed.map(|_| ())

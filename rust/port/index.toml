@@ -1064,7 +1064,7 @@ rust = "movie_harness/sources/browser.rs"
 module = "astroshot::movie_harness::sources::browser"
 ported_at = "2026-10-06T22:15:33Z"
 ts_base = "9b6b14283733a2a00cc83f0e46b758cc8fd4f36d"
-notes = "recordVideo → CDP screencast resampled to session fps and encoded by session.stop (duration is the encoded video's); scriptPath runs in the node helper via playwright-core connectOverCDP (browser-script); options are {session, browser}"
+notes = "recordVideo → CDP screencast through browser::record (port of Playwright FfmpegVideoRecorder: 25 fps, ≥1 s closing hold, VP8); durationMs = session.elapsedMs() as TS; window fitted to viewport; without ffmpeg the frames are resampled to session fps and encoded by session.stop; scriptPath runs in the node helper via playwright-core connectOverCDP (browser-script); options are {session, browser}"
 
 [module.ts_blobs]
 "packages/movie-harness/src/sources/browser.ts" = "48670fdb2e26cd1cf13beebfb021f5e506743b43"

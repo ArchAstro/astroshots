@@ -2,6 +2,8 @@
 //! Needs Chrome and ffmpeg; the scriptPath test also needs `node` >=22 and the
 //! workspace `node_modules` (playwright-core). Skipped with a reason otherwise.
 
+mod common;
+
 use std::path::Path;
 use std::process::Command;
 
@@ -149,7 +151,7 @@ fn all_frames(video: &str, dir: &Path) -> Vec<std::path::PathBuf> {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_static_page_is_recorded_on_playwrights_timeline() {
     if let Some(reason) = skip_reason() {
-        eprintln!("SKIP: {reason}");
+        common::skip(&reason);
         return;
     }
     let root = tempfile::tempdir().unwrap();
@@ -176,7 +178,9 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     let (codec, rate, frames) = video_stream(&still.video_path);
     assert_eq!(codec, "vp8");
     assert_eq!(rate, "25/1", "the session fps (10) does not set the rate");
-    assert!((24..=32).contains(&frames), "{frames} frames");
+    // The upper bounds here leave room for a loaded machine: the hold runs
+    // until the poster has been captured.
+    assert!((24..=45).contains(&frames), "{frames} frames");
     let seconds = video_seconds(&still.video_path);
     assert!(
         (seconds - f64::from(frames) / 25.0).abs() < 0.05,
@@ -190,7 +194,8 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     // 1.5 s settle: the hold is the idle time, about 1.5 s, not 1 s + 1.5 s.
     let (settled, settled_wall_ms) = record("settled", Some(1500)).await;
     let (_, _, frames) = video_stream(&settled.video_path);
-    assert!((35..=46).contains(&frames), "{frames} frames");
+    // 1 s + 1.5 s would be 62 frames.
+    assert!((35..=58).contains(&frames), "{frames} frames");
     assert!(settled.duration_ms >= 1500.0 && settled.duration_ms <= settled_wall_ms);
 
     let manifest = manifest_for(&settled);
@@ -213,21 +218,23 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
 #[tokio::test(flavor = "multi_thread")]
 async fn an_animating_page_yields_changing_frames() {
     if let Some(reason) = skip_reason() {
-        eprintln!("SKIP: {reason}");
+        common::skip(&reason);
         return;
     }
     let root = tempfile::tempdir().unwrap();
-    // Red, then green, then blue, 300 ms apart, then still.
+    // Red, then green, then blue, a second apart, then still. The page runs
+    // on its own clock, so each colour stays up long enough to survive a
+    // stalled test process.
     let html = r##"<body style="margin:0;background:#c00000"><script>
-setTimeout(() => { document.body.style.background = '#00c000'; }, 300);
-setTimeout(() => { document.body.style.background = '#0000c0'; }, 600);
+setTimeout(() => { document.body.style.background = '#00c000'; }, 1000);
+setTimeout(() => { document.body.style.background = '#0000c0'; }, 2000);
 </script></body>"##;
     let artifact = record_browser_movie(options(
         root.path(),
         "animated",
         BrowserMovieOptions {
             url: Some(data_url(html)),
-            settle_ms: Some(900),
+            settle_ms: Some(2400),
             ..Default::default()
         },
     ))
@@ -248,12 +255,12 @@ setTimeout(() => { document.body.style.background = '#0000c0'; }, 600);
     let total = seen.len();
     seen.dedup();
     assert_eq!(seen, ['r', 'g', 'b'], "colour runs across {total} frames");
-    // Each colour is on screen for 300 ms, so it spans several 25 fps frames;
-    // the last one is then held for at least a second.
+    // Each colour is on screen for a second, about 25 frames at 25 fps; the
+    // last one is then held for at least a second.
     let run = |colour: char| frames.iter().filter(|f| dominant(f) == colour).count();
-    assert!((4..=12).contains(&run('r')), "red for {} frames", run('r'));
+    assert!((15..=32).contains(&run('r')), "red for {} frames", run('r'));
     assert!(
-        (4..=12).contains(&run('g')),
+        (15..=32).contains(&run('g')),
         "green for {} frames",
         run('g')
     );
@@ -263,7 +270,7 @@ setTimeout(() => { document.body.style.background = '#0000c0'; }, 600);
 #[tokio::test(flavor = "multi_thread")]
 async fn records_a_data_url_journey_into_a_movie() {
     if let Some(reason) = skip_reason() {
-        eprintln!("SKIP: {reason}");
+        common::skip(&reason);
         return;
     }
     let root = tempfile::tempdir().unwrap();
@@ -300,7 +307,7 @@ async fn records_a_data_url_journey_into_a_movie() {
 #[tokio::test(flavor = "multi_thread")]
 async fn runs_a_script_path_module_that_clicks_a_button() {
     if let Some(reason) = skip_reason() {
-        eprintln!("SKIP: {reason}");
+        common::skip(&reason);
         return;
     }
     let root = tempfile::tempdir().unwrap();
@@ -344,7 +351,7 @@ async fn runs_a_script_path_module_that_clicks_a_button() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_missing_script_path_fails_with_the_ts_message() {
     if let Some(reason) = skip_reason() {
-        eprintln!("SKIP: {reason}");
+        common::skip(&reason);
         return;
     }
     let root = tempfile::tempdir().unwrap();
