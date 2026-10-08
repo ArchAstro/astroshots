@@ -178,11 +178,87 @@ jobs:
 
       - name: Clippy
         working-directory: rust
-        run: cargo clippy -p astroshot --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
         working-directory: rust
-        run: cargo test -p astroshot --no-fail-fast
+        run: cargo test --workspace --no-fail-fast
+
+  rust-target-check:
+    # archdev links the astroshot-engine and astroshot-review crates into a
+    # binary released for these seven targets. `cargo check` needs only the target's std, no cross linker, so
+    # each triple is checked on a runner of the same OS family. It proves the
+    # crates compile; linking and execution are covered by the `rust` and
+    # `rust-windows` jobs and by archdev's release workflow.
+    name: cargo check ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: x86_64-apple-darwin, os: macos-15 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest }
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: ${{ matrix.target }}
+
+      - name: Check
+        working-directory: rust
+        run: cargo check --workspace --locked --target ${{ matrix.target }}
+
+  rust-windows:
+    # One real Windows execution: the PTY still tests drive the built binary
+    # through ConPTY and rasterize the result to PNG.
+    name: Rust astroshot PTY stills on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      ASTROSHOT_REQUIRE_TOOLS: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace packages the fixtures import
+        run: npm run build --workspaces --if-present
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: PTY still tests
+        working-directory: rust
+        run: cargo test -p astroshot --test tui_shot_cli --no-fail-fast
 
   test:
     name: macOS app
