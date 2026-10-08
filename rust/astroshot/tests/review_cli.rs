@@ -20,8 +20,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use alacritty_terminal::term::TermMode;
-use astroshot::raster::HeadlessTerminal;
-use astroshot::tui_shot::kitty_graphics::{
+use astroshot_engine::raster::HeadlessTerminal;
+use astroshot_engine::tui_shot::kitty_graphics::{
     GraphicsOverlay, KittyGraphicsTracker, KittyTrackerOptions,
 };
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
@@ -472,6 +472,50 @@ fn ingests_a_new_capture_while_running_and_shows_friction_logs() {
         let review = read_review(&sidecar);
         assert_eq!(review["run_id"], "20260811T153000Z");
         assert_eq!(review["reviews"]["log.jsonl"]["decision"], "seen");
+    }));
+
+    session.close();
+    if let Err(panic) = body {
+        std::panic::resume_unwind(panic);
+    }
+}
+
+#[test]
+fn lists_user_stories_from_stories_and_the_legacy_friction_logs_under_one_tab() {
+    let root = temp_root();
+    let cache_dir = root.path().join(".cache");
+    seed_root(root.path());
+    let astroshot = root.path().join("demo-app/.astroshot");
+    for (tree, slug) in [
+        ("stories", "checkout-flow"),
+        ("friction-logs", "legacy-signup"),
+    ] {
+        let story = astroshot.join(tree).join(slug);
+        let run = story.join("runs/20260811T153000Z");
+        fs::create_dir_all(&run).unwrap();
+        fs::write(story.join("prompt.md"), format!("# {slug}\n")).unwrap();
+        fs::write(
+            run.join("log.jsonl"),
+            "{\"step\":1,\"id\":\"a\",\"title\":\"Step\"}\n",
+        )
+        .unwrap();
+    }
+    let mut session = launch(root.path(), &cache_dir);
+
+    let body = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let session = &session;
+        session.wait_for_screen("2 User stories", "the User stories tab");
+        session.write("2");
+        session.wait_for("both stories", |s| {
+            let screen = s.screen();
+            screen.contains("Checkout Flow") && screen.contains("Legacy Signup")
+        });
+        // The reserved directories are never features in the Shots stream.
+        session.write("1");
+        session.wait_for_screen("Unseen (3)", "the Shots stream");
+        let screen = session.screen();
+        assert!(!screen.contains("checkout-flow"), "{screen}");
+        assert!(!screen.contains("legacy-signup"), "{screen}");
     }));
 
     session.close();

@@ -1,12 +1,8 @@
-//! Astroshots tooling, ported from the TypeScript packages under
-//! `packages/`. Module layout mirrors the TS tree; see `rust/PORTING.md`.
+//! The `astroshot` command line: argument parsers, help text, argv[0]
+//! personalities, `doctor`, `demo` and `init`, on top of `astroshot-engine`
+//! (capture, stills, movies, review store) and `astroshot-review` (the tray).
+//! Module layout mirrors `packages/*/src/cli.ts` and `packages/astroshot/bin`;
+//! see `rust/PORTING.md`.
 
-pub mod astroshot_review;
 pub mod bin;
-pub mod browser;
-pub mod movie_harness;
-pub mod node_helper;
-pub mod raster;
-pub mod react_shot;
-pub mod tui_shot;
-pub mod video_encode;
+pub mod cli;

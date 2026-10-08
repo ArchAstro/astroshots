@@ -10,7 +10,7 @@
 //! Doctor differs from the TS bin in these disclosed ways, asserted below:
 //! - two extra checks, `astroshot` (required) and `node-helper`;
 //! - `node` is optional (`required: false`): only React and Ink shots use it;
-//! - `chromium` reports the Chrome `astroshot::browser::find_chrome` finds,
+//! - `chromium` reports the Chrome `astroshot_engine::browser::find_chrome` finds,
 //!   not Playwright's managed Chromium;
 //! - `demo-fixtures` remediation points at the releases page instead of
 //!   `npm install --global @archastro/astroshot`.
@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use astroshot::bin::doctor::check_watch_coverage;
-use astroshot::bin::mac_preferences::{
+use astroshot_review::mac_preferences::{
     CoverageState, PreferenceDomain, PreferenceOptions, ReadWatchConfigurationOptions,
     evaluate_watch_coverage, preference_tools_available, read_watch_configuration,
 };
@@ -120,7 +120,7 @@ fn matches(pattern: &str, text: &str) -> bool {
 /// Run one of the repository's contract scripts with Node. Prints SKIP when
 /// Node is missing; the Rust assertions around the call still run.
 fn assert_contract_script(script: &str, argument: &Path) {
-    let node = match astroshot::node_helper::find_node() {
+    let node = match astroshot_engine::node_helper::find_node() {
         Ok(node) => node,
         Err(error) => {
             common::skip(format!("scripts/{script}: {error}"));
@@ -395,7 +395,7 @@ fn doctor_reports_every_check_with_pass_fail_and_a_remediation_line() {
     // launch, not Playwright's managed Chromium.
     let chromium = check(&report, "chromium");
     assert_eq!(chromium["required"], false);
-    match astroshot::browser::find_chrome() {
+    match astroshot_engine::browser::find_chrome() {
         Ok(path) => {
             assert_eq!(chromium["status"], "pass");
             assert_eq!(chromium["detail"], path.display().to_string());

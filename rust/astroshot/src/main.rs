@@ -16,9 +16,13 @@ fn main() -> ExitCode {
 
     // Hidden subcommand: pty-shot re-execs this binary as the PTY exit
     // wrapper. It builds its own runtime, so it runs before ours.
-    if argv.get(1).map(String::as_str) == Some("__pty-exit-wrapper") {
+    if argv.get(1).map(String::as_str) == Some(astroshot_engine::self_exec::PTY_EXIT_WRAPPER_ARG) {
         let mut stdout = std::io::stdout();
-        let code = astroshot::tui_shot::pty_exit_wrapper::run(&argv[2..], &mut stdout);
+        let code = astroshot_engine::self_exec::run_pty_exit_wrapper(
+            &argv[2..],
+            &mut stdout,
+            &mut std::io::stderr(),
+        );
         let _ = stdout.flush();
         return exit_code(code);
     }

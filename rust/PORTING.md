@@ -1,27 +1,47 @@
 # Porting astroshots to Rust
 
-The TypeScript packages under `packages/` are being ported to one Rust crate,
-`rust/astroshot`, module by module with [rustify](https://github.com/ArchAstro/rustify).
-`rustify.toml` at the repository root defines the scope; port state lives in
-`rust/port/`.
+The TypeScript packages under `packages/` are being ported to three Rust
+crates in `rust/`, module by module. `rustify.toml` at the repository root
+defines the scope; port state lives in `rust/port/`.
 
 ```bash
-rustify status            # progress
-rustify next --brief      # what to port next, and how
-rustify done <ts file> --test <ts test>
-rustify check
-cd rust && cargo test && cargo clippy --all-targets -- -D warnings
+cd rust && cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+Port state convention: in `rust/port/index.toml`, `rust =` is a path relative
+to `rust/` that starts with the crate directory (for example
+`astroshot-engine/src/movie_harness/sink.rs`), and `module =` and symbol
+values start with the crate name (`astroshot_engine::`, `astroshot_review::`
+or `astroshot::`).
+
+## Crates
+
+The engine and the tray are libraries that other Rust programs link (archdev
+exposes them as `archdev shots …` with its own commands and help). The
+`astroshot` CLI is a consumer of those libraries, so everything that depends on
+a program name lives there.
+
+| Crate | Directory | Holds | Rule |
+|---|---|---|---|
+| `astroshot-engine` | `rust/astroshot-engine` | rasterizer, PTY and Ink stills, React shots and batches, browser driver, movie session, encode and sources, manifest sink (`sink_movie`, `sink_still`), `.astroshot/` readers and the review store (`review_data`), user-story readers, Node helper, `self_exec` | No argv parsing, no help text, no CLI output, no `process::exit`, no program name. Typed results and errors. |
+| `astroshot-review` | `rust/astroshot-review` | the ratatui tray (`run_tray`, `TrayOptions`), terminal graphics, watcher, index cache, video playback, `mac_preferences` | Depends on the engine. Prints nothing. |
+| `astroshot` | `rust/astroshot` | the `astroshot` binary: argument parsers, `const HELP` text, argv[0] personalities, `doctor`, `demo`, `init` | Output bytes and exit codes are a contract (see below). |
+
+The one process-level hook is `astroshot_engine::self_exec`: on Windows the PTY
+stills run the target under the current program re-executed with a hidden
+`__pty-exit-wrapper` argument. A host sets `set_self_exec_prefix` and routes
+that subcommand to `run_pty_exit_wrapper`; the `astroshot` binary uses the
+defaults.
 
 ## Scope
 
 | Package | Ports to | Notes |
 |---|---|---|
 | `@archastro/astroshot` (`bin/*.mjs`) | `astroshot::bin::*` | The `astroshot` CLI. Lands in `src/bin/` as ordinary modules (`autobins = false`). |
-| `@archastro/astroshot-review` | `astroshot::astroshot_review` | Terminal review tray. Ink → ratatui. |
-| `@archastro/movie-harness` | `astroshot::movie_harness` | Movie capture and encoding. |
-| `@archastro/tui-shot` | `astroshot::tui_shot` | Terminal screenshots. |
-| `@archastro/react-shot` | `astroshot::react_shot` | Browser component screenshots. |
+| `@archastro/astroshot-review` | `astroshot_review::*`, `astroshot_engine::review_data`, `astroshot::cli::review` | Terminal review tray (Ink → ratatui). `src/data` splits: the `.astroshot/` readers and writers are the engine's `review_data`; store, watcher and index cache stay with the tray. `cli.ts` is `astroshot::cli::review`. |
+| `@archastro/movie-harness` | `astroshot_engine::movie_harness`, `astroshot::cli::movie` | Movie capture and encoding. `cli.ts` and `source-help.ts` are in the CLI crate. |
+| `@archastro/tui-shot` | `astroshot_engine::tui_shot`, `astroshot::cli::tui_shot` | Terminal screenshots. Batch manifests are `tui_shot::batch`. |
+| `@archastro/react-shot` | `astroshot_engine::react_shot`, `astroshot::cli::react_shot` | Browser component screenshots. Batch manifests are `react_shot::batch`. |
 | `astroshot-unscoped`, `macos/`, `scripts/`, `skills/` | not ported | npm packaging, the Swift app, repo tooling. |
 
 One binary, `astroshot`, replaces the five npm bins (`astroshot`,
@@ -35,15 +55,15 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
    runtime, so a small Node helper (`rust/node-helper/`) does only that:
    load config and fixtures, serve React fixtures with vite, render Ink
    fixtures to ANSI frames. Rust spawns it and talks JSON over stdio
-   (`astroshot::node_helper`). TS modules whose job moves into the helper are
+   (`astroshot_engine::node_helper`). TS modules whose job moves into the helper are
    recorded with `rustify replace <file> --with "node helper: <command>"`.
    Everything else (CLI, orchestration, PTY capture, rasterizing, encoding,
    review tray, on-disk contract) is Rust. Node is required only for React
    and Ink shots.
 2. **No Playwright.**
    - Real browser work (React shots, browser movie sources) uses
-     `chromiumoxide` over CDP (`astroshot::browser`).
-   - Terminal frames are rasterized natively (`astroshot::raster`): a
+     `chromiumoxide` over CDP (`astroshot_engine::browser`).
+   - Terminal frames are rasterized natively (`astroshot_engine::raster`): a
      `alacritty_terminal` grid → glyphs with `cosmic-text` → `tiny-skia` → PNG, using a
      bundled monospace font. TS turned terminals into HTML and screenshotted
      them in Chromium; the Rust output is a different pixel image of the same
@@ -119,12 +139,14 @@ subcommands. Each subcommand's flags, output, and exit codes match its TS bin.
 
 ## Working rules for batch ports
 
-- Do not edit `rust/astroshot/Cargo.toml`. If a crate is missing, say so in
+- Do not edit the `Cargo.toml` files. If a crate is missing, say so in
   your report; the lead adds it.
 - Add `mod` lines for your files to their parent `mod.rs` / `lib.rs`; the lead
   merges parallel edits.
 - Shared infrastructure (`node_helper`, `browser`, `raster`) is owned by its
   module; call it, don't re-implement it.
 - Write deliberate divergences from TS into the `notes` of `rustify done`.
-- Before finishing: `cargo test -p astroshot`, `cargo clippy -p astroshot
+- Before finishing: `cargo test --workspace`, `cargo clippy --workspace
   --all-targets -- -D warnings`, `cargo fmt --all`.
+- A function with logic goes in a library crate with a typed request, result
+  and error; the CLI crate parses, prints and maps the result to an exit code.

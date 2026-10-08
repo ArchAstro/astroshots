@@ -15,7 +15,7 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use astroshot::node_helper::find_node;
+use astroshot_engine::node_helper::find_node;
 
 const BIN: &str = env!("CARGO_BIN_EXE_astroshot");
 

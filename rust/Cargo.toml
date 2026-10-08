@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["astroshot"]
+members = ["astroshot", "astroshot-engine", "astroshot-review"]
 
 [workspace.package]
 version = "0.2.2"

@@ -1,0 +1,36 @@
+# Astroshots review tray (ratatui) as a library. Depends on the engine; a host
+# program calls `run_tray`. See ../PORTING.md.
+[package]
+name = "astroshot-review"
+description = "Astroshots review tray, ported from TypeScript"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+astroshot-engine = { path = "../astroshot-engine" }
+anyhow = "1"
+base64 = "0.22"
+chrono = "0.4"
+crossterm = { version = "0.28", features = ["event-stream"] }
+dirs = "6"
+futures = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+notify = "8"
+png = "0.17"
+ratatui = "0.29"
+rayon = "1"
+regex = "1"
+rustix = { version = "1", features = ["event", "stdio", "termios", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

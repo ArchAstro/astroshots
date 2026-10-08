@@ -11,9 +11,9 @@
 //! |---|---|
 //! | `astroshot` | new first check: the astroshot binary version (TS reported npm package versions only through the install itself) |
 //! | `node` | now optional: Node is needed only for React and Ink shots; probes `node --version` |
-//! | `node-helper` | new: whether `astroshot::node_helper::find_helper` finds `helper.mjs` |
+//! | `node-helper` | new: whether `astroshot_engine::node_helper::find_helper` finds `helper.mjs` |
 //! | `demo-fixtures` | remediation points at the release page (the demo payload is embedded) |
-//! | `chromium` | `astroshot::browser::find_chrome()` replaces Playwright's `executablePath()` |
+//! | `chromium` | `astroshot_engine::browser::find_chrome()` replaces Playwright's `executablePath()` |
 //! | `screen-recording` | probes by re-running this binary as `astroshot movie check-screen-access` |
 //!
 //! Every side effect goes through [`Host`], so tests inject the environment,
@@ -26,7 +26,7 @@ use anyhow::{Result, bail};
 use serde_json::{Map, Value, json};
 
 use super::demo::load_demo_fixtures;
-use super::mac_preferences::{
+use astroshot_review::mac_preferences::{
     ASTROSHOTS_DOMAIN, CoverageState, ReadWatchConfigurationOptions, WatchConfiguration,
     WatchCoverage, evaluate_watch_coverage, preference_tools_available, read_watch_configuration,
 };
@@ -79,7 +79,7 @@ pub trait Host {
     fn node_version(&self) -> std::result::Result<String, String>;
     /// Path of the node helper script, or the lookup error text.
     fn node_helper(&self) -> std::result::Result<PathBuf, String>;
-    /// `astroshot::browser::find_chrome()`.
+    /// `astroshot_engine::browser::find_chrome()`.
     fn chrome(&self) -> std::result::Result<PathBuf, String>;
     fn read_watch_configuration(&self) -> WatchConfiguration;
     /// The `astroshot movie check-screen-access` probe.
@@ -114,7 +114,7 @@ impl Host for SystemHost {
     }
 
     fn node_version(&self) -> std::result::Result<String, String> {
-        let node = crate::node_helper::find_node().map_err(|error| error.to_string())?;
+        let node = astroshot_engine::node_helper::find_node().map_err(|error| error.to_string())?;
         let output = Command::new(&node)
             .arg("--version")
             .stdin(Stdio::null())
@@ -128,11 +128,11 @@ impl Host for SystemHost {
     }
 
     fn node_helper(&self) -> std::result::Result<PathBuf, String> {
-        crate::node_helper::find_helper().map_err(|error| error.to_string())
+        astroshot_engine::node_helper::find_helper().map_err(|error| error.to_string())
     }
 
     fn chrome(&self) -> std::result::Result<PathBuf, String> {
-        crate::browser::find_chrome().map_err(|error| error.to_string())
+        astroshot_engine::browser::find_chrome().map_err(|error| error.to_string())
     }
 
     fn read_watch_configuration(&self) -> WatchConfiguration {

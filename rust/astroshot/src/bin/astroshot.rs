@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use crate::bin::demo::{demo_help, run_demo};
 use crate::bin::doctor::{doctor_help, run_doctor};
-use crate::bin::mac_preferences::{ReadWatchConfigurationOptions, read_watch_configuration};
 use crate::bin::templates::{WriteFixtureTemplateOptions, write_fixture_template};
+use astroshot_review::mac_preferences::{ReadWatchConfigurationOptions, read_watch_configuration};
 
 const HELP: &str = r#"astroshot — one CLI for React, Ink, PTY stills, and movies
 
@@ -146,7 +146,7 @@ async fn run_engine(mode: &str, args: &[String]) -> i32 {
         forwarded.extend_from_slice(args);
         // One CLI serves both terminal modes, as the TS `tui-shot` bin did:
         // `pty` is its own subcommand there.
-        return crate::tui_shot::cli::run(&forwarded).await;
+        return crate::cli::tui_shot::run(&forwarded).await;
     }
     let normalized: Vec<String> = if args.first().is_some_and(|first| is_ts_fixture(first)) {
         std::iter::once("shot".to_string())
@@ -156,9 +156,9 @@ async fn run_engine(mode: &str, args: &[String]) -> i32 {
         args.to_vec()
     };
     if mode == "react" {
-        crate::react_shot::cli::run(&normalized).await
+        crate::cli::react_shot::run(&normalized).await
     } else {
-        crate::tui_shot::cli::run(&normalized).await
+        crate::cli::tui_shot::run(&normalized).await
     }
 }
 
@@ -217,7 +217,7 @@ async fn run_review(args: &[String]) -> i32 {
             forwarded.push("app".into());
         }
     }
-    crate::astroshot_review::cli::run(&forwarded).await
+    crate::cli::review::run(&forwarded).await
 }
 
 /// Run the dispatcher. `args` is argv after the program name; returns the
@@ -251,7 +251,7 @@ pub async fn run(args: &[String]) -> i32 {
             let forwarded: Vec<String> = std::iter::once(command.to_string())
                 .chain(rest.iter().cloned())
                 .collect();
-            crate::react_shot::cli::run(&forwarded).await
+            crate::cli::react_shot::run(&forwarded).await
         }
         "init" => match run_init(rest) {
             Ok(code) => code,
@@ -269,7 +269,7 @@ pub async fn run(args: &[String]) -> i32 {
             run_engine(mode, rest).await
         }
         "review" | "tray" => run_review(rest).await,
-        "movie" => crate::movie_harness::cli::run_cli(rest).await,
+        "movie" => crate::cli::movie::run_cli(rest).await,
         _ => {
             eprintln!("Unknown command: {command}");
             println!("{HELP}");
@@ -335,10 +335,10 @@ pub async fn run_argv(argv: &[String]) -> i32 {
     let program = argv.first().map(String::as_str).unwrap_or("astroshot");
     let rest = argv.get(1..).unwrap_or(&[]);
     match package_bin_for_program(program) {
-        Some(PackageBin::Review) => crate::astroshot_review::cli::run(rest).await,
-        Some(PackageBin::Movie) => crate::movie_harness::cli::run_cli(rest).await,
-        Some(PackageBin::ReactShot) => crate::react_shot::cli::run(rest).await,
-        Some(PackageBin::TuiShot) => crate::tui_shot::cli::run(rest).await,
+        Some(PackageBin::Review) => crate::cli::review::run(rest).await,
+        Some(PackageBin::Movie) => crate::cli::movie::run_cli(rest).await,
+        Some(PackageBin::ReactShot) => crate::cli::react_shot::run(rest).await,
+        Some(PackageBin::TuiShot) => crate::cli::tui_shot::run(rest).await,
         None => run(rest).await,
     }
 }
