@@ -33,6 +33,25 @@ stills run the target under the current program re-executed with a hidden
 that subcommand to `run_pty_exit_wrapper`; the `astroshot` binary uses the
 defaults.
 
+## Rust-only additions
+
+These have no TS original. Their reference is the bash helper
+`skills/astroshots-review/scripts/astroshot-capture` and the contract in
+`docs/contract.md`; `port/index.toml` has no entries for them.
+
+| Item | Where | Reference and differences |
+|---|---|---|
+| `sink_still`, `SinkStillRequest`, `SinkStillResult` | `movie_harness::sink` | `--source` of the helper. Same lock, sequence, run rules, in-place manifest edit and key order. Image check: the helper's signature/header/terminator checks, plus a full decode for PNG (`png` crate); the helper also decodes every format through `sips`/`magick`/`identify` when installed, which the engine does not (JPEG, GIF and WebP are structural only). Rejects `stories` and `friction-logs` (the helper does not). A generated run id that equals the manifest's current one gets a `-2`, `-3` suffix. |
+| `finalize_current_run`, `FinalizeCurrentRunResult` | `movie_harness::sink` | `--status <s> --finalize` without `--run-id`. |
+| `CaptureLock`, `parse_lock_timeout_seconds`, `DEFAULT_LOCK_TIMEOUT` | `movie_harness::capture_lock` | The helper's `.capture.lock` directory, `pid` file, 100 ms poll, stale-owner report. The engine never reads `ASTROSHOT_LOCK_TIMEOUT_SECONDS`; a host maps it with `parse_lock_timeout_seconds`. `sink_movie`, `finalize_manifest` and the two above take the lock too (`*_with_lock_timeout` variants set the wait). |
+| `assert_still_slug` | `movie_harness::paths` | Slug rule of stills, `^[a-z0-9][a-z0-9_-]*$` (the helper's). Movies keep `assert_slug`, which rejects `_`. |
+| `merge_reviews`, `ReviewMergeRequest`, `ReviewMergeEntry`, `ReviewMergeOutcome` | `review_data::review_store` | Merge of reviews made elsewhere: later `reviewed_at` wins, comments union by id, run id change resets. Uses the existing writer. |
+
+Left as is: `sink_movie` (like `sink.ts`) writes a fresh manifest when a movie
+starts a new run, while the bash helper edits the old manifest in place. A movie
+that starts a new run therefore drops the previous manifest's `description` and
+unknown keys; a still that starts a new run keeps them.
+
 ## Scope
 
 | Package | Ports to | Notes |

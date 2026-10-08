@@ -468,14 +468,25 @@ async fn mutate_review_document<T>(
     directory: &str,
     mut mutate: impl FnMut(&mut ReviewDocument) -> T,
 ) -> Result<T> {
+    mutate_review_document_if(directory, |document| (mutate(document), true)).await
+}
+
+/// [`mutate_review_document`] where the closure also says whether the
+/// document changed; an unchanged document is not written.
+async fn mutate_review_document_if<T>(
+    directory: &str,
+    mut mutate: impl FnMut(&mut ReviewDocument) -> (T, bool),
+) -> Result<T> {
     let target = Path::new(directory).join(REVIEW_FILE);
     for _attempt in 0..5 {
         let (mut document, stamp) = load_for_write(directory).await?;
-        let result = mutate(&mut document);
+        let (result, write) = mutate(&mut document);
         if stamp != stamp_of(&target).await {
             continue;
         }
-        write_review_document(directory, &document).await?;
+        if write {
+            write_review_document(directory, &document).await?;
+        }
         return Ok(result);
     }
     Err(anyhow!(
@@ -585,6 +596,153 @@ pub async fn add_comment(
         None
     };
     Ok(snapshot_from_entry(Some(&entry), sha.as_deref()))
+}
+
+// ------------------------------------------------------------------- merge
+
+/// Reviews of one image made elsewhere, to merge into this machine's
+/// `review.json`. Unlike [`mark_seen`] and [`add_comment`], which stamp the
+/// current time and invent comment ids, everything here is written as given.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ReviewMergeEntry {
+    /// Key inside `reviews` (the image file name).
+    pub file_name: String,
+    pub decision: Option<String>,
+    /// When the decision was made (`2026-01-02T03:04:05Z`).
+    pub reviewed_at: Option<String>,
+    /// Hash of the image the decision was made on.
+    pub image_sha256: Option<String>,
+    pub comments: Vec<StoredComment>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ReviewMergeRequest {
+    /// Directory holding `review.json` (the feature directory).
+    pub directory: String,
+    /// The manifest's `run_id` the entries belong to. A different one than the
+    /// file's replaces the review map, as for [`mark_seen`]; `None` leaves the
+    /// run alone.
+    pub run_id: Option<String>,
+    pub entries: Vec<ReviewMergeEntry>,
+    /// Stamped into `updated_at` when the file changes; defaults to now.
+    pub now: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReviewMergeOutcome {
+    /// Whether `review.json` was rewritten. Nothing is written when the merge
+    /// changes nothing.
+    pub changed: bool,
+    /// The file's run id differed and the existing review map was replaced.
+    pub run_reset: bool,
+    /// Decisions taken from the request (new, or with a later `reviewed_at`).
+    pub decisions_applied: usize,
+    /// Comments added (ids not yet present).
+    pub comments_added: usize,
+}
+
+/// Parse an RFC 3339 timestamp; used to order `reviewed_at` and `created_at`.
+fn parse_time(text: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(text)
+        .ok()
+        .map(|time| time.with_timezone(&Utc))
+}
+
+/// Order two timestamps by instant, or as text when either does not parse.
+fn compare_times(left: &str, right: &str) -> std::cmp::Ordering {
+    match (parse_time(left), parse_time(right)) {
+        (Some(left), Some(right)) => left.cmp(&right),
+        _ => left.cmp(right),
+    }
+}
+
+/// Whether a decision made at `incoming` replaces one made at `existing`.
+fn is_later(incoming: Option<&str>, existing: Option<&str>) -> bool {
+    match (incoming, existing) {
+        (None, _) => false,
+        (Some(_), None) => true,
+        (Some(incoming), Some(existing)) => {
+            compare_times(incoming, existing) == std::cmp::Ordering::Greater
+        }
+    }
+}
+
+/// Merge reviews made elsewhere into a feature's `review.json`:
+///
+/// - a `run_id` that differs from the file's resets the review map first;
+/// - a decision (with its `reviewed_at` and `image_sha256`, taken together)
+///   replaces the stored one only when its `reviewed_at` is later, or when
+///   there is no stored decision; an equal or earlier one is ignored;
+/// - comments are unioned by `id`: stored comments are never dropped or
+///   edited, new ones are added and the list is ordered by `created_at`
+///   (stable, so equal times keep stored-first order);
+/// - the file is written like every other review write (sorted keys, atomic
+///   replace, re-read when another writer changed it meanwhile), and only when
+///   something changed.
+///
+/// Fails when `review.json` is not valid JSON or has an unsupported version.
+pub async fn merge_reviews(request: &ReviewMergeRequest) -> Result<ReviewMergeOutcome> {
+    mutate_review_document_if(&request.directory, |document| {
+        let before = document.clone();
+        let mut outcome = ReviewMergeOutcome::default();
+        let reset_target = request.run_id.as_deref();
+        outcome.run_reset =
+            reset_target.is_some_and(|run_id| document.run_id.as_deref() != Some(run_id));
+        reset_reviews_if_needed(document, reset_target);
+
+        for incoming in &request.entries {
+            let has_decision = incoming.decision.is_some();
+            if !has_decision && incoming.comments.is_empty() {
+                continue;
+            }
+            let mut entry = document
+                .reviews
+                .get(&incoming.file_name)
+                .cloned()
+                .unwrap_or_default();
+            if has_decision
+                && (entry.decision.is_none()
+                    || is_later(
+                        incoming.reviewed_at.as_deref(),
+                        entry.reviewed_at.as_deref(),
+                    ))
+            {
+                entry.decision = incoming.decision.clone();
+                entry.reviewed_at = incoming.reviewed_at.clone();
+                entry.image_sha256 = incoming.image_sha256.clone();
+                outcome.decisions_applied += 1;
+            }
+            let mut added = 0;
+            for comment in &incoming.comments {
+                let known = entry
+                    .comments
+                    .as_ref()
+                    .is_some_and(|comments| comments.iter().any(|stored| stored.id == comment.id));
+                if !known {
+                    entry
+                        .comments
+                        .get_or_insert_with(Vec::new)
+                        .push(comment.clone());
+                    added += 1;
+                }
+            }
+            if added > 0
+                && let Some(comments) = entry.comments.as_mut()
+            {
+                comments.sort_by(|a, b| compare_times(&a.created_at, &b.created_at));
+            }
+            outcome.comments_added += added;
+            document.reviews.insert(incoming.file_name.clone(), entry);
+        }
+
+        outcome.changed = *document != before;
+        if outcome.changed {
+            document.updated_at = Some(now_iso(request.now));
+        }
+        let write = outcome.changed;
+        (outcome, write)
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -994,5 +1152,419 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.to_string(), "Feedback cannot be empty");
         assert!(!dir.path().join("review.json").exists());
+    }
+
+    // merging reviews made elsewhere
+
+    fn at(text: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(text)
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    fn merge_entry(
+        file_name: &str,
+        decision: Option<&str>,
+        reviewed_at: Option<&str>,
+        sha: Option<&str>,
+        comments: Vec<StoredComment>,
+    ) -> ReviewMergeEntry {
+        ReviewMergeEntry {
+            file_name: file_name.into(),
+            decision: decision.map(str::to_string),
+            reviewed_at: reviewed_at.map(str::to_string),
+            image_sha256: sha.map(str::to_string),
+            comments,
+        }
+    }
+
+    fn merge_request(
+        directory: &Path,
+        run_id: Option<&str>,
+        entries: Vec<ReviewMergeEntry>,
+    ) -> ReviewMergeRequest {
+        ReviewMergeRequest {
+            directory: directory.to_str().unwrap().into(),
+            run_id: run_id.map(str::to_string),
+            entries,
+            now: Some(at("2026-10-01T09:00:00Z")),
+        }
+    }
+
+    async fn read_back(directory: &Path) -> ReviewDocument {
+        read_review_document(directory.to_str().unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn merge_writes_decisions_and_comments_with_exact_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let outcome = merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![
+                merge_entry(
+                    "0002-b.png",
+                    Some("seen"),
+                    Some("2026-09-30T10:00:00Z"),
+                    Some(&"b".repeat(64)),
+                    vec![comment("ID-2", "second", "2026-09-30T10:05:00Z")],
+                ),
+                merge_entry(
+                    "0001-a.png",
+                    Some("approved"),
+                    Some("2026-09-30T09:00:00Z"),
+                    Some(&"a".repeat(64)),
+                    vec![],
+                ),
+            ],
+        ))
+        .await
+        .unwrap();
+        assert_eq!(
+            outcome,
+            ReviewMergeOutcome {
+                changed: true,
+                run_reset: true,
+                decisions_applied: 2,
+                comments_added: 1,
+            }
+        );
+        let expected = format!(
+            r#"{{
+  "reviews": {{
+    "0001-a.png": {{
+      "decision": "approved",
+      "image_sha256": "{a}",
+      "reviewed_at": "2026-09-30T09:00:00Z"
+    }},
+    "0002-b.png": {{
+      "comments": [
+        {{
+          "body": "second",
+          "created_at": "2026-09-30T10:05:00Z",
+          "id": "ID-2"
+        }}
+      ],
+      "decision": "seen",
+      "image_sha256": "{b}",
+      "reviewed_at": "2026-09-30T10:00:00Z"
+    }}
+  }},
+  "run_id": "run-1",
+  "updated_at": "2026-10-01T09:00:00Z",
+  "version": 1
+}}
+"#,
+            a = "a".repeat(64),
+            b = "b".repeat(64)
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("review.json")).unwrap(),
+            expected
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_replaces_a_decision_only_with_a_later_reviewed_at() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = "0001-a.png";
+        let put = |decision: &str, at_time: &str, sha: &str| {
+            merge_request(
+                dir.path(),
+                Some("run-1"),
+                vec![merge_entry(
+                    file,
+                    Some(decision),
+                    Some(at_time),
+                    Some(sha),
+                    vec![],
+                )],
+            )
+        };
+        merge_reviews(&put("seen", "2026-09-30T10:00:00Z", "sha-1"))
+            .await
+            .unwrap();
+
+        // Earlier and equal: ignored, and the file is not rewritten.
+        let before = std::fs::read(dir.path().join("review.json")).unwrap();
+        for (decision, time) in [
+            ("approved", "2026-09-30T09:59:59Z"),
+            ("approved", "2026-09-30T10:00:00Z"),
+        ] {
+            let outcome = merge_reviews(&put(decision, time, "sha-2")).await.unwrap();
+            assert_eq!(outcome, ReviewMergeOutcome::default());
+        }
+        assert_eq!(
+            std::fs::read(dir.path().join("review.json")).unwrap(),
+            before
+        );
+
+        // Later: replaces decision, time and hash together.
+        let outcome = merge_reviews(&put("approved", "2026-09-30T10:00:01Z", "sha-3"))
+            .await
+            .unwrap();
+        assert_eq!(outcome.decisions_applied, 1);
+        let entry = &read_back(dir.path()).await.reviews[file];
+        assert_eq!(entry.decision.as_deref(), Some("approved"));
+        assert_eq!(entry.reviewed_at.as_deref(), Some("2026-09-30T10:00:01Z"));
+        assert_eq!(entry.image_sha256.as_deref(), Some("sha-3"));
+    }
+
+    #[tokio::test]
+    async fn merge_compares_reviewed_at_as_instants_across_offsets() {
+        let dir = tempfile::tempdir().unwrap();
+        let put = |time: &str| {
+            merge_request(
+                dir.path(),
+                Some("run-1"),
+                vec![merge_entry(
+                    "0001-a.png",
+                    Some("seen"),
+                    Some(time),
+                    Some("s"),
+                    vec![],
+                )],
+            )
+        };
+        merge_reviews(&put("2026-09-30T10:00:00Z")).await.unwrap();
+        // 11:00+02:00 is 09:00Z: earlier, although it sorts later as text.
+        let outcome = merge_reviews(&put("2026-09-30T11:00:00+02:00"))
+            .await
+            .unwrap();
+        assert!(!outcome.changed);
+    }
+
+    #[tokio::test]
+    async fn merge_unions_comments_by_id_and_never_drops_stored_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = "0001-a.png";
+        merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![merge_entry(
+                file,
+                None,
+                None,
+                None,
+                vec![
+                    comment("A", "first", "2026-09-30T10:00:00Z"),
+                    comment("C", "third", "2026-09-30T12:00:00Z"),
+                ],
+            )],
+        ))
+        .await
+        .unwrap();
+        // The file has a comment with no decision: the entry has no decision.
+        assert_eq!(read_back(dir.path()).await.reviews[file].decision, None);
+
+        let outcome = merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![merge_entry(
+                file,
+                None,
+                None,
+                None,
+                vec![
+                    // Known id with a different body: the stored comment stays.
+                    comment("A", "edited elsewhere", "2026-09-30T10:00:00Z"),
+                    comment("B", "second", "2026-09-30T11:00:00Z"),
+                ],
+            )],
+        ))
+        .await
+        .unwrap();
+        assert_eq!(outcome.comments_added, 1);
+        let entry = &read_back(dir.path()).await.reviews[file];
+        let comments = entry.comments.as_ref().unwrap();
+        let shape: Vec<(&str, &str)> = comments
+            .iter()
+            .map(|c| (c.id.as_str(), c.body.as_str()))
+            .collect();
+        assert_eq!(shape, [("A", "first"), ("B", "second"), ("C", "third")]);
+
+        // Merging the same set again changes nothing.
+        let again = merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![merge_entry(file, None, None, None, comments.clone())],
+        ))
+        .await
+        .unwrap();
+        assert!(!again.changed);
+    }
+
+    #[tokio::test]
+    async fn merge_keeps_stored_comments_when_a_later_decision_arrives() {
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("0001-a.png");
+        std::fs::write(&image, "x").unwrap();
+        mark_seen(
+            &request(dir.path(), "0001-a.png", Some("run-1"), &image),
+            &MarkSeenOptions {
+                comment: Some("local note".into()),
+                now: Some(at("2026-09-30T08:00:00Z")),
+            },
+        )
+        .await
+        .unwrap();
+        merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![merge_entry(
+                "0001-a.png",
+                Some("approved"),
+                Some("2026-09-30T09:00:00Z"),
+                Some("remote-sha"),
+                vec![comment("R", "remote note", "2026-09-30T09:00:00Z")],
+            )],
+        ))
+        .await
+        .unwrap();
+        let entry = &read_back(dir.path()).await.reviews["0001-a.png"];
+        assert_eq!(entry.decision.as_deref(), Some("approved"));
+        let bodies: Vec<&str> = entry
+            .comments
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|c| c.body.as_str())
+            .collect();
+        assert_eq!(bodies, ["local note", "remote note"]);
+    }
+
+    #[tokio::test]
+    async fn merge_with_a_different_run_id_resets_the_review_map() {
+        let dir = tempfile::tempdir().unwrap();
+        merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![
+                merge_entry(
+                    "0001-a.png",
+                    Some("seen"),
+                    Some("2026-09-30T10:00:00Z"),
+                    Some("s"),
+                    vec![],
+                ),
+                merge_entry(
+                    "0002-b.png",
+                    None,
+                    None,
+                    None,
+                    vec![comment("X", "old", "t")],
+                ),
+            ],
+        ))
+        .await
+        .unwrap();
+        let outcome = merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-2"),
+            vec![merge_entry(
+                "0003-c.png",
+                Some("seen"),
+                Some("2026-09-30T11:00:00Z"),
+                Some("s"),
+                vec![],
+            )],
+        ))
+        .await
+        .unwrap();
+        assert!(outcome.run_reset && outcome.changed);
+        let document = read_back(dir.path()).await;
+        assert_eq!(document.run_id.as_deref(), Some("run-2"));
+        let files: Vec<&String> = document.reviews.keys().collect();
+        assert_eq!(files, ["0003-c.png"]);
+
+        // No run id in the request: the file's run is kept.
+        merge_reviews(&merge_request(
+            dir.path(),
+            None,
+            vec![merge_entry(
+                "0004-d.png",
+                Some("seen"),
+                Some("2026-09-30T12:00:00Z"),
+                Some("s"),
+                vec![],
+            )],
+        ))
+        .await
+        .unwrap();
+        let document = read_back(dir.path()).await;
+        assert_eq!(document.run_id.as_deref(), Some("run-2"));
+        assert_eq!(document.reviews.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn merge_refuses_a_review_json_it_cannot_parse() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("review.json"), "{nope").unwrap();
+        let error = merge_reviews(&merge_request(
+            dir.path(),
+            Some("run-1"),
+            vec![merge_entry(
+                "0001-a.png",
+                Some("seen"),
+                Some("t"),
+                Some("s"),
+                vec![],
+            )],
+        ))
+        .await
+        .unwrap_err();
+        assert!(
+            error.to_string().contains("refusing to overwrite"),
+            "{error}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("review.json")).unwrap(),
+            "{nope"
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_leaves_mark_seen_and_add_comment_output_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("0001-a.png");
+        std::fs::write(&image, "png-bytes").unwrap();
+        mark_seen(
+            &request(dir.path(), "0001-a.png", Some("run-1"), &image),
+            &MarkSeenOptions {
+                comment: None,
+                now: Some(at("2026-09-05T17:42:00Z")),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("review.json")).unwrap(),
+            format!(
+                "{{\n  \"reviews\": {{\n    \"0001-a.png\": {{\n      \"decision\": \"seen\",\n      \"image_sha256\": \"{}\",\n      \"reviewed_at\": \"2026-09-05T17:42:00Z\"\n    }}\n  }},\n  \"run_id\": \"run-1\",\n  \"updated_at\": \"2026-09-05T17:42:00Z\",\n  \"version\": 1\n}}\n",
+                sha256_bytes(b"png-bytes")
+            )
+        );
+        add_comment(
+            &request(dir.path(), "0001-a.png", Some("run-1"), &image),
+            "note",
+            &AddCommentOptions {
+                current_sha256: None,
+                now: Some(at("2026-09-05T17:43:00Z")),
+            },
+        )
+        .await
+        .unwrap();
+        let text = std::fs::read_to_string(dir.path().join("review.json")).unwrap();
+        let id = regex::Regex::new(r#""id": "[0-9A-F-]{36}""#).unwrap();
+        assert_eq!(
+            id.replace_all(&text, r#""id": "ID""#),
+            format!(
+                "{{\n  \"reviews\": {{\n    \"0001-a.png\": {{\n      \"comments\": [\n        {{\n          \"body\": \"note\",\n          \"created_at\": \"2026-09-05T17:43:00Z\",\n          \"id\": \"ID\"\n        }}\n      ],\n      \"decision\": \"seen\",\n      \"image_sha256\": \"{}\",\n      \"reviewed_at\": \"2026-09-05T17:42:00Z\"\n    }}\n  }},\n  \"run_id\": \"run-1\",\n  \"updated_at\": \"2026-09-05T17:43:00Z\",\n  \"version\": 1\n}}\n",
+                sha256_bytes(b"png-bytes")
+            )
+        );
     }
 }
