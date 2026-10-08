@@ -38,8 +38,8 @@ struct FrictionLogListView: View {
                             ? "eye"
                             : "clock.arrow.circlepath",
                         isActive: appState.frictionLogFilter == .history,
-                        unseenHelp: "Show seen friction-log history",
-                        seenHelp: "Return to unseen friction logs",
+                        unseenHelp: "Show seen user story history",
+                        seenHelp: "Return to unseen user stories",
                         accessibilityIdentifier: "friction.history"
                     ) {
                         appState.frictionLogFilter =
@@ -58,7 +58,7 @@ struct FrictionLogListView: View {
                         }
                     } else {
                         ReviewedStreamView(
-                            detail: "Every current friction log has been seen.",
+                            detail: "Every current user story has been seen.",
                             accessibilityIdentifier: "friction.seen.empty"
                         ) {
                             appState.frictionLogFilter = .history
@@ -278,14 +278,14 @@ struct EmptyFrictionLogsView: View {
             VStack(spacing: 6) {
                 Text(
                     appState.hiddenFrictionLogIDs.isEmpty
-                        ? "No friction logs yet"
-                        : "All friction logs are hidden"
+                        ? "No user stories yet"
+                        : "All user stories are hidden"
                 )
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(
                     appState.hiddenFrictionLogIDs.isEmpty
-                        ? "Author a scenario with the friction-log skill, then run it. Results land under .astroshot/friction-logs/."
+                        ? "Author a story with the user-story skill, then run it. Results land under .astroshot/stories/."
                         : "Their files are still on disk. Restore them from Settings whenever you need them."
                 )
                 .font(.system(size: 11))
@@ -294,7 +294,7 @@ struct EmptyFrictionLogsView: View {
                 .padding(.horizontal, 28)
             }
             if !appState.hiddenFrictionLogIDs.isEmpty {
-                Button("Manage hidden logs") {
+                Button("Manage hidden stories") {
                     appState.openSettings()
                 }
                 .buttonStyle(.plain)
@@ -311,9 +311,9 @@ struct EmptyFrictionLogsView: View {
                     .foregroundStyle(Theme.muted)
                     .textCase(.uppercase)
                     .tracking(0.3)
-                codeLine(".astroshot/friction-logs/<slug>/prompt.md")
+                codeLine(".astroshot/stories/<slug>/prompt.md")
                 codeLine("runs/<run-id>/log.jsonl + screenshots")
-                Text("In a coding agent: use the friction-log skill → Author, then Run.")
+                Text("In a coding agent: use the user-story skill → Author, then Run.")
                     .font(.system(size: 10.5))
                     .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)

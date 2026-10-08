@@ -6,7 +6,7 @@ const SECTIONS: Array<{ title: string; keys: Array<[string, string]> }> = [
   {
     title: "Everywhere",
     keys: [
-      ["1 / 2", "Shots · Friction Logs"],
+      ["1 / 2", "Shots · User stories"],
       ["tab", "next tab"],
       [",", "settings"],
       ["r", "rescan"],
@@ -46,9 +46,9 @@ const SECTIONS: Array<{ title: string; keys: Array<[string, string]> }> = [
     ],
   },
   {
-    title: "Friction Logs",
+    title: "User stories",
     keys: [
-      ["⏎", "open log · open step"],
+      ["⏎", "open story · open step"],
       ["[ ]", "switch run · switch image"],
       ["p", "toggle prompt"],
       ["← →", "previous / next step"],

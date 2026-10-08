@@ -156,7 +156,7 @@ struct SettingsPane: View {
 
                     card {
                         HStack(spacing: 8) {
-                            Text("Hidden friction logs")
+                            Text("Hidden user stories")
                                 .font(.system(size: 12, weight: .semibold))
                             Spacer(minLength: 4)
                             if !appState.hiddenFrictionLogIDs.isEmpty {
@@ -169,13 +169,13 @@ struct SettingsPane: View {
                                 .accessibilityIdentifier("settings.hidden-friction.restore-all")
                             }
                         }
-                        Text("Hidden logs stay on disk. Astroshots saves their stable IDs locally and removes them from the normal UX.")
+                        Text("Hidden stories stay on disk. Astroshots saves their stable IDs locally and removes them from the normal UX.")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.muted)
                             .padding(.bottom, 4)
 
                         if appState.hiddenFrictionLogIDs.isEmpty {
-                            Text("No hidden friction logs")
+                            Text("No hidden user stories")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Theme.muted)
                                 .padding(.horizontal, 8)
@@ -215,7 +215,7 @@ struct SettingsPane: View {
             Text("Narration")
                 .font(.system(size: 12, weight: .semibold))
             Text(
-                "Opt-in. Uses on-device mlx-audio-swift (MLX Swift) with Qwen3-TTS to turn friction-log transcripts into narrated MP4s."
+                "Opt-in. Uses on-device mlx-audio-swift (MLX Swift) with Qwen3-TTS to turn user-story transcripts into narrated MP4s."
             )
             .font(.system(size: 10))
             .foregroundStyle(Theme.muted)

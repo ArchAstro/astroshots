@@ -284,4 +284,117 @@ struct FrictionLogLoaderTests {
         #expect(shots[0].feature == "install-wizard")
         #expect(shots.allSatisfy { !$0.path.contains("friction-logs") })
     }
+
+    // MARK: - stories/ and legacy friction-logs/
+
+    private func writeStory(
+        in astroshot: URL,
+        tree: String,
+        slug: String,
+        title: String,
+        runID: String? = nil
+    ) throws {
+        let slugDir = astroshot.appendingPathComponent("\(tree)/\(slug)", isDirectory: true)
+        try FileManager.default.createDirectory(at: slugDir, withIntermediateDirectories: true)
+        try "# \(title)".write(
+            to: slugDir.appendingPathComponent("prompt.md"), atomically: true, encoding: .utf8)
+        try "{\"title\":\"\(title)\"}".write(
+            to: slugDir.appendingPathComponent("meta.json"), atomically: true, encoding: .utf8)
+        if let runID {
+            let runDir = slugDir.appendingPathComponent("runs/\(runID)", isDirectory: true)
+            try FileManager.default.createDirectory(at: runDir, withIntermediateDirectories: true)
+            try """
+            {"step":1,"id":"a","title":"A","description":"d","screenshots":[],"good":[],"improve":[]}
+            """.write(
+                to: runDir.appendingPathComponent("log.jsonl"), atomically: true, encoding: .utf8)
+        }
+    }
+
+    @Test func listsStoriesFromBothTreesPreferringStories() throws {
+        let worktree = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stories-both-\(UUID().uuidString)", isDirectory: true)
+        let astroshot = worktree.appendingPathComponent(".astroshot", isDirectory: true)
+        try FileManager.default.createDirectory(at: astroshot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: worktree) }
+
+        try writeStory(in: astroshot, tree: "stories", slug: "new-only", title: "New only")
+        try writeStory(in: astroshot, tree: "friction-logs", slug: "legacy-only", title: "Legacy only", runID: "r1")
+        try writeStory(in: astroshot, tree: "stories", slug: "both", title: "From stories")
+        try writeStory(in: astroshot, tree: "friction-logs", slug: "both", title: "From legacy", runID: "r9")
+
+        let logs = FrictionLogLoader.loadLogs(inAstroshot: astroshot)
+        #expect(Set(logs.map(\.slug)) == ["new-only", "legacy-only", "both"])
+        #expect(logs.count == 3)
+
+        let both = try #require(logs.first { $0.slug == "both" })
+        #expect(both.title == "From stories")
+        #expect(both.runs.isEmpty)
+        #expect(both.promptPath?.contains("/.astroshot/stories/both/") == true)
+
+        let legacy = try #require(logs.first { $0.slug == "legacy-only" })
+        #expect(legacy.runs.count == 1)
+        // Stored hidden/seen IDs are worktree::slug, so legacy IDs are unchanged.
+        #expect(legacy.id == "\(worktree.standardizedFileURL.path)::legacy-only")
+        let moved = try #require(logs.first { $0.slug == "new-only" })
+        #expect(moved.id == "\(worktree.standardizedFileURL.path)::new-only")
+    }
+
+    @Test func loadRunResolvesInEitherTree() throws {
+        let worktree = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stories-run-\(UUID().uuidString)", isDirectory: true)
+        let astroshot = worktree.appendingPathComponent(".astroshot", isDirectory: true)
+        try FileManager.default.createDirectory(at: astroshot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: worktree) }
+
+        try writeStory(in: astroshot, tree: "stories", slug: "s", title: "S", runID: "r1")
+        try writeStory(in: astroshot, tree: "friction-logs", slug: "l", title: "L", runID: "r2")
+
+        let fromStories = try #require(FrictionLogLoader.loadRun(
+            directory: astroshot.appendingPathComponent("stories/s/runs/r1", isDirectory: true)))
+        #expect(fromStories.0.slug == "s")
+        let fromLegacy = try #require(FrictionLogLoader.loadRun(
+            directory: astroshot.appendingPathComponent("friction-logs/l/runs/r2", isDirectory: true)))
+        #expect(fromLegacy.1.runID == "r2")
+    }
+
+    @Test func shotPathRejectsBothReservedStoryTrees() {
+        for tree in ["stories", "friction-logs"] {
+            let nested = "/Users/x/proj/.astroshot/\(tree)/checkout/runs/r1/0001-home.png"
+            #expect(ShotPath.parse(imagePath: nested) == nil)
+            #expect(FrictionLogPath.containsImage(path: nested))
+            // Image directly under the reserved root.
+            #expect(ShotPath.parse(imagePath: "/Users/x/proj/.astroshot/\(tree)/0001-home.png") == nil)
+        }
+        #expect(ShotPath.parse(imagePath: "/Users/x/proj/.astroshot/storyboard/0001-home.png") != nil)
+    }
+
+    @Test func scanAllExcludesBothReservedTreesFromShots() throws {
+        let worktree = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stories-exclude-\(UUID().uuidString)", isDirectory: true)
+        let astroshot = worktree.appendingPathComponent(".astroshot", isDirectory: true)
+        let feature = astroshot.appendingPathComponent("install-wizard", isDirectory: true)
+        try FileManager.default.createDirectory(at: feature, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: worktree) }
+        try Data("shot".utf8).write(to: feature.appendingPathComponent("0001-a.png"))
+
+        for tree in ["stories", "friction-logs"] {
+            try writeStory(in: astroshot, tree: tree, slug: "checkout-\(tree)", title: "C", runID: "r1")
+            let runDir = astroshot.appendingPathComponent("\(tree)/checkout-\(tree)/runs/r1")
+            try Data("x".utf8).write(to: runDir.appendingPathComponent("0001-b.png"))
+            // Stray image directly under the reserved root.
+            try Data("x".utf8).write(to: astroshot.appendingPathComponent("\(tree)/0001-stray.png"))
+        }
+
+        let watcher = AstroshotWatcher(
+            configuration: .init(
+                roots: [worktree],
+                cacheFileURL: worktree.appendingPathComponent("shot-index.json"))
+        )
+        defer { watcher.stop() }
+
+        let shots = watcher.scanAll()
+        #expect(shots.count == 1)
+        #expect(shots[0].feature == "install-wizard")
+        #expect(watcher.scanAllFrictionLogs().count == 2)
+    }
 }

@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadFrictionLogs } from "./friction.js";
+import { loadUserStories } from "./friction.js";
 import type { HashCache } from "./hash-cache.js";
 import {
   chaptersOf,
@@ -17,13 +17,12 @@ import {
 import type { AstroshotTree, ReviewSnapshot, Shot } from "./model.js";
 import {
   ASTROSHOT_DIR,
-  FRICTION_DIR,
   MAX_SCAN_DEPTH,
   SKIP_DIRECTORIES,
   VIDEO_EXTENSIONS,
-  frictionLogsDir,
   humanize,
   isImageFile,
+  isReservedDir,
   sequenceAndSlug,
   worktreeShort,
 } from "./paths.js";
@@ -271,10 +270,10 @@ export async function scanTree(astroshotDir: string, hashes: HashCache): Promise
   }
   const shots: Shot[] = [];
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === FRICTION_DIR) continue;
+    if (entry.name.startsWith(".") || isReservedDir(entry.name)) continue;
     if ((await kindOf(astroshotDir, entry)) !== "dir") continue;
     shots.push(...(await scanFeatureDir(path.join(astroshotDir, entry.name), context, hashes)));
   }
-  const frictionLogs = await loadFrictionLogs(frictionLogsDir(astroshotDir), context, hashes);
+  const frictionLogs = await loadUserStories(astroshotDir, context, hashes);
   return { astroshotDir, worktreePath, worktree, shots, frictionLogs };
 }

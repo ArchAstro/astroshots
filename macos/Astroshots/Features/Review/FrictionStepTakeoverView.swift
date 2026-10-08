@@ -110,7 +110,7 @@ struct FrictionStepTakeoverView: View {
             .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
             .keyboardShortcut(.cancelAction)
             .help("Close")
-            .accessibilityLabel("Close friction step review")
+            .accessibilityLabel("Close user story step review")
             .accessibilityIdentifier("friction.takeover.close")
         }
         .padding(.horizontal, 18)

@@ -1,5 +1,7 @@
 /**
- * Friction logs: `.astroshot/friction-logs/<slug>/{prompt.md,meta.json,runs/<run>/log.jsonl}`.
+ * User stories (formerly friction logs):
+ * `.astroshot/stories/<slug>/{prompt.md,meta.json,runs/<run>/log.jsonl}`, plus the
+ * legacy `.astroshot/friction-logs/<slug>/` tree with the same layout.
  * Mirrors the macOS loader, including field aliases and silent skipping of
  * malformed lines and missing screenshots.
  */
@@ -8,7 +10,7 @@ import path from "node:path";
 
 import type { HashCache } from "./hash-cache.js";
 import type { FrictionLog, FrictionRun, FrictionStep, ReviewSnapshot } from "./model.js";
-import { humanize, worktreeShort } from "./paths.js";
+import { frictionLogsDir, humanize, storiesDir, worktreeShort } from "./paths.js";
 import {
   entryNeedsHash,
   readReviewDocument,
@@ -243,6 +245,22 @@ export async function loadFrictionLogs(
     if (log) logs.push(log);
   }
   return logs.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/**
+ * Stories under `.astroshot/stories/` and the legacy `.astroshot/friction-logs/`.
+ * A slug that loads from `stories/` is listed once, from `stories/`; the legacy
+ * copy is ignored. Newest first.
+ */
+export async function loadUserStories(
+  astroshotDir: string,
+  context: { worktreePath: string; worktree: string },
+  hashes: HashCache,
+): Promise<FrictionLog[]> {
+  const logs = await loadFrictionLogs(storiesDir(astroshotDir), context, hashes);
+  const legacy = await loadFrictionLogs(frictionLogsDir(astroshotDir), context, hashes);
+  const legacyOnly = legacy.filter((old) => !logs.some((log) => log.slug === old.slug));
+  return [...logs, ...legacyOnly].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 /** `MMM d · HH:mm` in local time for `yyyyMMddTHHmmssZ(-N)` run ids. */

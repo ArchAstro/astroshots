@@ -23,6 +23,21 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+describe("user stories", () => {
+  it("never lists stories or friction-logs as features and reads both trees", async () => {
+    write(path.join(root, "app/.astroshot/checkout/0001-a.png"), "x");
+    for (const tree of ["stories", "friction-logs"]) {
+      const run = `app/.astroshot/${tree}/${tree}-flow/runs/20260811T153000Z`;
+      write(path.join(root, run, "log.jsonl"), `${JSON.stringify({ step: 1 })}\n`);
+      write(path.join(root, run, "0001-s1.png"), "x");
+      write(path.join(root, `app/.astroshot/${tree}/0001-stray.png`), "x");
+    }
+    const tree = await scanTree(path.join(root, "app/.astroshot"), new HashCache());
+    expect(tree.shots.map((shot) => shot.feature)).toEqual(["checkout"]);
+    expect(tree.frictionLogs.map((log) => log.slug).sort()).toEqual(["friction-logs-flow", "stories-flow"]);
+  });
+});
+
 describe("discovery", () => {
   it("finds .astroshot trees, skips heavy and hidden directories, and does not descend into trees", async () => {
     write(path.join(root, "app/.astroshot/feature/0001-a.png"), "x");

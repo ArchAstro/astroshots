@@ -1,13 +1,13 @@
 /**
  * Recursive filesystem watching over the roots, routed the same way the app
  * routes FSEvents: image files ingest individually, sidecars refresh their
- * feature, friction-log paths refresh the whole friction namespace, and new
+ * feature, user-story paths (stories/ and friction-logs/) refresh the whole story namespace, and new
  * or vanished `.astroshot` directories rescan the tree.
  */
 import fs from "node:fs";
 import path from "node:path";
 
-import { ASTROSHOT_DIR, FRICTION_DIR, VIDEO_EXTENSIONS, extensionOf, isImageFile } from "./paths.js";
+import { ASTROSHOT_DIR, VIDEO_EXTENSIONS, extensionOf, isImageFile, isReservedDir } from "./paths.js";
 
 export type WatchEvent =
   | { kind: "shot"; path: string; featureDir: string; astroshotDir: string }
@@ -22,7 +22,7 @@ export function classifyPath(fullPath: string): WatchEvent | null {
   const astroshotDir = parts.slice(0, index + 1).join(path.sep);
   const rest = parts.slice(index + 1);
   if (rest.length === 0) return { kind: "tree", astroshotDir };
-  if (rest[0] === FRICTION_DIR) return { kind: "friction", astroshotDir };
+  if (isReservedDir(rest[0]!)) return { kind: "friction", astroshotDir };
   if (rest[0]!.startsWith(".")) return null;
   const featureDir = path.join(astroshotDir, rest[0]!);
   if (rest.length === 1) return { kind: "feature", featureDir, astroshotDir };

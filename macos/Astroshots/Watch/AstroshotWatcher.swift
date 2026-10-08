@@ -503,8 +503,8 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard fm.fileExists(atPath: featureDir.path, isDirectory: &isDir), isDir.boolValue else {
                 continue
             }
-            // Reserved namespace for agentic UX scenario logs — never shots.
-            if featureDir.lastPathComponent == FrictionLogPath.directoryName {
+            // Reserved namespaces for agentic UX user stories — never shots.
+            if FrictionLogPath.isReserved(directoryName: featureDir.lastPathComponent) {
                 continue
             }
             shots.append(contentsOf: shotsInFeatureDirectory(featureDir))
@@ -705,10 +705,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         var frictionLogTouched = false
         for eventPath in paths {
             let path = Self.canonicalPath(eventPath)
-            if FrictionLogPath.containsImage(path: path)
-                || path.contains("/\(ShotPath.astroshotDirName)/\(FrictionLogPath.directoryName)/")
-                || path.hasSuffix("/\(ShotPath.astroshotDirName)/\(FrictionLogPath.directoryName)")
-            {
+            if FrictionLogPath.containsPath(path) {
                 frictionLogTouched = true
                 continue
             }
@@ -727,10 +724,10 @@ final class AstroshotWatcher: @unchecked Sendable {
             scheduleSettledIngest(path: path)
         }
         for directory in featureDirectories {
-            // Never treat the reserved friction-logs root as a shot feature.
-            if URL(fileURLWithPath: directory).lastPathComponent
-                == FrictionLogPath.directoryName
-            {
+            // Never treat a reserved story root as a shot feature.
+            if FrictionLogPath.isReserved(
+                directoryName: URL(fileURLWithPath: directory).lastPathComponent
+            ) {
                 frictionLogTouched = true
                 continue
             }
@@ -742,7 +739,7 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     private func scheduleFrictionLogRefresh() {
-        let key = "friction-logs"
+        let key = "stories"
         lock.lock()
         settleWorkItems[key]?.cancel()
         let nanos = configuration.settleNanos

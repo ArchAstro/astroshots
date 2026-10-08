@@ -8,6 +8,7 @@ describe("watch event routing", () => {
     expect(classifyPath("/w/.astroshot/f/manifest.json")).toMatchObject({ kind: "feature", featureDir: "/w/.astroshot/f" });
     expect(classifyPath("/w/.astroshot/f/0001-a.webm")).toMatchObject({ kind: "feature" });
     expect(classifyPath("/w/.astroshot/friction-logs/x/runs/1/log.jsonl")).toEqual({ kind: "friction", astroshotDir: "/w/.astroshot" });
+    expect(classifyPath("/w/.astroshot/stories/x/runs/1/log.jsonl")).toEqual({ kind: "friction", astroshotDir: "/w/.astroshot" });
     expect(classifyPath("/w/.astroshot")).toEqual({ kind: "tree", astroshotDir: "/w/.astroshot" });
     expect(classifyPath("/w/.astroshot/f")).toMatchObject({ kind: "feature" });
     expect(classifyPath("/w/src/index.ts")).toBeNull();

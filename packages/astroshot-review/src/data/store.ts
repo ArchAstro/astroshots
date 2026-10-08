@@ -6,11 +6,11 @@
  */
 import path from "node:path";
 
-import { LOG_FILE, loadFrictionLogs } from "./friction.js";
+import { LOG_FILE, loadUserStories } from "./friction.js";
 import { HashCache } from "./hash-cache.js";
 import { loadIndex, reconcileArrivalOrder, saveIndex, type IndexDocument } from "./index-cache.js";
 import type { AstroshotTree, FrictionLog, FrictionRun, Shot } from "./model.js";
-import { MAX_SCAN_DEPTH, frictionLogsDir } from "./paths.js";
+import { MAX_SCAN_DEPTH } from "./paths.js";
 import { addComment, markSeen } from "./review-store.js";
 import { findAstroshotDirs, rebuildShot, scanFeatureDir, scanTree } from "./scan.js";
 import { watchRoots, type RootWatcher, type WatchEvent } from "./watcher.js";
@@ -375,8 +375,8 @@ export class ReviewStore {
 
   private async refreshFriction(astroshotDir: string): Promise<void> {
     const tree = this.treeFor(astroshotDir);
-    tree.frictionLogs = await loadFrictionLogs(
-      frictionLogsDir(astroshotDir),
+    tree.frictionLogs = await loadUserStories(
+      astroshotDir,
       { worktreePath: tree.worktreePath, worktree: tree.worktree },
       this.hashes,
     );

@@ -57,7 +57,7 @@ struct FrictionLogDetailView: View {
                             .frame(width: 24, height: 22)
                     }
                     .buttonStyle(.plain)
-                    .help("Mark this log seen")
+                    .help("Mark this user story seen")
                     .accessibilityLabel("Mark \(log.title) seen")
                     .accessibilityIdentifier("friction.detail.seen")
                 }
@@ -71,7 +71,7 @@ struct FrictionLogDetailView: View {
                         .frame(width: 24, height: 22)
                 }
                 .buttonStyle(.plain)
-                .help("Hide friction log")
+                .help("Hide user story")
                 .accessibilityLabel("Hide \(log.title)")
                 .accessibilityIdentifier("friction.detail.hide")
             }
@@ -166,7 +166,7 @@ struct FrictionLogDetailView: View {
 
     private func promptCard(_ markdown: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Scenario prompt")
+            Text("Story prompt")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.muted)
                 .textCase(.uppercase)
@@ -721,7 +721,7 @@ struct FrictionLogDetailView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Text(
-                "This scenario has a prompt but no log.jsonl run. Use the friction-log skill to execute it; steps will appear here as the agent writes them."
+                "This user story has a prompt but no log.jsonl run. Use the user-story skill to execute it; steps will appear here as the agent writes them."
             )
             .font(.system(size: 11))
             .foregroundStyle(Theme.ink2)

@@ -1,7 +1,16 @@
 import path from "node:path";
 
 export const ASTROSHOT_DIR = ".astroshot";
+/** User stories (formerly friction logs) live under `.astroshot/stories/`. */
+export const STORIES_DIR = "stories";
+/** The legacy name of the user stories directory; still read. */
 export const FRICTION_DIR = "friction-logs";
+/** Names under `.astroshot/` that hold user stories, never shot features. */
+export const RESERVED_DIRS: readonly string[] = [STORIES_DIR, FRICTION_DIR];
+
+export function isReservedDir(name: string): boolean {
+  return RESERVED_DIRS.includes(name);
+}
 
 /** Directories the scanner never descends into (mirrors the macOS app). */
 export const SKIP_DIRECTORIES = new Set([
@@ -51,13 +60,13 @@ export interface ShotPath {
   fileName: string;
 }
 
-/** Accept only `<worktree>/.astroshot/<feature>/<image>`; friction logs are excluded. */
+/** Accept only `<worktree>/.astroshot/<feature>/<image>`; user stories are excluded. */
 export function parseShotPath(imagePath: string): ShotPath | null {
   const fileName = path.basename(imagePath);
   if (!isImageFile(fileName)) return null;
   const featureDir = path.dirname(imagePath);
   const feature = path.basename(featureDir);
-  if (!feature || feature === ASTROSHOT_DIR || feature === FRICTION_DIR) return null;
+  if (!feature || feature === ASTROSHOT_DIR || isReservedDir(feature)) return null;
   const astroshotDir = path.dirname(featureDir);
   if (path.basename(astroshotDir) !== ASTROSHOT_DIR) return null;
   if (imagePath.split(path.sep).includes(FRICTION_DIR)) return null;
@@ -98,11 +107,15 @@ export function worktreeShort(name: string): string {
 export function isInsideFrictionLogs(filePath: string): boolean {
   const parts = filePath.split(path.sep);
   const index = parts.indexOf(ASTROSHOT_DIR);
-  return index !== -1 && parts[index + 1] === FRICTION_DIR;
+  return index !== -1 && parts[index + 1] !== undefined && isReservedDir(parts[index + 1]!);
 }
 
 export function frictionLogsDir(astroshotDir: string): string {
   return path.join(astroshotDir, FRICTION_DIR);
+}
+
+export function storiesDir(astroshotDir: string): string {
+  return path.join(astroshotDir, STORIES_DIR);
 }
 
 export function abbreviateHome(filePath: string, home: string): string {

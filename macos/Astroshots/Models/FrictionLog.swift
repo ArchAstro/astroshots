@@ -1,27 +1,46 @@
 import Foundation
 
-/// Reserved feature directory under `.astroshot/` for agentic UX scenario runs.
-/// Images and JSONL under this tree never appear in the Shots stream.
+/// Reserved feature directories under `.astroshot/` for agentic UX user-story runs.
+/// Images and JSONL under either tree never appear in the Shots stream.
+///
+/// `stories` is where new user stories are written; `friction-logs` is the
+/// legacy tree, still read. A slug present in both is taken from `stories`.
 enum FrictionLogPath {
-    static let directoryName = "friction-logs"
+    static let directoryName = "stories"
+    static let legacyDirectoryName = "friction-logs"
+    /// Precedence order: earlier entries win when a slug exists in several.
+    static let directoryNames = [directoryName, legacyDirectoryName]
     static let promptFileName = "prompt.md"
     static let metaFileName = "meta.json"
     static let logFileName = "log.jsonl"
     static let runsDirectoryName = "runs"
 
-    /// `…/<worktree>/.astroshot/friction-logs`
+    /// `…/<worktree>/.astroshot/stories`
     static func root(inAstroshot astroshot: URL) -> URL {
         astroshot.appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    /// True when an image path lives under `.astroshot/friction-logs/…`.
-    static func containsImage(path: String) -> Bool {
-        let markers = [
-            "/\(ShotPath.astroshotDirName)/\(directoryName)/",
-            "/\(ShotPath.astroshotDirName)/\(directoryName)",
-        ]
+    /// Story roots under one `.astroshot`, highest precedence first.
+    static func roots(inAstroshot astroshot: URL) -> [URL] {
+        directoryNames.map { astroshot.appendingPathComponent($0, isDirectory: true) }
+    }
+
+    static func isReserved(directoryName name: String) -> Bool {
+        directoryNames.contains(name)
+    }
+
+    /// True when `path` is a reserved root (`…/.astroshot/stories`) or lives inside one.
+    static func containsPath(_ path: String) -> Bool {
         let normalized = path.replacingOccurrences(of: "\\", with: "/")
-        return markers.contains { normalized.contains($0) }
+        return directoryNames.contains { name in
+            let root = "/\(ShotPath.astroshotDirName)/\(name)"
+            return normalized.contains(root + "/") || normalized.hasSuffix(root)
+        }
+    }
+
+    /// True when an image path lives under `.astroshot/stories/…` or the legacy tree.
+    static func containsImage(path: String) -> Bool {
+        containsPath(path)
     }
 }
 
@@ -56,7 +75,7 @@ enum FrictionLogStatus: String, Sendable, Hashable, Codable {
     }
 }
 
-/// One authored friction-log scenario under `.astroshot/friction-logs/<slug>/`.
+/// One authored user story under `.astroshot/stories/<slug>/` (or legacy `friction-logs/<slug>/`).
 struct FrictionLog: Identifiable, Hashable, Sendable {
     /// Stable identity: worktree path + slug.
     var id: String { "\(worktreePath)::\(slug)" }
@@ -233,7 +252,7 @@ enum FrictionLogLoader {
         let slugDir = runDir.deletingLastPathComponent().deletingLastPathComponent()
         let frictionRoot = slugDir.deletingLastPathComponent()
         let astroshot = frictionRoot.deletingLastPathComponent()
-        guard frictionRoot.lastPathComponent == FrictionLogPath.directoryName,
+        guard FrictionLogPath.isReserved(directoryName: frictionRoot.lastPathComponent),
               astroshot.lastPathComponent == ShotPath.astroshotDirName
         else { return nil }
         let logs = loadLogs(inAstroshot: astroshot)
@@ -245,37 +264,44 @@ enum FrictionLogLoader {
         return (log, run)
     }
 
-    /// Scan `.astroshot/friction-logs/*` under a single `.astroshot` directory.
+    /// Scan `.astroshot/stories/*` and legacy `.astroshot/friction-logs/*` under a
+    /// single `.astroshot` directory. A slug in both is listed once, from `stories`.
     static func loadLogs(inAstroshot astroshot: URL) -> [FrictionLog] {
-        let root = FrictionLogPath.root(inAstroshot: astroshot)
         let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else {
-            return []
-        }
-
         let worktreeURL = astroshot.deletingLastPathComponent()
         let worktree = worktreeURL.lastPathComponent
         let worktreePath = worktreeURL.standardizedFileURL.path
 
-        guard let children = try? fm.contentsOfDirectory(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
+        var seenSlugs = Set<String>()
+        var logs: [FrictionLog] = []
+        for root in FrictionLogPath.roots(inAstroshot: astroshot) {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue,
+                  let children = try? fm.contentsOfDirectory(
+                      at: root,
+                      includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
+                      options: [.skipsHiddenFiles]
+                  )
+            else { continue }
 
-        return children.compactMap { slugDir -> FrictionLog? in
-            var childIsDir: ObjCBool = false
-            guard fm.fileExists(atPath: slugDir.path, isDirectory: &childIsDir),
-                  childIsDir.boolValue
-            else { return nil }
-            return loadLog(
-                slugDirectory: slugDir,
-                worktree: worktree,
-                worktreePath: worktreePath
-            )
+            for slugDir in children {
+                var childIsDir: ObjCBool = false
+                guard fm.fileExists(atPath: slugDir.path, isDirectory: &childIsDir),
+                      childIsDir.boolValue
+                else { continue }
+                let slug = slugDir.lastPathComponent
+                // A slug directory in `stories/` shadows the legacy one even
+                // if it is empty, so the two trees never merge.
+                guard seenSlugs.insert(slug).inserted else { continue }
+                guard let log = loadLog(
+                    slugDirectory: slugDir,
+                    worktree: worktree,
+                    worktreePath: worktreePath
+                ) else { continue }
+                logs.append(log)
+            }
         }
-        .sorted { $0.updatedAt > $1.updatedAt }
+        return logs.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     static func loadLog(

@@ -186,7 +186,7 @@ final class StatusItemController: NSObject {
     }
 
     /// Seeds a complete multi-worktree stream for grouped-stream UI proofs.
-    /// Also loads any `.astroshot/friction-logs/` scenarios under the root.
+    /// Also loads any `.astroshot/stories/` (and legacy `friction-logs/`) user stories under the root.
     func openTray(atRootPath path: String) {
         let reader = AstroshotWatcher(
             configuration: .init(
