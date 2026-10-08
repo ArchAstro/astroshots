@@ -124,6 +124,15 @@ pub fn run(args: &[String], stdout: &mut impl Write, stderr: &mut impl Write) ->
             .filter_map(|kind| signal(kind).ok())
             .collect::<Vec<_>>()
         };
+        // Windows: Ctrl-C reaches every process attached to the console, and
+        // without a handler the wrapper dies with STATUS_CONTROL_C_EXIT before
+        // it can report. Registering a handler makes Windows skip the default
+        // termination. Node's SIGINT and SIGHUP are CTRL_C and CTRL_CLOSE.
+        #[cfg(windows)]
+        let _signals = (
+            tokio::signal::windows::ctrl_c().ok(),
+            tokio::signal::windows::ctrl_close().ok(),
+        );
         let mut child = match tokio::process::Command::new(command)
             .args(&args[3..])
             .spawn()
