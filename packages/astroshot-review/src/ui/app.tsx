@@ -325,9 +325,9 @@ export function App({ onQuit }: AppProps) {
       }
       try {
         await store.markFrictionRunSeen(log, run);
-        toast("Marked 1 log seen");
+        toast("Marked 1 story seen");
       } catch (error) {
-        toast(error instanceof Error ? error.message : "Couldn’t mark logs as seen");
+        toast(error instanceof Error ? error.message : "Couldn’t mark stories as seen");
       }
     },
     [store, toast],
@@ -346,7 +346,7 @@ export function App({ onQuit }: AppProps) {
           // counted below
         }
       }
-      toast(ok === 0 ? "Couldn’t mark logs as seen" : ok === 1 ? "Marked 1 log seen" : `Marked ${ok} logs seen`);
+      toast(ok === 0 ? "Couldn’t mark stories as seen" : ok === 1 ? "Marked 1 story seen" : `Marked ${ok} stories seen`);
     },
     [store, toast],
   );
@@ -861,12 +861,12 @@ export function App({ onQuit }: AppProps) {
             {shotsUnseen > 0 ? <Text color={theme.amber} bold>{` ${shotsUnseen}`}</Text> : null}
             <Text>   </Text>
             <Text color={ui.tab === "frictionLogs" ? theme.text : theme.muted} bold={ui.tab === "frictionLogs"} inverse={ui.tab === "frictionLogs"}>
-              {" 2 Friction Logs "}
+              {" 2 User stories "}
             </Text>
             {frictionCounts.pending > 0 ? <Text color={theme.amber} bold>{` ${frictionCounts.pending}`}</Text> : null}
           </Text>
         ) : (
-          <Text color={theme.muted}>{ui.help ? "Help" : ui.pane === "settings" ? "Settings" : ui.takeover?.kind === "shot" ? "Full-screen review" : "Friction step review"}</Text>
+          <Text color={theme.muted}>{ui.help ? "Help" : ui.pane === "settings" ? "Settings" : ui.takeover?.kind === "shot" ? "Full-screen review" : "Story step review"}</Text>
         )}
       </Box>
       {body}

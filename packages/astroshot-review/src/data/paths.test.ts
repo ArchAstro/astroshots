@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { humanize, isInsideFrictionLogs, parseShotPath, sequenceAndSlug, worktreeShort } from "./paths.js";
+import { humanize, isInsideFrictionLogs, isReservedDir, parseShotPath, storiesDir, sequenceAndSlug, worktreeShort } from "./paths.js";
 
 describe("shot paths", () => {
   it("accepts <worktree>/.astroshot/<feature>/<image>", () => {
@@ -20,6 +20,18 @@ describe("shot paths", () => {
     expect(parseShotPath("/repos/app/.astroshot/0001-a.png")).toBeNull();
     expect(parseShotPath("/repos/app/shots/checkout/0001-a.png")).toBeNull();
     expect(isInsideFrictionLogs("/repos/app/.astroshot/friction-logs/x/prompt.md")).toBe(true);
+  });
+
+  it("treats stories and friction-logs as reserved names", () => {
+    expect(parseShotPath("/repos/app/.astroshot/stories/x/0001-a.png")).toBeNull();
+    expect(parseShotPath("/repos/app/.astroshot/stories/0001-a.png")).toBeNull();
+    // A `stories` directory outside `.astroshot` is an ordinary path.
+    expect(parseShotPath("/repos/stories/.astroshot/checkout/0001-a.png")).not.toBeNull();
+    expect(isInsideFrictionLogs("/repos/app/.astroshot/stories/x/prompt.md")).toBe(true);
+    expect(isInsideFrictionLogs("/repos/app/.astroshot/checkout/x")).toBe(false);
+    expect(isReservedDir("stories") && isReservedDir("friction-logs")).toBe(true);
+    expect(isReservedDir("checkout")).toBe(false);
+    expect(storiesDir("/r/.astroshot")).toBe("/r/.astroshot/stories");
   });
 
   it("splits sequence and slug only for numeric prefixes", () => {

@@ -22,7 +22,7 @@ enum TrayTab: String, CaseIterable, Identifiable, Equatable {
     var label: String {
         switch self {
         case .shots: return "Shots"
-        case .frictionLogs: return "Friction Logs"
+        case .frictionLogs: return "User stories"
         }
     }
 }
@@ -389,21 +389,21 @@ final class AppState {
             pane = .stream
             activeTab = .frictionLogs
         }
-        showToast("Friction log hidden")
+        showToast("User story hidden")
     }
 
     func restoreFrictionLog(id: String) {
         guard hiddenFrictionLogIDs.contains(id) else { return }
         hiddenFrictionLogIDs.removeAll { $0 == id }
         preferences.hiddenFrictionLogIDs = hiddenFrictionLogIDs
-        showToast("Friction log restored")
+        showToast("User story restored")
     }
 
     func restoreAllFrictionLogs() {
         guard !hiddenFrictionLogIDs.isEmpty else { return }
         hiddenFrictionLogIDs = []
         preferences.hiddenFrictionLogIDs = []
-        showToast("All friction logs restored")
+        showToast("All user stories restored")
     }
 
     func discoveredFrictionLog(id: String) -> FrictionLog? {
@@ -638,8 +638,8 @@ final class AppState {
         }
         showToast(
             markedCount == 1
-                ? "Marked 1 log seen"
-                : "Marked \(markedCount) logs seen"
+                ? "Marked 1 user story seen"
+                : "Marked \(markedCount) user stories seen"
         )
     }
 

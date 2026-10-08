@@ -246,4 +246,31 @@ describe("astroshot review in a kitty-capable PTY", () => {
       await session.close();
     }
   }, 60_000);
+
+  it("lists user stories from stories/ and the legacy friction-logs/ under one tab", async () => {
+    seedRoot(root);
+    const astroshot = path.join(root, "demo-app", ".astroshot");
+    for (const [tree, slug] of [["stories", "checkout-flow"], ["friction-logs", "legacy-signup"]] as const) {
+      const run = path.join(astroshot, tree, slug, "runs", "20260811T153000Z");
+      fs.mkdirSync(run, { recursive: true });
+      fs.writeFileSync(path.join(astroshot, tree, slug, "prompt.md"), `# ${slug}\n`);
+      fs.writeFileSync(path.join(run, "log.jsonl"), `${JSON.stringify({ step: 1, id: "a", title: "Step" })}\n`);
+    }
+    const session = await launch(root, cacheDir);
+    try {
+      await session.waitFor(() => session.screen().includes("2 User stories"), "the User stories tab");
+      session.write("2");
+      await session.waitFor(
+        () => session.screen().includes("Checkout Flow") && session.screen().includes("Legacy Signup"),
+        "both stories",
+      );
+      // The reserved directories are never features in the Shots stream.
+      session.write("1");
+      await session.waitFor(() => session.screen().includes("Unseen (3)"), "the Shots stream");
+      expect(session.screen()).not.toContain("checkout-flow");
+      expect(session.screen()).not.toContain("legacy-signup");
+    } finally {
+      await session.close();
+    }
+  }, 60_000);
 });

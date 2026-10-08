@@ -159,16 +159,16 @@ enum ShotPath {
 
     /// Parse `…/<worktree>/.astroshot/<feature>/<file>` into components.
     ///
-    /// Paths under `.astroshot/friction-logs/` are intentionally rejected so
-    /// friction-log screenshots never enter the one-off Shots stream.
+    /// Paths under `.astroshot/stories/` and legacy `.astroshot/friction-logs/`
+    /// are intentionally rejected so user-story screenshots never enter the one-off Shots stream.
     static func parse(imagePath: String) -> (worktreePath: String, worktree: String, feature: String, fileName: String)? {
         let url = URL(fileURLWithPath: imagePath)
         let fileName = url.lastPathComponent
         let ext = url.pathExtension.lowercased()
         guard imageExtensions.contains(ext) else { return nil }
 
-        // Friction-log screenshots may nest under runs/; walk ancestors for
-        // `.astroshot/friction-logs` and refuse the path as a normal shot.
+        // Story screenshots may nest under runs/; walk ancestors for
+        // the reserved story directories and refuse the path as a normal shot.
         if FrictionLogPath.containsImage(path: imagePath) {
             return nil
         }
@@ -176,8 +176,8 @@ enum ShotPath {
         let featureURL = url.deletingLastPathComponent()
         let feature = featureURL.lastPathComponent
         guard !feature.isEmpty, feature != astroshotDirName else { return nil }
-        // Top-level reserved namespace for friction logs (not a feature).
-        guard feature != FrictionLogPath.directoryName else { return nil }
+        // Top-level reserved namespaces for user stories (not a feature).
+        guard !FrictionLogPath.isReserved(directoryName: feature) else { return nil }
 
         let astroshotURL = featureURL.deletingLastPathComponent()
         guard astroshotURL.lastPathComponent == astroshotDirName else { return nil }

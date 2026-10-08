@@ -1,5 +1,5 @@
 /**
- * Friction Logs: scenario list, scenario detail with run picker and steps,
+ * User stories: story list, story detail with run picker and steps,
  * step detail, and the step takeover.
  */
 import path from "node:path";
@@ -102,11 +102,11 @@ export function FrictionList(props: FrictionListProps) {
       <Box flexShrink={0} flexDirection="column" width={width} height={height}>
         <EmptyState
           width={width}
-          title="No friction logs yet"
-          body="Author a scenario with the friction-log skill, then run it. Results land under .astroshot/friction-logs/."
+          title="No user stories yet"
+          body="Author a story with the user-story skill, then run it. Results land under .astroshot/stories/."
         />
         <Box flexDirection="column" paddingX={2}>
-          <Text color={theme.muted}>.astroshot/friction-logs/{"<slug>"}/prompt.md</Text>
+          <Text color={theme.muted}>.astroshot/stories/{"<slug>"}/prompt.md</Text>
           <Text color={theme.muted}>runs/{"<run-id>"}/log.jsonl + screenshots</Text>
         </Box>
       </Box>
@@ -114,9 +114,9 @@ export function FrictionList(props: FrictionListProps) {
   }
   if (logs.length === 0) {
     return filter === "unseen" ? (
-      <EmptyState width={width} title="You’re all caught up" body="Every friction log has been seen." action="u View history" />
+      <EmptyState width={width} title="You’re all caught up" body="Every user story has been seen." action="u View history" />
     ) : (
-      <EmptyState width={width} title="No history yet" body="Logs you mark Seen will appear here." action="u Back to unseen" />
+      <EmptyState width={width} title="No history yet" body="Seen stories will appear here." action="u Back to unseen" />
     );
   }
   const perPage = Math.max(1, Math.floor(height / FRICTION_ROW_HEIGHT));
@@ -154,7 +154,7 @@ export function FrictionLogDetail({ log, run, stepCursor, promptOpen, prompt, wi
   return (
     <Box flexShrink={0} flexDirection="column" width={width} height={height} paddingX={1} overflow="hidden">
       <Box flexShrink={0} height={1} justifyContent="space-between" width={inner}>
-        <Text color={theme.blue}>‹ Logs</Text>
+        <Text color={theme.blue}>‹ Stories</Text>
         <Text color={theme.muted}>
           {run ? stepCountLabel(run.steps.length) : "no runs"}
           {frictionState(log) !== "seen" && run ? <Text color={theme.green}>   s Seen</Text> : null}
@@ -181,7 +181,7 @@ export function FrictionLogDetail({ log, run, stepCursor, promptOpen, prompt, wi
       </Text>
       {promptOpen && prompt !== null ? (
         <Box flexShrink={0} flexDirection="column" width={inner} height={6} overflow="hidden" borderStyle="round" borderColor={theme.faint} paddingX={1}>
-          <SectionLabel>SCENARIO PROMPT</SectionLabel>
+          <SectionLabel>STORY PROMPT</SectionLabel>
           <Text color={theme.muted} wrap="wrap">
             {truncate(prompt, (inner - 4) * 4)}
           </Text>
@@ -222,7 +222,7 @@ export function FrictionLogDetail({ log, run, stepCursor, promptOpen, prompt, wi
         <Box flexDirection="column" width={inner}>
           <Text bold>No runs yet</Text>
           <Text color={theme.muted} wrap="wrap">
-            This scenario has a prompt but no log.jsonl run. Use the friction-log skill to execute it; steps will appear here as the agent writes them.
+            This story has a prompt but no log.jsonl run. Use the user-story skill to execute it; steps will appear here as the agent writes them.
           </Text>
         </Box>
       ) : run.steps.length === 0 ? (
@@ -341,7 +341,7 @@ export function FrictionStepDetail({ log, run, stepIndex, imageIndex, width, hei
         <NoteCard title="Looks good" color={theme.green} items={step.good} empty="No positives noted for this step" width={inner} />
         <NoteCard title="Can improve" color={theme.amber} items={step.improve} empty="No friction found for this step" width={inner} />
         <Rule width={inner} />
-        <MetaRow label="Log" value={log.slug} width={inner} />
+        <MetaRow label="Story" value={log.slug} width={inner} />
         <MetaRow label="Run" value={run.runId} width={inner} />
         <MetaRow label="Tree" value={log.worktree} width={inner} />
         <MetaRow label="File" value={screenshot ? path.basename(screenshot) : "—"} width={inner} />
