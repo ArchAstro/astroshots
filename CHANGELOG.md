@@ -11,6 +11,26 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Changed
+
+- **Friction logs are now user stories:** the `friction-log` skill is renamed
+  `user-story`, and `docs/friction-logs.md` is now
+  [`docs/user-stories.md`](docs/user-stories.md). New stories are written to
+  `.astroshot/stories/<slug>/`. The old `.astroshot/friction-logs/<slug>/` tree
+  is still read: readers list both, a slug present in both is taken from
+  `stories/`, and existing content is never moved or deleted. File formats
+  (`prompt.md`, `meta.json`, `log.jsonl`, run ids) are unchanged. `stories` and
+  `friction-logs` are both reserved names that never appear in the Shots
+  stream. The macOS app may still say Friction Logs until it is updated.
+- **Skills detect native `archdev shots` support:** `astroshot`,
+  `astroshots-review`, `browser-ui-harness`, and `user-story` check
+  `archdev shots doctor` and, when it exits 0, use `archdev shots …` (including
+  `capture`, `status --json`, and `stories …`) instead of the standalone
+  commands. Without it, the standalone `astroshot` and `astroshot-capture`
+  instructions apply unchanged. The browser-ui-harness runner skeleton resolves
+  `archdev shots capture` before `astroshot-capture`, and
+  `test-astroshot-capture` covers both paths.
+
 ## [0.2.2] (npm) - 2026-09-14
 
 ### Added

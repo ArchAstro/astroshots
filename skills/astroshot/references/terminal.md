@@ -1,5 +1,9 @@
 # Ink and PTY modes
 
+When `archdev shots` is available (see the **astroshot** skill), `archdev shots ink …`
+and `archdev shots pty …` take the same arguments as `astroshot ink …` and
+`astroshot pty …`.
+
 Choose the terminal boundary deliberately:
 
 | Need | Mode |

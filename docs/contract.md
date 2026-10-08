@@ -123,7 +123,14 @@ acknowledgement and comments do not carry forward, even when the bytes match.
    nothing Seen.
 
 The **astroshots-review** skill teaches this contract end to end — see
-[`docs/skills.md`](skills.md).
+[`docs/skills.md`](skills.md). When `archdev shots` is available,
+`archdev shots status --json` applies the hash and run-id scoping below and
+reports each shot as `seen`, `stale`, or `unseen`; agents still never write
+`review.json` to mark their own work Seen.
+
+User stories (previously friction logs) use a separate reserved tree,
+`.astroshot/stories/`, documented in [`user-stories.md`](user-stories.md).
+Neither `stories` nor `friction-logs` is a Shots feature.
 
 ---
 

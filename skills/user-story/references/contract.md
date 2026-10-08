@@ -1,9 +1,12 @@
-# Friction log on-disk contract
+# User story on-disk contract
+
+User stories were previously called friction logs. The file formats did not
+change; only the directory name did.
 
 ## Layout
 
 ```text
-<worktree>/.astroshot/friction-logs/<slug>/
+<worktree>/.astroshot/stories/<slug>/
   prompt.md
   meta.json                 # optional
   runs/<run-id>/
@@ -17,7 +20,7 @@
 If there are no nested `runs/` directories, the app accepts:
 
 ```text
-.astroshot/friction-logs/<slug>/
+.astroshot/stories/<slug>/
   prompt.md
   log.jsonl
   NNNN-slug.png
@@ -26,10 +29,32 @@ If there are no nested `runs/` directories, the app accepts:
 and treats it as a single run with id `latest`. Prefer nested `runs/` for
 history.
 
-## Reserved namespace
+## Legacy location
 
-`friction-logs` is not a shot feature. Images under this tree **never** appear
-in the Astroshots **Shots** stream. Only the **Friction Logs** tab lists them.
+`.astroshot/friction-logs/<slug>/` has the same layout and is still read. Readers
+list both trees; a slug present in both is taken from `stories/`. Existing
+content under `friction-logs/` is never moved or deleted. New stories go under
+`stories/`.
+
+## Reserved namespaces
+
+`stories` and `friction-logs` are not shot features. Images under either tree
+**never** appear in the Astroshots **Shots** stream. Only the user stories tab
+lists them. The terminal tray will label that tab `User stories`; the macOS app may
+still label it Friction Logs until it is updated.
+
+## Native commands
+
+When `archdev shots` is available and enabled (`archdev shots doctor` exits 0),
+these commands operate on the layout above:
+
+| Command | Effect |
+|---|---|
+| `archdev shots stories new <slug> --title <t>` | Create a story |
+| `archdev shots stories list [--json]` | List stories from both trees |
+| `archdev shots stories show <slug> [--run <id>] [--json]` | Show a story and its runs |
+| `archdev shots stories run-dir <slug>` | Create and print a new `runs/<run-id>/` directory |
+| `archdev shots stories upload <slug>` | Upload a story for review in the ArchCode web UI |
 
 ## meta.json
 
@@ -102,7 +127,7 @@ dropped from the loaded path list; the step still appears.
 
 ## App behavior
 
-- Lists every slug with a `prompt.md` and/or at least one run.
+- Lists every slug (from `stories/` and `friction-logs/`) with a `prompt.md` and/or at least one run.
 - Loads **all** nested `runs/<run-id>/` directories that have at least one
   parsed JSONL step **or** at least one image. Empty stubs (empty `log.jsonl`,
   no PNGs) are omitted.
@@ -118,6 +143,6 @@ dropped from the loaded path list; the step still appears.
 
 1. Agent creates `runs/<new-unique-id>/` (never reuses an old id).
 2. Writes `log.jsonl` lines + PNGs into that directory.
-3. FSEvents on anything under `.astroshot/friction-logs/` schedules a full
-   friction-log rescan; the loader re-reads every slug’s `runs/*`.
+3. FSEvents on anything under `.astroshot/stories/` or `.astroshot/friction-logs/`
+   schedules a full user-story rescan; the loader re-reads every slug’s `runs/*`.
 4. The tray updates the scenario’s run list; open the log and pick a run chip.

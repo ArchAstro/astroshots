@@ -22,7 +22,7 @@
 Your test suites, agents, and UI harnesses already produce screenshots and
 recordings — they just die in `/tmp` or a CI artifact nobody opens. Astroshots
 watches the folders where your projects live, flashes every new frame as a
-desktop overlay, and streams stills, journey movies, and UX friction logs into
+desktop overlay, and streams stills, journey movies, and user stories into
 one newest-first tray.
 
 Your feedback goes back to disk beside the capture, so the agent that took the
@@ -32,7 +32,7 @@ screenshot can read what you said about it.
 - **A terminal tray too** — `npx astroshot review` opens the same stream in Ghostty, kitty, or WezTerm with real thumbnails, movie playback through ffmpeg, and the same `review.json` writes.
 - **Every worktree in one stream** — stills and movies from every project under your watched folders, newest first.
 - **Movies, not just stills** — WebM/MP4/MOV playback with scrubbing, chapters, and duration metadata; **Make narrated video** turns a walkthrough into an on-device MP4.
-- **Friction Logs** — agentic UX walkthroughs with per-step evidence, transcript, and good/improve notes, plus switchable run history.
+- **User stories** (previously friction logs) — agentic UX walkthroughs with per-step evidence, transcript, and good/improve notes, plus switchable run history. Stored under `.astroshot/stories/`; the old `.astroshot/friction-logs/` tree is still read.
 - **A contract, not an API** — write a folder, read `review.json`; any language or harness can participate.
 - **Six agent skills included** — your coding agent learns to capture, stream, and act on human feedback.
 
@@ -83,7 +83,7 @@ Prerequisites: macOS 14+, and Node.js 22.14+ for the capture CLI.
                 ▼
    ┌──────────────────────────┐
    │   Astroshots menu bar    │  overlay flash → Shots stream → review
-   │   (macOS, no Dock icon)  │  Friction Logs → narrated video
+   │   (macOS, no Dock icon)  │  User stories → narrated video
    └────────────┬─────────────┘
                 │  you hit Seen / leave a comment
                 ▼
@@ -124,7 +124,7 @@ journeys. Details in [`docs/capture.md`](docs/capture.md).
 | [`docs/contract.md`](docs/contract.md) | Write layout, `manifest.json`, `review.json`, hash + run-id scoping, agent obligations |
 | [`docs/capture.md`](docs/capture.md) | The four capture modes, fixtures, batch manifests, movie sources, `astroshot-capture` |
 | [`docs/review-tui.md`](docs/review-tui.md) | `astroshot review`: the terminal tray, Kitty graphics, ffmpeg playback, key map |
-| [`docs/friction-logs.md`](docs/friction-logs.md) | Friction-log tree and the JSONL step schema |
+| [`docs/user-stories.md`](docs/user-stories.md) | User-story tree (previously friction logs) and the JSONL step schema |
 | [`docs/skills.md`](docs/skills.md) | All six agent skills and the full install matrix |
 | [`docs/product-tour.md`](docs/product-tour.md) | Every surface, the full review loop, requirements |
 | [`docs/releasing.md`](docs/releasing.md) | Cut workflows, signed DMG, npm trusted publishing and bootstrap |

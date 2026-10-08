@@ -66,7 +66,7 @@ asset directory when practical.
 
 When documenting movie support, capture the viewer state that teaches the
 reader something—movie badge/filter, playback actions, controls, chapters—not
-only a poster frame. When documenting friction logs, prove the scenario list,
+only a poster frame. When documenting user stories (previously friction logs), prove the scenario list,
 run history/rollup, and transcript-backed step evidence as distinct states.
 
 Open every generated image with the available image inspection tool. Check:

@@ -115,4 +115,4 @@ required check fails, and it never installs anything or changes app state.
 |------|---------|
 | Browser-backed stills and movies | `npx astroshot install-browser` |
 | Native-window movie capture | macOS Screen Recording permission |
-| Narrated friction-log videos | Apple Silicon; enabling Settings → Narration downloads the Qwen3-TTS model locally |
+| Narrated user-story videos | Apple Silicon; enabling Settings → Narration downloads the Qwen3-TTS model locally |

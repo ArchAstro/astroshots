@@ -60,6 +60,10 @@ If none match, title falls back to a humanized slug from the filename.
 
 ## Human review file
 
+When `archdev shots` is available, `archdev shots status --json` reports the
+state derived from this file (`seen`, `stale`, `unseen`) with the hash and
+run-id scoping below already applied.
+
 Path: `<worktree>/.astroshot/<feature>/review.json`
 
 ```json

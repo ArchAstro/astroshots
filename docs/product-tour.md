@@ -5,7 +5,7 @@
 | **Desktop overlay** | New frame above all windows; Open / dismiss |
 | **Shots stream** | Newest-first stills and movies, worktree grouping, Unseen/History, Movies filter |
 | **Movie detail** | Playback, chapters, duration/source metadata, feedback, Seen state |
-| **Friction Logs** | Scenario prompts, run history, improvement rollup, step screenshots/transcripts/notes |
+| **User stories** (Friction Logs in the macOS app until it is updated) | Scenario prompts, run history, improvement rollup, step screenshots/transcripts/notes |
 | **Narrated video** | Optional on-device transcript-to-MP4 generation on Apple Silicon |
 | **Settings** | Watched folders, overlay behavior, narration, and software updates |
 
@@ -19,7 +19,7 @@
 | Jumping between projects to find shots | One tray, every project under your watched folders |
 | "Did that step look right?" mid-run | Desktop overlay above all windows |
 | Manual folder digging after a suite | Newest-first history with titles from a small manifest |
-| UX findings scattered across chat and screenshots | Friction Logs pair every step with evidence, transcript, and good/improve notes |
+| UX findings scattered across chat and screenshots | User stories (earlier: friction logs) pair every step with evidence, transcript, and good/improve notes |
 | Repeating a walkthrough loses the earlier result | Per-scenario run history keeps every non-empty attempt switchable |
 
 No project picker. No account. No cloud. Just files on disk and an Astroshots
@@ -45,9 +45,10 @@ icon in the menu bar.
    chapters.
 5. **Review** — Send feedback or mark the current poster/image Seen. Astroshots
    writes hash- and run-scoped human state to `review.json`.
-6. **Walk the product** — **Friction Logs** lists agentic scenarios under the
-   reserved `.astroshot/friction-logs/` tree
-   ([friction logs](friction-logs.md)).
+6. **Walk the product** — **User stories** lists agentic scenarios under the
+   reserved `.astroshot/stories/` tree, and the older `.astroshot/friction-logs/`
+   tree ([user stories](user-stories.md)). The macOS app may still label the tab
+   Friction Logs.
 7. **Narrate (optional)** — On Apple Silicon, enable Settings → Narration to
    generate an on-device MP4 from step screenshots and transcripts with
    Qwen3-TTS. Models download only after opt-in.
@@ -62,7 +63,7 @@ icon in the menu bar.
   <img src="images/movie-detail.png" alt="Movie detail showing playback actions, chapter metadata, feedback, and Seen acknowledgement" width="360" />
 </p>
 
-## Friction Logs
+## User stories (Friction Logs)
 
 <p align="center">
   <img src="images/friction-logs.png" alt="Friction Logs tab listing a completed checkout scenario with two retained runs and two improvement notes" width="280" />
@@ -85,5 +86,5 @@ complete set with `bash scripts/capture-readme-screenshots.sh`.
 
 The npm screenshot tools require Node.js 22.14 or later and a locally installed
 Chromium managed by Playwright. Native-window movie capture needs macOS Screen
-Recording permission. Optional narrated friction-log videos need Apple Silicon;
+Recording permission. Optional narrated user-story videos need Apple Silicon;
 enabling Narration downloads the Qwen3-TTS model locally.

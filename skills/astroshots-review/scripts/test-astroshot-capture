@@ -361,4 +361,106 @@ if find "$TEST_ROOT/.astroshot" \
   fail "temporary or lock residue remains after capture"
 fi
 
+# Runner skeleton capture resolution. The skeleton is driven end to end with a
+# fake agent-browser and curl, so only the capture command differs per case.
+SKELETON="$SCRIPT_DIR/../../browser-ui-harness/references/runner-skeleton.sh"
+[[ -f "$SKELETON" ]] || fail "runner skeleton not found at $SKELETON"
+
+SKEL_PROJECT="$TEST_ROOT/skeleton-project"
+SKEL_BIN="$TEST_ROOT/skeleton-bin"
+SKEL_ARGV="$TEST_ROOT/archdev-argv.log"
+mkdir -p "$SKEL_PROJECT/harness/cases" "$SKEL_BIN"
+git -C "$SKEL_PROJECT" init -q
+# The skeleton reports the physical path; compare against that, not /var vs /private/var.
+SKEL_PROJECT="$(cd "$SKEL_PROJECT" && pwd -P)"
+SKEL_ARTIFACTS="$(cd "$TEST_ROOT" && pwd -P)/skeleton-artifacts"
+cp "$SKELETON" "$SKEL_PROJECT/harness/run.sh"
+cat >"$SKEL_PROJECT/harness/cases/smoke.sh" <<'CASE'
+run_case() {
+  smoke_step "Open the page"
+  smoke_capture "first-frame" "The page is visible."
+}
+CASE
+
+# Fake agent-browser: `screenshot --full <path>` copies the PNG fixture; every
+# other verb succeeds silently.
+cat >"$SKEL_BIN/agent-browser" <<FAKE
+#!/usr/bin/env bash
+args=("\$@")
+for ((i = 0; i < \${#args[@]}; i++)); do
+  if [[ "\${args[i]}" == "screenshot" ]]; then
+    cp "$SOURCE" "\${args[\${#args[@]} - 1]}"
+  fi
+done
+exit 0
+FAKE
+printf '#!/usr/bin/env bash\nexit 0\n' >"$SKEL_BIN/curl"
+chmod +x "$SKEL_BIN/agent-browser" "$SKEL_BIN/curl"
+
+run_skeleton() {
+  local path_value="$1"
+  (
+    cd "$SKEL_PROJECT"
+    env PATH="$path_value" \
+      APP_BASE_URL="http://skeleton.invalid" \
+      SMOKE_RUN_ID="skeleton-run" \
+      SMOKE_ARTIFACTS_DIR="$SKEL_ARTIFACTS" \
+      bash harness/run.sh smoke >"$TEST_ROOT/skeleton.out" 2>&1
+  ) || {
+    cat "$TEST_ROOT/skeleton.out" >&2
+    fail "runner skeleton exited non-zero"
+  }
+}
+
+path_without_archdev() {
+  local IFS=:
+  local dir out=""
+  for dir in $PATH; do
+    [[ -n "$dir" && ! -x "$dir/archdev" ]] || continue
+    out+="${out:+:}$dir"
+  done
+  printf '%s' "$out"
+}
+
+# (a) A fake archdev whose `shots doctor` exits 0 takes the capture step.
+cat >"$SKEL_BIN/archdev" <<FAKE
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$SKEL_ARGV"
+exit 0
+FAKE
+chmod +x "$SKEL_BIN/archdev"
+: >"$SKEL_ARGV"
+run_skeleton "$SKEL_BIN:$PATH"
+
+[[ "$(sed -n 1p "$SKEL_ARGV")" == "shots doctor" ]] ||
+  fail "skeleton did not probe 'archdev shots doctor' first: $(cat "$SKEL_ARGV")"
+grep -qxF "shots capture --root $SKEL_PROJECT --feature smoke --slug first-frame --description The page is visible. --status running --source $SKEL_ARTIFACTS/screenshots/01-first-frame.png --run-id skeleton-run" "$SKEL_ARGV" ||
+  fail "skeleton did not call 'archdev shots capture' with the expected flags: $(cat "$SKEL_ARGV")"
+grep -qxF "shots capture --root $SKEL_PROJECT --feature smoke --status pass --run-id skeleton-run --finalize" "$SKEL_ARGV" ||
+  fail "skeleton did not finalize through 'archdev shots capture': $(cat "$SKEL_ARGV")"
+[[ ! -e "$SKEL_PROJECT/.astroshot" ]] ||
+  fail "bash helper ran even though archdev handled the capture"
+
+# (b) With no archdev on PATH, the skeleton falls back to the bash helper.
+rm -f "$SKEL_BIN/archdev"
+rm -rf "$SKEL_ARTIFACTS"
+ln -s "$CAPTURE" "$SKEL_BIN/astroshot-capture"
+NO_ARCHDEV_PATH="$SKEL_BIN:$(path_without_archdev)"
+PATH="$NO_ARCHDEV_PATH" command -v archdev >/dev/null 2>&1 &&
+  fail "test setup could not remove archdev from PATH"
+run_skeleton "$NO_ARCHDEV_PATH"
+
+SKEL_MANIFEST="$SKEL_PROJECT/.astroshot/smoke/manifest.json"
+jq -e '
+  .feature == "smoke"
+  and .run_id == "skeleton-run"
+  and .status == "pass"
+  and (.shots | length) == 1
+  and .shots[0].slug == "first-frame"
+' "$SKEL_MANIFEST" >/dev/null ||
+  fail "skeleton did not publish through the bash helper without archdev"
+[[ -f "$SKEL_PROJECT/.astroshot/smoke/0001-first-frame.png" ]] ||
+  fail "bash helper did not publish the skeleton image"
+
+echo "PASS: runner skeleton capture resolution (archdev shots, bash helper)"
 echo "PASS: astroshot-capture atomicity and concurrency"

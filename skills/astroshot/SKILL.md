@@ -12,6 +12,34 @@ description: >
 
 # Astroshot capture
 
+## Native `archdev shots` support
+
+When `archdev shots` is available and enabled, the same engine runs as a
+command group of `archdev`. Detect it once per session:
+
+```bash
+if command -v archdev >/dev/null 2>&1 && archdev shots doctor >/dev/null 2>&1; then
+  NATIVE=1   # archdev shots is installed and enabled
+else
+  NATIVE=0   # use the standalone astroshot commands in this skill
+fi
+```
+
+`archdev shots doctor` exits 0 only when the feature is installed and enabled
+(`archdev settings set shots on`). Any other result means: use the standalone
+`astroshot` commands below, which stay the fallback.
+
+| Standalone | Native |
+|---|---|
+| `astroshot react\|ink\|pty\|movie …` | `archdev shots react\|ink\|pty\|movie …` |
+| `astroshot review` | `archdev shots review` |
+| `astroshot doctor`, `init`, `demo` | `archdev shots doctor`, `init`, `demo` |
+| render, then `astroshot-capture --source` | `archdev shots react\|ink\|pty <fixture> --feature <f> --slug <s>` renders and publishes into `.astroshot/<f>/` in one step |
+| `astroshot-capture …` | `archdev shots capture …` |
+
+Subcommands and arguments are otherwise identical, so every `astroshot …`
+example in this skill works as `archdev shots …`.
+
 Use one CLI with four capture boundaries:
 
 | Target state | Mode | Read |
@@ -147,7 +175,8 @@ cross-platform.
 
 - To stream a standalone PNG into `.astroshot/<feature>/`, read the
   **astroshots-review**
-  skill and pass the file to `astroshot-capture --source`.
+  skill and pass the file to `astroshot-capture --source` (or
+  `archdev shots capture --source` when native support is available).
 - Movies already write poster+video+manifest into `.astroshot/<feature>/`; do
   not pass their poster through `astroshot-capture` again.
 - To plan, embed, inventory, and render-check a documentation image set, read

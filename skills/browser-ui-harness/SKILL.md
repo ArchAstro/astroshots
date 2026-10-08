@@ -151,15 +151,29 @@ smoke_capture "destination-default" \
 
 Also dual-write for live review when Astroshots is in play:
 
+Resolve the capture command in this order (the runner skeleton in
+[`references/runner-skeleton.sh`](references/runner-skeleton.sh) does this):
+
+1. `ASTROSHOT_CAPTURE`, when set to an executable (explicit override).
+2. `archdev shots capture`, when `archdev shots doctor` exits 0 (native
+   support is installed and enabled).
+3. `astroshot-capture` on `PATH` (the helper from the astroshots-review skill).
+
+If none resolve, the dual-write is skipped and the harness still runs.
+
 ```bash
-# Prefer astroshot-capture after install of the astroshots-review skill
-astroshot-capture --feature "$CASE_NAME" --slug "$slug" \
+# CAPTURE is the resolved command, e.g. `archdev shots capture` or astroshot-capture
+$CAPTURE --feature "$CASE_NAME" --slug "$slug" \
   --description "$description" \
   --status running \
   --from-agent-browser "$SESSION"
 # at end:
-astroshot-capture --feature "$CASE_NAME" --status pass --finalize
+$CAPTURE --feature "$CASE_NAME" --status pass --finalize
 ```
+
+`archdev shots capture` and `astroshot-capture` take the same flags. In a
+script, keep the command in an array (`CAPTURE_CMD=(archdev shots capture)`)
+and call `"${CAPTURE_CMD[@]}"`.
 
 Layout (see **astroshots-review** skill):
 
@@ -270,6 +284,6 @@ strict CI parallelism.
 
 - **screenshot** skill — documentation asset planning and visual review
 - **agent-browser** skill — CLI loop, snapshot, screenshots  
-- **astroshots-review** skill — `.astroshot/` layout + `astroshot-capture`
+- **astroshots-review** skill — `.astroshot/` layout, `astroshot-capture`, and the `archdev shots` equivalents
 - **astroshot** skill — deterministic React, Ink, and PTY stills plus journey movies
 - CLI deep dive: `agent-browser skills get core --full`
