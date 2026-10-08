@@ -49,16 +49,16 @@ while IFS= read -r skill_doc; do
   forbid_reference "$skill_doc" "@archastro:registry"
 done < <(find skills -name '*.md')
 
-for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness friction-log; do
+for skill in astroshot astroshots-review screenshot agent-browser browser-ui-harness user-story; do
   require_reference "skills/$skill/SKILL.md" "name: $skill"
 done
 
-require_reference "skills/friction-log/SKILL.md" ".astroshot/friction-logs"
-require_reference "skills/friction-log/SKILL.md" "log.jsonl"
-require_reference "skills/friction-log/SKILL.md" "transcript"
-require_reference "skills/friction-log/SKILL.md" "Transitions"
-require_reference "skills/friction-log/references/contract.md" "screenshots"
-require_reference "skills/friction-log/references/contract.md" "transcript"
+require_reference "skills/user-story/SKILL.md" ".astroshot/stories"
+require_reference "skills/user-story/SKILL.md" "log.jsonl"
+require_reference "skills/user-story/SKILL.md" "transcript"
+require_reference "skills/user-story/SKILL.md" "Transitions"
+require_reference "skills/user-story/references/contract.md" "screenshots"
+require_reference "skills/user-story/references/contract.md" "transcript"
 require_reference "skills/astroshot/SKILL.md" "astroshot movie which-source"
 require_reference "skills/astroshot/SKILL.md" "desktop.window"
 require_reference "skills/astroshot/SKILL.md" "astroshot demo"

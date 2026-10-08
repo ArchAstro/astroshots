@@ -10,7 +10,7 @@ This repo ships **six** skills for coding agents. Install them with the
 | **astroshot** | Capture deterministic React, Ink, and PTY stills plus journey movies |
 | **agent-browser** | Install & drive the agent-browser CLI |
 | **browser-ui-harness** | Bash UI smoke harness design (runner vs cases, evidence, cleanup) |
-| **friction-log** | Author, list, and run user-perspective UX scenarios with transcripts and evidence |
+| **user-story** | Author, list, and run user-perspective UX scenarios with transcripts and evidence (previously `friction-log`) |
 
 Skill sources: [`skills/`](../skills).
 
@@ -35,7 +35,7 @@ npx skills add ArchAstro/astroshots --skill '*' -y
 
 `--skill '*'` installs **every** skill in this repo (`astroshot`,
 `astroshots-review`, `screenshot`, `agent-browser`, `browser-ui-harness`, and
-`friction-log`). Using a single name (for example,
+`user-story`). Using a single name (for example,
 `--skill astroshots-review`) installs just that one.
 
 ### Install one skill
@@ -47,7 +47,7 @@ npx skills add ArchAstro/astroshots --skill screenshot -g -y
 npx skills add ArchAstro/astroshots --skill astroshot -g -y
 npx skills add ArchAstro/astroshots --skill agent-browser -g -y
 npx skills add ArchAstro/astroshots --skill browser-ui-harness -g -y
-npx skills add ArchAstro/astroshots --skill friction-log -g -y
+npx skills add ArchAstro/astroshots --skill user-story -g -y
 
 # This project only (from project root)
 npx skills add ArchAstro/astroshots --skill agent-browser -y

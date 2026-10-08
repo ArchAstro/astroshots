@@ -30,8 +30,18 @@ browser_started=0
 astroshot_started=0
 run_succeeded=0
 
-if [[ -z "$ASTROSHOT_CAPTURE" ]] && command -v astroshot-capture >/dev/null 2>&1; then
-  ASTROSHOT_CAPTURE="$(command -v astroshot-capture)"
+# Capture command, as an argv array. Resolution order:
+#   1. ASTROSHOT_CAPTURE (explicit override; must be executable)
+#   2. `archdev shots capture`, when `archdev shots doctor` exits 0
+#   3. `astroshot-capture` on PATH (the bash helper from the astroshots-review skill)
+# Empty array means no live-review dual-write.
+CAPTURE_CMD=()
+if [[ -n "$ASTROSHOT_CAPTURE" ]]; then
+  [[ -x "$ASTROSHOT_CAPTURE" ]] && CAPTURE_CMD=("$ASTROSHOT_CAPTURE")
+elif command -v archdev >/dev/null 2>&1 && archdev shots doctor >/dev/null 2>&1; then
+  CAPTURE_CMD=(archdev shots capture)
+elif command -v astroshot-capture >/dev/null 2>&1; then
+  CAPTURE_CMD=("$(command -v astroshot-capture)")
 fi
 
 log() { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$ARTIFACTS/run.log" >&2; }
@@ -67,8 +77,8 @@ smoke_capture() {
   smoke_browser wait 400 >/dev/null || true
   smoke_browser screenshot --full "$shot" >/dev/null
   printf -- '- %s\n- Screenshot: `%s`\n' "$description" "$shot" >>"$REPORT"
-  if [[ -x "$ASTROSHOT_CAPTURE" ]] && \
-    "$ASTROSHOT_CAPTURE" --root "$REPO_ROOT" --feature "$case_name" --slug "$slug" \
+  if [[ ${#CAPTURE_CMD[@]} -gt 0 ]] && \
+    "${CAPTURE_CMD[@]}" --root "$REPO_ROOT" --feature "$case_name" --slug "$slug" \
       --description "$description" --status running --source "$shot" \
       --run-id "$RUN_ID" >/dev/null; then
     astroshot_started=1
@@ -107,7 +117,7 @@ cleanup() {
     agent-browser --session "$SESSION" close >/dev/null 2>&1 || true
   fi
   if [[ "$astroshot_started" == "1" ]]; then
-    "$ASTROSHOT_CAPTURE" --root "$REPO_ROOT" --feature "$case_name" \
+    "${CAPTURE_CMD[@]}" --root "$REPO_ROOT" --feature "$case_name" \
       --status "$astroshot_status" --run-id "$RUN_ID" --finalize >/dev/null 2>&1 || true
   fi
   log "artifacts: $ARTIFACTS"

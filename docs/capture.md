@@ -177,6 +177,10 @@ astroshot-capture --feature install-wizard --slug configure \
   --from-agent-browser "$SESSION"
 ```
 
+When `archdev shots` is available and enabled (`archdev shots doctor` exits 0),
+`archdev shots capture` takes the same flags and prints the destination path;
+the skills prefer it and fall back to the helper.
+
 The helper lives at [`bin/astroshot-capture`](../bin/astroshot-capture) →
 [`skills/astroshots-review/scripts/astroshot-capture`](../skills/astroshots-review/scripts/astroshot-capture).
 

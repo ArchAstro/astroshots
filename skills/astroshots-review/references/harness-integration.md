@@ -1,5 +1,10 @@
 # Wiring harnesses to Astroshots
 
+When `archdev shots` is available (detect it with `archdev shots doctor`; see
+the **astroshots-review** skill), call `archdev shots capture` with the same
+flags wherever this page calls `astroshot-capture`. The browser-ui-harness
+runner skeleton already prefers it. The bash helper below is the fallback.
+
 ## agent-browser smoke (`services/agent_network/test-harness/agent-browser`)
 
 Today `smoke_capture` writes to:

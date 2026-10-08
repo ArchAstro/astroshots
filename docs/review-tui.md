@@ -73,7 +73,7 @@ herdr's own renderer, not the mosh image path.
 | macOS app | Terminal tray |
 |-----------|---------------|
 | Menu-bar tray, 430×640 | Full-screen alternate screen. Wide terminals (≥120 columns) split into stream + detail; narrow ones drill in like the app. |
-| Shots · Friction Logs tabs | `1` / `2` (or `tab`), with the same amber unseen counts |
+| Shots · Friction Logs tabs (the terminal tray's second tab will be labeled `User stories`) | `1` / `2` (or `tab`), with the same amber unseen counts |
 | Unseen / History chip, Movies chip, Seen-all | `u`, `m`, `S` (whole visible pool) or `A` (this worktree group) |
 | Worktree groups | Contiguous groups with the same chips; `z` collapses one |
 | Row text → Detail, thumbnail → full-screen review | `⏎` opens detail (narrow) or full-screen review (split); `f` always opens full screen |
@@ -84,10 +84,10 @@ herdr's own renderer, not the mosh image path.
 | Zoom & pan | Detail and full-screen review fill their area; `+` / `-` magnify (a true crop), `0` resets. When zoomed in, the arrows pan around the image instead of paging |
 | Copy Image, Show in Finder | `y`, `o` |
 | Desktop overlay for new frames | New captures insert at the top with a `N new` badge and a 5.5 s toast while the tray is open |
-| Friction log list, run picker, improve rollup, steps, step detail, step takeover | Same screens: `⏎` opens, `[` `]` switch runs (and images inside a step), `p` toggles the prompt, `← →` step, `f` full screen |
+| User story list, run picker, improve rollup, steps, step detail, step takeover | Same screens: `⏎` opens, `[` `]` switch runs (and images inside a step), `p` toggles the prompt, `← →` step, `f` full screen |
 | Settings | `,` shows watched folders, graphics capability, ffmpeg, and the index location |
 
-Not carried over: hiding friction logs, narrated video, software updates, and
+Not carried over: hiding user stories, narrated video, software updates, and
 the desktop overlay window itself.
 
 Press `?` inside the tray for the full key map.
@@ -104,7 +104,7 @@ The tray is a second writer of the on-disk contract, never a second contract:
 - `c` appends a comment without inventing a decision.
 - A run-id change resets the review map on the next write, exactly like the
   app's `resetReviewsIfNeeded`.
-- Friction logs are acknowledged per run through `runs/<run>/review.json`,
+- User stories (and legacy `friction-logs/` entries) are acknowledged per run through `runs/<run>/review.json`,
   keyed by `log.jsonl`.
 - Seen is never toggled off; replacing an image or starting a new run makes it
   unseen again, and the stale banner says so.
@@ -123,7 +123,7 @@ The tray is a second writer of the on-disk contract, never a second contract:
   the deep walk (ten levels, the app's skip list) when the index is older than
   30 minutes. `r` forces a deep rescan.
 - Filesystem changes stream in live: images ingest individually, `manifest.json`
-  / `review.json` refresh their feature, friction-log paths refresh that
+  / `review.json` refresh their feature, user-story paths (`stories/` and `friction-logs/`) refresh that
   namespace, and new `.astroshot` directories join the stream.
 - Pictures are decoded and downsampled on worker threads and cached by file
   identity and target size. Only frames with a review entry are hashed.

@@ -1,5 +1,8 @@
 # React mode
 
+When `archdev shots` is available (see the **astroshot** skill), `archdev shots react …`
+takes the same arguments as `astroshot react …`.
+
 Use `astroshot react` when fixed props and local providers can reproduce the
 state without a running application.
 

@@ -5,9 +5,9 @@ description: >
   the macOS menu-bar app that watches .astroshot/ across worktrees, and read
   its hash- and run-scoped feedback. Use when wiring a harness to the
   .astroshot contract, choosing a movie source, operating movie playback,
-  separating one-off Shots from the reserved friction-log tree, or debugging
+  separating one-off Shots from the reserved user-story tree, or debugging
   overlays and review state. This is review transport, not the underlying
-  React, terminal, browser, friction-log, or documentation capture workflow.
+  React, terminal, browser, user-story, or documentation capture workflow.
 ---
 
 # Astroshots live review
@@ -15,6 +15,42 @@ description: >
 Astroshots watches `.astroshot/` trees, flashes new frames as desktop overlays,
 and keeps one menu-bar stream across watched worktrees. Capture tools produce
 images; Astroshots transports them to a human and writes feedback.
+
+## Native `archdev shots` support
+
+When `archdev shots` is available and enabled, the Astroshots engine is also a
+command group of `archdev`. Detect it once per session:
+
+```bash
+if command -v archdev >/dev/null 2>&1 && archdev shots doctor >/dev/null 2>&1; then
+  NATIVE=1   # archdev shots is installed and enabled
+else
+  NATIVE=0   # use the standalone astroshot commands in this skill
+fi
+```
+
+`archdev shots doctor` exits 0 only when the feature is installed and enabled
+(`archdev settings set shots on`). Any other result means: use the standalone
+path. The rest of this skill stays correct as the fallback.
+
+| Standalone | Native |
+|---|---|
+| `astroshot-capture --feature … --source …` | `archdev shots capture --feature … --source …` |
+| `astroshot-capture … --from-agent-browser "$SESSION"` | `archdev shots capture … --from-agent-browser "$SESSION"` |
+| `astroshot-capture … --status pass --finalize` | `archdev shots capture … --status pass --finalize` |
+| `astroshot react\|ink\|pty\|movie\|review\|doctor\|init\|demo` | `archdev shots react\|ink\|pty\|movie\|review\|doctor\|init\|demo` |
+| read `manifest.json` and `review.json` by hand | `archdev shots status [--feature <f>] --json` |
+
+`archdev shots capture` takes the same flags as the bash helper (`--feature`,
+`--slug`, `--source` or `--from-agent-browser`, `--title`, `--description`,
+`--url`, `--viewport`, `--status`, `--run-id`, `--root`, `--finalize`) and prints
+the destination path on stdout. `archdev shots react|ink|pty <fixture>
+--feature <f> --slug <s>` renders and publishes into `.astroshot/<f>/` in one
+step.
+
+To bring review into the ArchCode web UI, `archdev shots upload --feature <f>`
+uploads a run, and `archdev shots status --remote` or `archdev shots pull`
+bring web review comments back into `review.json`.
 
 ## Choose the capture source
 
@@ -72,10 +108,12 @@ Write from the worktree root:
 - `manifest.json` is harness execution state.
 - `review.json` is human feedback written by the app.
 - The directory containing `.astroshot` defines the worktree/project.
-- Do **not** put one-off harness frames under `.astroshot/friction-logs/` —
-  that reserved tree is for agentic friction-log scenarios (see the
-  **friction-log** skill). Those runs appear in the tray **Friction Logs**
-  tab, not the Shots stream.
+- Do **not** put one-off harness frames under `.astroshot/stories/` or
+  `.astroshot/friction-logs/`. Both are reserved names for agentic user-story
+  scenarios (see the **user-story** skill; `friction-logs` is the earlier name
+  and is still read). Those runs appear in the tray's user stories tab, not the
+  Shots stream. The terminal tray will label that tab `User stories`; the macOS app
+  may still label it Friction Logs until it is updated.
 
 Read [the manifest and review contract](references/manifest.md) whenever
 writing a custom integration or interpreting feedback. Read
@@ -84,7 +122,8 @@ from a Bash or agent-browser harness.
 
 ## Use the capture helper
 
-Resolve `astroshot-capture` from an explicit override, a project install, a
+With native support (see above), run `archdev shots capture` with the same
+flags and skip the lookup below. Otherwise resolve `astroshot-capture` from an explicit override, a project install, a
 global skill install, or this repository:
 
 ```bash
@@ -143,7 +182,20 @@ finalize call. Finalize execution state when the journey ends:
 
 ## Read review feedback
 
-For every current-run frame:
+When `archdev shots` is available, read review state with:
+
+```bash
+archdev shots status --feature <feature> --json
+```
+
+It prints `{ root, features: [{ feature, run_id, status, shots: [{ file, slug,
+title, kind, state, comments: [{id, body, created_at}] }] }], totals }`, where
+`state` is `seen`, `stale`, or `unseen`, and it applies the hash and run
+scoping below for you. Report every comment it returns. Without `--feature` it
+covers every feature under the root.
+
+Fallback when `archdev shots` is not available: apply the rules by hand. For
+every current-run frame:
 
 1. Find the exact filename entry in `review.json`.
 2. Confirm `review.json.run_id` matches `manifest.json.run_id`.
@@ -159,8 +211,9 @@ The resulting state is:
 | Decision hash differs from current bytes | `stale`; comments remain guidance |
 | Matching current-run `seen` decision and hash | `seen` |
 
-Never edit `review.json` to mark your own work Seen. Address feedback, capture
-new bytes, and let the human review the new hash.
+Never edit `review.json` to mark your own work Seen, with or without
+`archdev shots`. Address feedback, capture new bytes, and let the human review
+the new hash.
 
 ## Operate and troubleshoot the app
 

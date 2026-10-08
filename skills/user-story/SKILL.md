@@ -1,34 +1,68 @@
 ---
-name: friction-log
+name: user-story
 description: >
-  Author, list, and run Astroshots friction logs — agentic user-perspective UX
+  Author, list, and run Astroshots user stories — agentic user-perspective UX
   scenarios that write JSONL steps with screenshots, good/improve notes, and a
-  spoken transcript per step under .astroshot/friction-logs/. Use when the user
-  wants a friction log, UX walkthrough from a clean user, scenario prompt for the
-  Astroshots Friction Logs tab, narrated-video-ready step transcripts, or to
-  run/list existing friction logs in a worktree.
+  spoken transcript per step under .astroshot/stories/. Use when the user wants
+  a user story, a friction log (the earlier name), a UX walkthrough from a clean
+  user, a scenario prompt for the Astroshots user stories tab, narrated-video-ready
+  step transcripts, or to run/list existing user stories in a worktree.
 ---
 
-# Friction logs
+# User stories
 
-A **friction log** is a local agent run that walks a product the way a real user
+A **user story** is a local agent run that walks a product the way a real user
 would: explicit steps, clean environment, screenshots, and honest UX notes.
 
-Astroshots shows them in the tray **Friction Logs** tab (separate from one-off
-**Shots**). Prompts and run output live under the worktree:
+This feature was previously called **friction logs**. New stories go under
+`.astroshot/stories/`. The old `.astroshot/friction-logs/` tree is still read,
+and existing content there is never moved or deleted. If a slug exists in both
+trees, the copy under `stories/` is the one that is read.
+
+The review tray lists user stories in its second tab, separate from one-off
+**Shots**. The terminal tray (`astroshot review`) will label that tab `User stories`.
+The macOS app may still label it Friction Logs until it is updated. Prompts and
+run output live under the worktree:
 
 ```text
-.astroshot/friction-logs/<slug>/
-  prompt.md              # authored scenario (viewable in the app)
+.astroshot/stories/<slug>/
+  prompt.md              # authored scenario (viewable in the tray)
   meta.json              # optional title / description / status
   runs/<run-id>/
     log.jsonl            # one JSON object per step
+    meta.json            # optional per-run status
     0001-land-home.png
     0002-open-cart.png
 ```
 
-One-off captures still use `.astroshot/<feature>/` — never put friction-log
-runs there. The app ignores `friction-logs` in the Shots stream.
+One-off captures still use `.astroshot/<feature>/`; never put user-story runs
+there. `stories` and `friction-logs` are both reserved names and never appear
+in the Shots stream.
+
+## Native `archdev shots` support
+
+When `archdev shots` is available and enabled, use its `stories` commands
+instead of the shell steps below. They read and write the same on-disk layout.
+Detect it once per session:
+
+```bash
+if command -v archdev >/dev/null 2>&1 && archdev shots doctor >/dev/null 2>&1; then
+  NATIVE=1   # archdev shots is installed and enabled
+else
+  NATIVE=0   # use the manual shell steps in this skill
+fi
+```
+
+`archdev shots doctor` exits 0 only when the feature is installed and enabled
+(`archdev settings set shots on`). Any other result means: use the manual steps.
+
+| Task | Native command | Manual fallback |
+|---|---|---|
+| Create a story | `archdev shots stories new <slug> --title "<title>"` | `mkdir -p .astroshot/stories/<slug>` and write `prompt.md` |
+| List stories | `archdev shots stories list [--json]` | the `find` loop under **List** |
+| Show a story and its runs | `archdev shots stories show <slug> [--run <id>] [--json]` | read `prompt.md` and `runs/*/log.jsonl` |
+| Start a new run directory | `archdev shots stories run-dir <slug>` (creates and prints it) | the shell block under **Run** |
+| Upload for web review | `archdev shots stories upload <slug>` | none; review in the tray |
 
 ## Choose the mode
 
@@ -46,13 +80,17 @@ Write a prompt a coding agent can execute without inventing the journey.
 
 ### Prompt file
 
-Create:
+Create the story directory, then write its `prompt.md`:
 
 ```bash
-mkdir -p .astroshot/friction-logs/<slug>
+# native (when archdev shots is available)
+archdev shots stories new <slug> --title "<title>"
+
+# manual fallback
+mkdir -p .astroshot/stories/<slug>
 ```
 
-Write `.astroshot/friction-logs/<slug>/prompt.md` with:
+Write `.astroshot/stories/<slug>/prompt.md` with:
 
 1. **Goal** — one sentence, user outcome (not implementation).
 2. **Persona** — who the user is (new, free tier, admin, etc.).
@@ -122,28 +160,38 @@ First-time buyer on the free marketing site.
 Admin dashboards, refunds, mobile native shells.
 
 ## Output
-Write `runs/<run-id>/log.jsonl` and screenshots per the friction-log run contract.
+Write `runs/<run-id>/log.jsonl` and screenshots per the user-story run contract.
 Every JSONL step must include a `transcript` (spoken narrative with flowing
 transitions across steps).
 ```
 
 After authoring, tell the human the path and that Astroshots will list the
-prompt under **Friction Logs** once the tray rescans (or on next FSEvent).
+prompt under **User stories** once the tray rescans (or on next FSEvent). The
+macOS app may still show the tab as Friction Logs.
 
 ---
 
 ## List
 
-From the worktree root (or any watched parent):
+From the worktree root (or any watched parent). With native support:
 
 ```bash
-# All friction logs under this worktree
-find .astroshot/friction-logs -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort
+archdev shots stories list --json
+archdev shots stories show <slug> --json
+```
+
+Manual fallback. It lists `stories/` and the legacy `friction-logs/` tree; when
+a slug is in both, skip the `friction-logs/` copy:
+
+```bash
+# All user stories under this worktree
+find .astroshot/stories .astroshot/friction-logs -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort
 
 # Prompt + every run per slug (flag empty stubs the app will hide)
-for d in .astroshot/friction-logs/*/; do
+for d in .astroshot/stories/*/ .astroshot/friction-logs/*/; do
   [ -d "$d" ] || continue
   slug=$(basename "$d")
+  case "$d" in .astroshot/friction-logs/*) [ -d ".astroshot/stories/$slug" ] && continue ;; esac
   prompt="missing"; [ -f "$d/prompt.md" ] && prompt="prompt.md"
   echo "$slug  prompt=$prompt"
   if [ -d "$d/runs" ]; then
@@ -165,7 +213,8 @@ done
 ```
 
 Summarize for the human: slug, title (from meta or humanized slug), **all run
-ids** (not only latest), which are empty stubs, and whether `log.jsonl` has steps.
+ids** (not only latest), which are empty stubs, and whether `log.jsonl` has steps. Note which stories exist only under the
+legacy `friction-logs/` tree.
 
 ---
 
@@ -179,11 +228,23 @@ Execute an existing `prompt.md` (or author first if missing).
 existing `runs/<id>/` folder, and never write `log.jsonl` only at the slug root
 when you already have nested runs (the app prefers nested history).
 
+With native support, this creates the run directory and prints its path:
+
+```bash
+SLUG="<slug>"                     # e.g. checkout-as-new-user
+RUN_DIR="$(archdev shots stories run-dir "$SLUG")"
+RUN_ID="$(basename "$RUN_DIR")"
+```
+
+Manual fallback. A story that exists only under `friction-logs/` keeps its
+runs there; use `ROOT=".astroshot/friction-logs/$SLUG"` for it. New stories use
+`stories/`:
+
 ```bash
 SLUG="<slug>"                     # e.g. checkout-as-new-user
 # Unique id — second resolution. Never reuse an existing runs/<id>/.
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
-ROOT=".astroshot/friction-logs/$SLUG"
+ROOT=".astroshot/stories/$SLUG"
 RUN_DIR="$ROOT/runs/$RUN_ID"
 i=0
 while [ -e "$RUN_DIR" ]; do
@@ -193,7 +254,7 @@ done
 RUN_ID="$(basename "$RUN_DIR")"
 mkdir -p "$RUN_DIR"
 : > "$RUN_DIR/log.jsonl"
-echo "Friction run dir: $RUN_DIR"
+echo "User story run dir: $RUN_DIR"
 ```
 
 Set slug `meta.json` status to `running` while active; `complete` or `failed`
@@ -201,7 +262,7 @@ when finished. Optional per-run `runs/<id>/meta.json` with the same `status`
 field is fine.
 
 Astroshots lists **every** non-empty `runs/<id>/` under the slug (newest by
-directory mtime first). The tray Friction Logs row shows the run count; open the
+directory mtime first). The tray User stories row shows the run count; open the
 log to switch between runs.
 
 ### 2. Clean environment
@@ -227,7 +288,7 @@ Before step 1:
 
    Prefer the project capture helper / agent-browser / astroshot skill that
    already matches the surface. Copy or write the PNG **into the run dir**
-   (friction logs do not use `astroshot-capture` feature folders).
+   (user stories do not use `astroshot-capture` feature folders).
 
 4. **Append one JSON line** to `$RUN_DIR/log.jsonl` (never rewrite earlier lines
    mid-run unless correcting a failed partial write):
@@ -277,7 +338,7 @@ Honesty bar:
 ### Transcript rules (required every step)
 
 `transcript` is the **spoken voiceover** for this step. It will be stitched into a
-narrated video of the friction log. Write it for the ear, not as a bullet dump.
+narrated video of the user story. Write it for the ear, not as a bullet dump.
 
 **What every transcript must cover (in prose):**
 
@@ -335,8 +396,8 @@ account, and land in an empty workspace ready for first project.
 ### 4. Finish
 
 1. Update `meta.json` status to `complete` or `failed`.
-2. Confirm Astroshots tray → **Friction Logs** shows the slug; open it and
-   click through steps.
+2. Confirm the Astroshots tray **User stories** tab shows the slug (the macOS
+   app may still label it Friction Logs); open it and click through steps.
 3. Report to the human: path to `RUN_DIR`, step count, top 3 improve items
    across the run.
 
@@ -370,9 +431,9 @@ account, and land in an empty workspace ready for first project.
 | Live browser routing / auth | **agent-browser** |
 | Reusable multi-case browser harness | **browser-ui-harness** |
 | Stream one-off harness frames for human review | **astroshots-review** |
-| Friction-log author / list / run | **friction-log** (this skill) |
+| User-story author / list / run | **user-story** (this skill) |
 
-Friction logs are **agent-authored UX narrative**, not harness pass/fail.
+User stories are **agent-authored UX narrative**, not harness pass/fail.
 `manifest.json` / `review.json` remain the one-off shot contract.
 Do not replace required per-step screenshots with one `astroshot movie`
 recording. The screenshots ground each note; the optional narrated MP4 is a
@@ -388,5 +449,8 @@ the model in the background and serializes render jobs in a queue.
 Agents should still write high-quality `transcript` fields; they do **not**
 invoke TTS themselves. Point humans at the run detail **Make narrated video**
 control once narration status is Ready.
+
+With native support, `archdev shots stories upload <slug>` uploads a story for
+review in the ArchCode web UI.
 
 Full JSONL and directory notes: [references/contract.md](references/contract.md).
