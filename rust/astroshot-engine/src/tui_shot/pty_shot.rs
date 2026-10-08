@@ -105,6 +105,16 @@ fn key_from_name(name: &str) -> Option<PtyKey> {
     })
 }
 
+/// TEMPORARY diagnostics: append a line to `ASTROSHOT_PTY_DEBUG_LOG`.
+pub(crate) fn debug_log(message: &str) {
+    let Some(path) = std::env::var_os("ASTROSHOT_PTY_DEBUG_LOG") else {
+        return;
+    };
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "[pid {}] {message}", std::process::id());
+    }
+}
+
 fn fixture_error(fixture_path: &str, detail: &str) -> anyhow::Error {
     anyhow!("Invalid PTY fixture {fixture_path}: {detail}")
 }
@@ -653,10 +663,27 @@ fn process_chunk(context: &ReaderContext, data: &[u8]) {
 
 fn read_loop(mut reader: Box<dyn Read + Send>, context: ReaderContext) {
     let mut buffer = [0u8; 8192];
+    let mut reads = 0;
     loop {
         match reader.read(&mut buffer) {
-            Ok(0) | Err(_) => break,
-            Ok(count) => process_chunk(&context, &buffer[..count]),
+            Ok(0) => {
+                debug_log("reader: EOF");
+                break;
+            }
+            Err(error) => {
+                debug_log(&format!("reader: error {error}"));
+                break;
+            }
+            Ok(count) => {
+                if reads < 8 {
+                    reads += 1;
+                    debug_log(&format!(
+                        "reader: {count} bytes: {:?}",
+                        String::from_utf8_lossy(&buffer[..count.min(200)])
+                    ));
+                }
+                process_chunk(&context, &buffer[..count]);
+            }
         }
     }
     lock(&context.shared).reader_done = true;
@@ -744,6 +771,7 @@ fn wait_loop(child: SharedChild, shared: SharedState, exited_flag: Arc<AtomicBoo
             Err(_) => break None,
         }
     };
+    debug_log(&format!("child exit status: {status:?}"));
     let code = status.map_or(1, |status| {
         // node-pty reports `exitCode: 0` for a signal death.
         if status.signal().is_some() {
@@ -1079,7 +1107,13 @@ pub async fn take_isolated_pty_shot(
         builder.env(name, value);
     }
     builder.cwd(&cwd);
+    debug_log(&format!(
+        "spawn: wrapper={use_exit_wrapper} argv={:?} cwd={} fixture_command={command:?}",
+        builder.get_argv(),
+        cwd.display()
+    ));
     let spawned = pair.slave.spawn_command(builder);
+    debug_log(&format!("spawn result ok={}", spawned.is_ok()));
     drop(pair.slave);
     let child = match spawned {
         Ok(child) => child,

@@ -82,6 +82,7 @@ fn report_exit(
 /// to `stdout`. Returns the wrapper's own exit code: `2` for bad usage,
 /// otherwise `0` once the program's code has been reported.
 pub fn run(args: &[String], stdout: &mut impl Write, stderr: &mut impl Write) -> i32 {
+    super::pty_shot::debug_log(&format!("wrapper: argv={args:?}"));
     let (Some(token), Some(status_path), Some(command)) = (
         args.first().filter(|value| !value.is_empty()),
         args.get(1).filter(|value| !value.is_empty()),
@@ -138,8 +139,12 @@ pub fn run(args: &[String], stdout: &mut impl Write, stderr: &mut impl Write) ->
                 return LAUNCH_FAILURE_CODE;
             }
         };
+        super::pty_shot::debug_log("wrapper: spawned target");
         match child.wait().await {
-            Ok(status) => status.code().unwrap_or(1),
+            Ok(status) => {
+                super::pty_shot::debug_log(&format!("wrapper: target status {status:?}"));
+                status.code().unwrap_or(1)
+            }
             Err(_) => 1,
         }
     });
