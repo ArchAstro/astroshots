@@ -92,7 +92,10 @@ async function importOwn(name) {
 let tsxApi = null;
 async function tsImport(file) {
   tsxApi ??= await importOwn("tsx/esm/api");
-  return tsxApi.tsImport(file, import.meta.url);
+  // tsx hands the specifier to Node's ESM loader, which rejects a Windows
+  // absolute path (`D:\...`) as an unknown URL scheme. Callers pass absolute
+  // paths, so always convert to a file URL.
+  return tsxApi.tsImport(pathToFileURL(file).href, import.meta.url);
 }
 
 // -------------------------------------------------------------- react config
