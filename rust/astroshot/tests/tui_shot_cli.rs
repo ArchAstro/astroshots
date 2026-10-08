@@ -431,10 +431,12 @@ fn astroshot_tui_writes_a_png_for_a_bare_ink_fixture_path() {
     ]);
 
     assert_eq!(result.status.code(), Some(0), "{}", combined(&result));
-    assert_eq!(
-        text(&result.stdout),
-        format!("wrote {}\n", out_path.display())
-    );
+    // The CLI prints the resolved path, which `path.resolve` writes with the
+    // platform separator; the `-o` argument above is spelled with `/`.
+    let printed = out_path.display().to_string();
+    #[cfg(windows)]
+    let printed = printed.replace('/', "\\");
+    assert_eq!(text(&result.stdout), format!("wrote {printed}\n"));
     assert_eq!(text(&result.stderr), "");
     // basic.tsx: 42x8 cells at scale 1.
     assert_eq!(varied_png_size(&out_path), (435, 203));
@@ -580,6 +582,17 @@ fn usage_errors_print_the_ts_message_and_exit_1() {
     // A manifest that does not exist is reported with its resolved path.
     let dir = tempfile::tempdir().unwrap();
     let cwd = dir.path().canonicalize().unwrap();
+    // `canonicalize` returns a `\\?\` verbatim path on Windows. The child
+    // is started in it, but `GetCurrentDirectoryW` hands back the plain
+    // drive path (CI log: the binary printed `C:\Users\...`). Node's
+    // `process.cwd()` is the same call, so the TS message names the plain form
+    // too.
+    #[cfg(windows)]
+    let cwd = PathBuf::from(
+        cwd.to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .to_string(),
+    );
     let result = run_with(Path::new(BIN), &["ink", "batch", "m.yaml"], &cwd, &[]);
     assert_eq!(result.status.code(), Some(1));
     assert_eq!(

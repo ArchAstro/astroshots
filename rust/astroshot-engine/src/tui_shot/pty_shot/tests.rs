@@ -441,12 +441,23 @@ mod real_programs {
 
     #[test]
     fn graphics_mode_answers_device_queries() {
-        assert_eq!(terminal_replies("\x1b[c", (0, 0)), "\x1b[?1;2c");
+        assert_eq!(terminal_replies("\x1b[c", (0, 0), false), "\x1b[?1;2c");
         assert_eq!(
-            terminal_replies("x\x1b[0cy\x1b[5n", (0, 0)),
+            terminal_replies("x\x1b[0cy\x1b[5n", (0, 0), false),
             "\x1b[?1;2c\x1b[0n"
         );
-        assert_eq!(terminal_replies("\x1b[6n", (4, 2)), "\x1b[3;5R");
-        assert_eq!(terminal_replies("\x1b[31mred", (0, 0)), "");
+        assert_eq!(terminal_replies("\x1b[6n", (4, 2), false), "\x1b[3;5R");
+        assert_eq!(terminal_replies("\x1b[31mred", (0, 0), false), "");
+    }
+
+    #[test]
+    fn conpty_startup_query_gets_only_a_cursor_report() {
+        // ConPTY asks for the cursor position and withholds output until
+        // answered; the other device queries stay unanswered without graphics.
+        assert_eq!(
+            terminal_replies("\x1b[c\x1b[5n\x1b[6n", (0, 0), true),
+            "\x1b[1;1R"
+        );
+        assert_eq!(terminal_replies("plain", (0, 0), true), "");
     }
 }

@@ -16,6 +16,10 @@
 //!   its replies. The alacritty screen answers nothing, so graphics mode
 //!   replies to primary DA (`CSI c`), DSR 5 and DSR 6 itself with xterm's
 //!   answers (`ESC [ ? 1 ; 2 c`, `ESC [ 0 n`, `ESC [ row ; col R`).
+//! - Windows cursor report: portable-pty opens ConPTY with
+//!   `PSEUDOCONSOLE_INHERIT_CURSOR`, so ConPTY sends `ESC [ 6 n` first and
+//!   holds all output until the terminal answers. node-pty does not set that
+//!   flag. On Windows the reader answers DSR 6 even without graphics.
 //! - Kill: `portable-pty` sends SIGHUP, waits 200ms, then SIGKILL in one
 //!   `kill()`; it is called twice with a 500ms wait after each, as in TS.
 //! - Exit wrapper: TS spawns `node pty-exit-wrapper.js`. Here the wrapper is
@@ -583,7 +587,10 @@ fn decode_utf8_chunk(pending: &mut Vec<u8>, data: &[u8]) -> String {
 }
 
 /// Answers xterm gives to the device queries a kitty-aware program sends.
-fn terminal_replies(text: &str, cursor: (u16, u16)) -> String {
+///
+/// `cursor_report_only` answers just DSR 6 (the cursor position ConPTY asks
+/// for at startup) and ignores the other queries.
+fn terminal_replies(text: &str, cursor: (u16, u16), cursor_report_only: bool) -> String {
     let mut replies = String::new();
     let mut rest = text;
     while let Some(start) = rest.find("\x1b[") {
@@ -593,8 +600,8 @@ fn terminal_replies(text: &str, cursor: (u16, u16)) -> String {
             .unwrap_or(after.len());
         let params = &after[..end];
         match (after[end..].chars().next(), params) {
-            (Some('c'), "" | "0") => replies.push_str("\x1b[?1;2c"),
-            (Some('n'), "5") => replies.push_str("\x1b[0n"),
+            (Some('c'), "" | "0") if !cursor_report_only => replies.push_str("\x1b[?1;2c"),
+            (Some('n'), "5") if !cursor_report_only => replies.push_str("\x1b[0n"),
             (Some('n'), "6") => {
                 replies.push_str(&format!("\x1b[{};{}R", cursor.1 + 1, cursor.0 + 1));
             }
@@ -611,6 +618,8 @@ struct ReaderContext {
     exited_flag: Arc<AtomicBool>,
     marker_prefix: Option<String>,
     graphics: bool,
+    /// Answer ConPTY's startup cursor position query (see the module notes).
+    answer_cursor_report: bool,
 }
 
 /// `child.write`: errors (a closed PTY) are ignored.
@@ -652,9 +661,13 @@ fn process_chunk(context: &ReaderContext, data: &[u8]) {
             shared.marker_buffer = buffer;
         }
         shared.emulator.write(&text);
-        context
-            .graphics
-            .then(|| terminal_replies(&text, shared.emulator.terminal().cursor_position()))
+        (context.graphics || context.answer_cursor_report).then(|| {
+            terminal_replies(
+                &text,
+                shared.emulator.terminal().cursor_position(),
+                !context.graphics,
+            )
+        })
     };
     if let Some(replies) = replies.filter(|replies| !replies.is_empty()) {
         write_to_pty(&context.writer, &context.exited_flag, &replies);
@@ -1158,6 +1171,7 @@ pub async fn take_isolated_pty_shot(
             exited_flag: Arc::clone(&exited_flag),
             marker_prefix,
             graphics,
+            answer_cursor_report: cfg!(windows),
         };
         std::thread::spawn(move || read_loop(reader, context));
         let (wait_shared, wait_flag) = (Arc::clone(&shared), Arc::clone(&exited_flag));
