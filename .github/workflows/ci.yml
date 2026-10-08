@@ -256,18 +256,9 @@ jobs:
         with:
           workspaces: rust
 
-      - name: Enable temporary PTY diagnostics
-        shell: pwsh
-        run: echo "ASTROSHOT_PTY_DEBUG_LOG=$env:RUNNER_TEMP\\pty-debug.log" >> $env:GITHUB_ENV
-
       - name: PTY still tests
         working-directory: rust
         run: cargo test -p astroshot --test tui_shot_cli --no-fail-fast
-
-      - name: Show PTY diagnostics
-        if: always()
-        shell: pwsh
-        run: if (Test-Path $env:ASTROSHOT_PTY_DEBUG_LOG) { Get-Content $env:ASTROSHOT_PTY_DEBUG_LOG | Select-Object -First 400 }
 
   test:
     name: macOS app
