@@ -1,0 +1,42 @@
+# Astroshots engine: stills, movies, browser driver, rasterizer, manifest sink
+# and review store. A library other Rust programs link; it parses no argv,
+# prints no CLI output and knows no program name. See ../PORTING.md.
+[package]
+name = "astroshot-engine"
+description = "Astroshots capture and review-store library, ported from TypeScript"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+alacritty_terminal = "0.25"
+anyhow = "1"
+base64 = "0.22"
+chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"] }
+chrono = "0.4"
+cosmic-text = "0.12"
+dirs = "6"
+flate2 = "1"
+futures = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+png = "0.17"
+portable-pty = "0.9"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+tiny-skia = "0.11"
+tokio = { version = "1", features = ["full"] }
+unicode-normalization = "0.1"
+which = "7"
+
+[dev-dependencies]
+tempfile = "3"
+url = "2"
+
+[lints]
+workspace = true

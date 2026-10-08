@@ -13,7 +13,7 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use astroshot::movie_harness::encode_solid_png;
+use astroshot_engine::movie_harness::encode_solid_png;
 use serde_json::Value;
 
 const BIN: &str = env!("CARGO_BIN_EXE_astroshot");
@@ -74,7 +74,7 @@ fn can_encode() -> bool {
         .arg("-version")
         .output()
         .is_ok_and(|output| output.status.success());
-    if ffmpeg || astroshot::browser::find_chrome().is_ok() {
+    if ffmpeg || astroshot_engine::browser::find_chrome().is_ok() {
         return true;
     }
     common::skip("neither ffmpeg nor Chrome is installed");
@@ -549,7 +549,7 @@ fn usage_errors_exit_1_with_the_exact_message_and_a_hint() {
             vec!["run", "--source", "no\"pe", "--feature", "x", "--slug", "y"],
             format!(
                 "error: unknown --source \"no\\\"pe\"\n{}\n",
-                astroshot::movie_harness::SOURCE_DECISION_TABLE
+                astroshot::cli::source_help::SOURCE_DECISION_TABLE
             ),
         ),
         (
@@ -564,7 +564,7 @@ fn usage_errors_exit_1_with_the_exact_message_and_a_hint() {
             ],
             format!(
                 "error: desktop.region is not implemented yet.\nUse --source desktop.window for a single app, or --source frames.\n{}\n{HINT}",
-                astroshot::movie_harness::source_hint_for_error(Some("desktop.window"))
+                astroshot::cli::source_help::source_hint_for_error(Some("desktop.window"))
             ),
         ),
     ];

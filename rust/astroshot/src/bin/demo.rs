@@ -26,7 +26,7 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::mac_preferences::{
+use astroshot_review::mac_preferences::{
     CoverageState, ReadWatchConfigurationOptions, evaluate_watch_coverage, read_watch_configuration,
 };
 
@@ -451,7 +451,7 @@ fn coverage_advice(root: &Path) -> Vec<String> {
     advice_lines(&coverage)
 }
 
-fn advice_lines(coverage: &super::mac_preferences::WatchCoverage) -> Vec<String> {
+fn advice_lines(coverage: &astroshot_review::mac_preferences::WatchCoverage) -> Vec<String> {
     let lines: &[String] = match coverage.state {
         CoverageState::InsideRoot => &[
             format!(
@@ -934,7 +934,7 @@ mod tests {
 
     #[test]
     fn coverage_advice_never_claims_setup_is_missing_when_unknown() {
-        use super::super::mac_preferences::WatchCoverage;
+        use astroshot_review::mac_preferences::WatchCoverage;
         let coverage = |state| WatchCoverage {
             state,
             reason: None,

@@ -12,7 +12,10 @@ roots = [
 ]
 packages_dir = "packages"
 primary_package = "@archastro/astroshot"
-rust_crate = "rust/astroshot"
+# Three crates under rust/: astroshot-engine, astroshot-review, astroshot (CLI).
+# `rust =` in rust/port/index.toml is a path relative to rust/ naming the crate
+# directory first; see rust/PORTING.md.
+rust_crate = "rust"
 rust_crate_name = "astroshot"
 extensions = ["ts", "tsx", "mjs"]
 

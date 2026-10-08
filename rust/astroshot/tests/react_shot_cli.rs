@@ -8,8 +8,8 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use astroshot::browser::find_chrome;
-use astroshot::node_helper::find_node;
+use astroshot_engine::browser::find_chrome;
+use astroshot_engine::node_helper::find_node;
 
 fn package_root() -> PathBuf {
     // Not canonicalized: the worktree's node_modules may be a symlink.
