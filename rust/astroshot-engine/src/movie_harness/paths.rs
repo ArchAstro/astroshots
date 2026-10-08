@@ -14,6 +14,8 @@ use chrono::{SecondsFormat, Utc};
 pub enum PathsError {
     #[error("{label} must be kebab-case [a-z0-9-]+, got {got}")]
     NotKebabCase { label: String, got: String },
+    #[error("slug must be [a-z0-9][a-z0-9_-]*, got {got}")]
+    NotStillSlug { got: String },
 }
 
 /// Lexical `path.resolve`: join onto the cwd when relative, then collapse
@@ -102,6 +104,21 @@ pub fn assert_kebab_case(name: &str, label: &str) -> Result<(), PathsError> {
 
 pub fn assert_slug(slug: &str) -> Result<(), PathsError> {
     assert_kebab_case(slug, "slug")
+}
+
+/// Slugs of stills: `^[a-z0-9][a-z0-9_-]*$`, the rule of
+/// `skills/astroshots-review/scripts/astroshot-capture`. Movies keep
+/// [`assert_slug`], which rejects underscores.
+pub fn assert_still_slug(slug: &str) -> Result<(), PathsError> {
+    let mut chars = slug.chars();
+    let valid = matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+    if !valid {
+        return Err(PathsError::NotStillSlug {
+            got: json_string(slug),
+        });
+    }
+    Ok(())
 }
 
 pub fn feature_dir(root: &str, feature: &str) -> String {
@@ -213,6 +230,18 @@ mod tests {
             assert_slug("No Good").unwrap_err().to_string(),
             "slug must be kebab-case [a-z0-9-]+, got \"No Good\""
         );
+    }
+
+    #[test]
+    fn still_slugs_allow_underscores_but_movie_slugs_do_not() {
+        assert!(assert_still_slug("a_b-c9").is_ok());
+        assert!(assert_slug("a_b").is_err());
+        for bad in ["", "_a", "-a", "A", "a b", "a\n", "a.b"] {
+            assert_eq!(
+                assert_still_slug(bad).unwrap_err().to_string(),
+                format!("slug must be [a-z0-9][a-z0-9_-]*, got {}", json_string(bad))
+            );
+        }
     }
 
     #[test]

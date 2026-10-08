@@ -25,6 +25,18 @@ harness can participate by writing this layout.
 Project name is inferred from the folder that contains `.astroshot`. Feature is
 the directory name under it.
 
+### Capture lock
+
+A writer that picks a sequence number or rewrites `manifest.json` holds the
+directory `<feature>/.capture.lock` for that time. It creates the directory
+with `mkdir` (atomic), writes its process id to `<feature>/.capture.lock/pid`,
+and removes the directory when done. A writer that finds the directory waits,
+polling every 100 ms, up to 120 s by default (`ASTROSHOT_LOCK_TIMEOUT_SECONDS`
+in the bash helper). If the recorded process no longer exists, the writer fails
+and names the directory instead of taking it over; remove it and retry.
+`astroshot-capture` and the engine's `sink_still`, `sink_movie` and finalize
+functions all use this lock, so they can write to one feature at the same time.
+
 ---
 
 ## `manifest.json`
