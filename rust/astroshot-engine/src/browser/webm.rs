@@ -14,6 +14,11 @@ use base64::Engine as _;
 
 use super::{Browser, BrowserError, PageOptions, Result, Size, js_str};
 
+/// Upper bound on waiting for the encoder's first output after the last frame
+/// was fed. It is a failure bound, not a delay: the wait ends as soon as the
+/// recorder emits data.
+const ENCODER_WARMUP_LIMIT_MS: u64 = 15_000;
+
 const PNG_MAGIC: [u8; 4] = [0x89, b'P', b'N', b'G'];
 
 /// Record `frames` (PNG or JPEG bytes, sniffed per frame) as a WebM, each
@@ -35,7 +40,7 @@ pub async fn record_webm<F: AsRef<[u8]>>(
     let page = browser
         .new_page(PageOptions::new(size.width, size.height))
         .await?;
-    let outcome = replay(&page, frames, size, frame_ms).await;
+    let outcome = replay(&page, frames, size, frame_ms, frame_ms.max(100)).await;
     let _ = page.close().await;
     outcome
 }
@@ -45,6 +50,7 @@ async fn replay<F: AsRef<[u8]>>(
     frames: &[F],
     size: Size,
     frame_ms: u64,
+    tail_hold_ms: u64,
 ) -> Result<Vec<u8>> {
     page.set_content(
         "<!doctype html><html><body style=\"margin:0;background:#000\"></body></html>",
@@ -84,6 +90,15 @@ async fn replay<F: AsRef<[u8]>>(
       track.requestFrame();
       await sleep(holdMs);
       track.requestFrame();
+      // The encoder starts lazily on the first frame and takes ~70 ms to
+      // emit its first data on an idle machine, far longer under load.
+      // `timeslice` chunks only arrive at stop, so flush with requestData()
+      // until the recorder has produced something rather than guessing a hold.
+      const deadline = performance.now() + {warmup_ms};
+      while (!chunks.length && performance.now() < deadline) {{
+        recorder.requestData();
+        await sleep(5);
+      }}
       recorder.requestData();
       const stopped = new Promise((r) => (recorder.onstop = r));
       recorder.stop();
@@ -101,6 +116,7 @@ async fn replay<F: AsRef<[u8]>>(
 }})()"#,
         w = size.width,
         h = size.height,
+        warmup_ms = ENCODER_WARMUP_LIMIT_MS,
     );
     page.evaluate::<bool>(&setup).await?;
 
@@ -120,9 +136,8 @@ async fn replay<F: AsRef<[u8]>>(
         page.evaluate::<bool>(&call).await?;
     }
 
-    let hold = frame_ms.max(100);
     let b64: String = page
-        .evaluate(&format!("window.__astroshotRec.stop({hold})"))
+        .evaluate(&format!("window.__astroshotRec.stop({tail_hold_ms})"))
         .await?;
     let webm = engine
         .decode(b64)
@@ -133,4 +148,44 @@ async fn replay<F: AsRef<[u8]>>(
         ));
     }
     Ok(webm)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::browser::{LaunchOptions, ScreenshotOptions, find_chrome};
+
+    /// The encoder needs ~70 ms after the first frame before it emits data.
+    /// With no tail hold at all, `stop()` runs inside that window, so the
+    /// recorder must wait for output instead of finalizing an empty blob.
+    #[tokio::test]
+    async fn stop_waits_for_the_encoder_instead_of_a_fixed_hold() {
+        if find_chrome().is_err() {
+            eprintln!("skipping: no Chrome");
+            return;
+        }
+        let browser = Browser::launch(LaunchOptions::default()).await.unwrap();
+        let page = browser.new_page(PageOptions::new(64, 48)).await.unwrap();
+        page.set_content("<body style='margin:0;background:#00f'></body>")
+            .await
+            .unwrap();
+        let frame = page.screenshot(ScreenshotOptions::default()).await.unwrap();
+        page.close().await.unwrap();
+        let size = Size {
+            width: 64,
+            height: 48,
+        };
+        for _ in 0..5 {
+            let page = browser
+                .new_page(PageOptions::new(size.width, size.height))
+                .await
+                .unwrap();
+            let webm = replay(&page, std::slice::from_ref(&frame), size, 1, 0)
+                .await
+                .unwrap();
+            page.close().await.unwrap();
+            assert_eq!(&webm[..4], &[0x1A, 0x45, 0xDF, 0xA3]);
+        }
+        browser.close().await.unwrap();
+    }
 }
