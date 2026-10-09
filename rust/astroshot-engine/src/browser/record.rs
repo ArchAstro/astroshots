@@ -171,6 +171,35 @@ mod tests {
         assert_eq!(repeats.iter().sum::<usize>(), 35); // 0.4 s + 1 s at 25 fps
     }
 
+    /// The idle time is the whole hold: `max(idle, 1 s)`, not `1 s + idle`.
+    /// A settle of 1.5 s on a page whose last frame arrived at the start is
+    /// 37 frames, however long the earlier frames were spread.
+    #[test]
+    fn frames_hold_for_the_idle_time_not_one_second_more() {
+        assert_eq!(recorder_repeats(&[100.0], 1.5).iter().sum::<usize>(), 37);
+        // A slow machine: the second frame came 1.5 s late and the poster
+        // took 1.5 s. The video is as long as that really was (3 s).
+        let repeats = recorder_repeats(&[100.0, 101.5], 1.5);
+        assert_eq!(repeats, [37, 38]);
+        assert_eq!(repeats.iter().sum::<usize>(), 75);
+        // Under a second of idle time still gets the 1 s minimum.
+        assert_eq!(recorder_repeats(&[100.0, 101.5], 0.25), [37, 25]);
+    }
+
+    /// Frames follow Chrome's timestamps, not when the test thread saw them:
+    /// a page whose colour timers fire late and close together (1.5 s and
+    /// 1.875 s after the first frame) gets runs of 37 and 9 frames, with the
+    /// last frame held for a second. That is a faithful recording of a stalled
+    /// page, so `an_animating_page_yields_changing_frames` does not bound run
+    /// lengths.
+    #[test]
+    fn a_stalled_page_keeps_its_real_gaps_on_the_timeline() {
+        let repeats = recorder_repeats(&[50.0, 51.5, 51.875], 0.1);
+        assert_eq!(repeats, [37, 9, 25]);
+        // On time (1 s apart) the runs are 25 and 25.
+        assert_eq!(recorder_repeats(&[50.0, 51.0, 52.0], 0.1), [25, 25, 25]);
+    }
+
     #[test]
     fn a_timestamp_that_goes_backwards_writes_nothing() {
         assert_eq!(recorder_repeats(&[1.0, 0.5, 1.25], 0.0), [0, 19, 25]);
