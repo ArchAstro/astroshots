@@ -2983,11 +2983,14 @@ async fn s_writes_a_seen_decision_with_the_image_hash_to_review_json() {
     let Disk { mut h, feature, .. } = disk(140).await;
     assert!(h.screen().contains("Unseen (3)"));
     h.keys("s");
+    // The "Seen" toast is set when the write's completion is applied, which
+    // can come after the store has already reloaded the shot (the shot leaves
+    // Unseen first). Wait for the completion itself, then for the reload.
+    h.until_toast("Seen").await;
     h.until("the shot to leave Unseen", |h| {
         h.screen().contains("Unseen (2)")
     })
     .await;
-    assert_eq!(h.toast(), "Seen");
     let review = review_json(&feature);
     assert_eq!(review["version"], 1);
     assert_eq!(review["run_id"], "checkout-e2e");
