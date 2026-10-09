@@ -178,9 +178,12 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     let (codec, rate, frames) = video_stream(&still.video_path);
     assert_eq!(codec, "vp9");
     assert_eq!(rate, "25/1", "the session fps (10) does not set the rate");
-    // The upper bounds here leave room for a loaded machine: the hold runs
-    // until the poster has been captured.
-    assert!((24..=45).contains(&frames), "{frames} frames");
+    // The hold is `max(time since the last frame, 1 s)` and that time runs
+    // until the poster has been captured, so how long the video is depends on
+    // the speed of the machine (a loaded CI runner took 3 s for it). Only the
+    // 1 s minimum is machine independent: 25 frames, or 24 after the float
+    // rounding `epoch_timestamps_keep_playwrights_float_rounding` pins.
+    assert!(frames >= 24, "{frames} frames");
     let seconds = video_seconds(&still.video_path);
     assert!(
         (seconds - f64::from(frames) / 25.0).abs() < 0.05,
@@ -190,12 +193,28 @@ async fn a_static_page_is_recorded_on_playwrights_timeline() {
     // unrelated to the video's length and bounded by the whole call.
     assert!(still.duration_ms > 0.0 && still.duration_ms <= still_wall_ms);
     assert_eq!(still.duration_ms.fract(), 0.0);
+    // The video cannot be longer than the time the recording ran, plus the
+    // 1 s minimum hold and 1 s for frame delivery latency at the first frame.
+    assert!(
+        seconds <= still_wall_ms / 1000.0 + 2.0,
+        "{seconds} s of video from a {still_wall_ms} ms recording"
+    );
 
     // 1.5 s settle: the hold is the idle time, about 1.5 s, not 1 s + 1.5 s.
     let (settled, settled_wall_ms) = record("settled", Some(1500)).await;
     let (_, _, frames) = video_stream(&settled.video_path);
-    // 1 s + 1.5 s would be 62 frames.
-    assert!((35..=58).contains(&frames), "{frames} frames");
+    // The hold is the idle time, which is at least the settle: 37 frames, 35
+    // with rounding. It also runs until the poster was captured, so it grows
+    // on a slow machine; the video cannot outlast the recording, though (the
+    // hold is measured from the last frame to the stop, so 1 s + 1.5 s of
+    // hold would exceed it). `frames_hold_for_the_idle_time_not_one_second_more`
+    // in `browser::record` pins the exact arithmetic.
+    assert!(frames >= 35, "{frames} frames");
+    let settled_seconds = video_seconds(&settled.video_path);
+    assert!(
+        settled_seconds <= settled_wall_ms / 1000.0 + 1.0,
+        "{settled_seconds} s of video from a {settled_wall_ms} ms recording"
+    );
     assert!(settled.duration_ms >= 1500.0 && settled.duration_ms <= settled_wall_ms);
 
     let manifest = manifest_for(&settled);
@@ -278,12 +297,17 @@ async fn an_animating_page_yields_changing_frames() {
         return;
     }
     let root = tempfile::tempdir().unwrap();
-    // Red, then green, then blue, a second apart, then still. The page runs
-    // on its own clock, so each colour stays up long enough to survive a
-    // stalled test process.
+    // Red, then green after 1 s, then blue 1 s after green has been
+    // painted (two animation frames later), then still. Chaining blue on
+    // the paint keeps a starved page from running both timers before it
+    // paints green once, which no recorder could show.
     let html = r##"<body style="margin:0;background:#c00000"><script>
-setTimeout(() => { document.body.style.background = '#00c000'; }, 1000);
-setTimeout(() => { document.body.style.background = '#0000c0'; }, 2000);
+setTimeout(() => {
+  document.body.style.background = '#00c000';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    setTimeout(() => { document.body.style.background = '#0000c0'; }, 1000);
+  }));
+}, 1000);
 </script></body>"##;
     let artifact = record_browser_movie(options(
         root.path(),
@@ -311,15 +335,23 @@ setTimeout(() => { document.body.style.background = '#0000c0'; }, 2000);
     let total = seen.len();
     seen.dedup();
     assert_eq!(seen, ['r', 'g', 'b'], "colour runs across {total} frames");
-    // Each colour is on screen for a second, about 25 frames at 25 fps; the
-    // last one is then held for at least a second.
-    let run = |colour: char| frames.iter().filter(|f| dominant(f) == colour).count();
-    assert!((15..=32).contains(&run('r')), "red for {} frames", run('r'));
+    // The page changes colour on its own timers, green 1 s and blue at
+    // least 2 s after its script started, and the video's frames follow Chrome's own frame
+    // timestamps. On a loaded machine Chrome paints late and in bursts (a run
+    // of 11 frames, and one of 35, have been seen), so no run has a length
+    // worth asserting. What cannot change: the video starts no later than the
+    // page's script, blue cannot appear before the 2 s timer, and the last
+    // frame is held for at least a second. So the video is at least 3 s long
+    // (75 frames, less one for float rounding, less one for a timer that
+    // fires a millisecond early). This catches a recorder that collapses the
+    // time between frames; the exact slot arithmetic is pinned by the
+    // `browser::record` unit tests.
     assert!(
-        (15..=32).contains(&run('g')),
-        "green for {} frames",
-        run('g')
+        frames.len() >= 73,
+        "{} frames for a page that runs for 2 s and is held for 1 s",
+        frames.len()
     );
+    let run = |colour: char| frames.iter().filter(|f| dominant(f) == colour).count();
     assert!(run('b') >= 24, "blue for {} frames", run('b'));
 }
 

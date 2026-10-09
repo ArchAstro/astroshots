@@ -448,10 +448,14 @@ fn running_as_root() -> bool {
     cfg!(target_os = "linux") && std::env::var("USER").is_ok_and(|u| u == "root")
 }
 
+/// How long [`Page::refresh_screencast`] waits for a frame after each ask.
+const REFRESH_WAIT: Duration = Duration::from_millis(300);
+
 struct Screencast {
     frames: Arc<Mutex<Vec<ScreencastFrame>>>,
     task: JoinHandle<()>,
     started: Instant,
+    params: StartScreencastParams,
 }
 
 /// One frame from [`Page::stop_screencast`].
@@ -916,7 +920,8 @@ impl Page {
             Some(q) => params.format(StartScreencastFormat::Jpeg).quality(q as i64),
             None => params.format(StartScreencastFormat::Png),
         };
-        if let Err(error) = self.page.execute(params.build()).await {
+        let params = params.build();
+        if let Err(error) = self.page.execute(params.clone()).await {
             task.abort();
             return Err(cdp(error));
         }
@@ -930,6 +935,7 @@ impl Page {
             frames,
             task,
             started,
+            params,
         });
         Ok(())
     }
@@ -943,12 +949,41 @@ impl Page {
     /// clipped capture would not do: the frame it produces has the clip's
     /// size.)
     pub async fn refresh_screencast(&self) -> Result<()> {
+        let sink = self
+            .screencast
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|running| running.frames.clone());
+        let before = sink
+            .as_ref()
+            .map_or(0, |frames| frames.lock().unwrap().len());
         let params = CaptureScreenshotParams::builder()
             .format(CaptureScreenshotFormat::Jpeg)
             .quality(1)
             .optimize_for_speed(true)
             .build();
         self.page.execute(params).await.map_err(cdp)?;
+        let Some(frames) = sink else { return Ok(()) };
+        if wait_for_frame(&frames, before).await {
+            return Ok(());
+        }
+        // The capture did not make Chrome send a frame. Starting the
+        // screencast again does: Chrome sends the current surface on start.
+        let restart = self
+            .screencast
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|r| r.params.clone());
+        if let Some(restart) = restart {
+            self.page
+                .execute(StopScreencastParams::default())
+                .await
+                .map_err(cdp)?;
+            self.page.execute(restart).await.map_err(cdp)?;
+            wait_for_frame(&frames, before).await;
+        }
         Ok(())
     }
 
@@ -1017,6 +1052,18 @@ pub fn resample_frames(frames: &[ScreencastFrame], fps: u32, duration_ms: u128) 
         out.push(frames[index].data.clone());
     }
     out
+}
+
+/// Wait up to [`REFRESH_WAIT`] for more than `before` frames to be collected.
+async fn wait_for_frame(frames: &Mutex<Vec<ScreencastFrame>>, before: usize) -> bool {
+    let deadline = Instant::now() + REFRESH_WAIT;
+    while Instant::now() < deadline {
+        if frames.lock().unwrap().len() > before {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    false
 }
 
 async fn poll<F, Fut>(deadline: Instant, what: &str, mut check: F) -> Result<()>
