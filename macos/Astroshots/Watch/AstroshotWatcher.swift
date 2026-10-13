@@ -163,7 +163,10 @@ final class AstroshotWatcher: @unchecked Sendable {
             // A non-empty, internally consistent index is authoritative at
             // launch. FSEvents keeps it current after the stream starts.
             if let cache, !cache.astroshotDirs.isEmpty {
-                let warm = self.scanKnownAstroshotDirs(cache.astroshotDirs)
+                // An older index may contain trees discovery now excludes.
+                // Evict them before publishing state whose events we ignore.
+                let eligibleDirs = cache.astroshotDirs.filter { self.relevantPath($0) != nil }
+                let warm = self.scanKnownAstroshotDirs(eligibleDirs)
                 let warmOrder = ShotIndexCache.reconciledArrivalOrder(
                     existing: cachedArrivalOrder,
                     shots: warm.shots
@@ -173,6 +176,7 @@ final class AstroshotWatcher: @unchecked Sendable {
                 if stillCurrent {
                     self.knownPaths = Set(warm.shots.map(\.path))
                     self.knownAstroshotDirs = Set(warm.astroshotDirs)
+                    self.arrivalOrder = warmOrder
                 }
                 self.lock.unlock()
                 if stillCurrent {
@@ -189,7 +193,9 @@ final class AstroshotWatcher: @unchecked Sendable {
                 // Missing indexed directories mean the filesystem moved while
                 // Astroshots was closed. Recover once instead of preserving a
                 // silently incomplete index.
-                if warm.astroshotDirs.count == cache.astroshotDirs.count {
+                // Exclusions are intentional eviction, not missing directories
+                // that require another recursive workspace walk.
+                if warm.astroshotDirs.count == eligibleDirs.count {
                     ShotIndexCache.save(
                         roots: roots,
                         astroshotDirs: warm.astroshotDirs,
@@ -741,7 +747,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         var frictionLogTouched = false
         var recoveryRoots = Set<URL>()
         for (index, eventPath) in paths.enumerated() {
-            guard let path = relevantEventPath(eventPath) else { continue }
+            guard let path = relevantPath(eventPath) else { continue }
             let eventFlags = index < flags.count ? flags[index] : 0
             let mustScan = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs) != 0
             let directoryChanged = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir) != 0
@@ -810,8 +816,8 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     /// Apply the discovery exclusions relative to a watch root, not to its
     /// ancestors (a user may explicitly watch a checkout beneath /tmp).
-    private func relevantEventPath(_ eventPath: String) -> String? {
-        let path = Self.canonicalPath(eventPath)
+    private func relevantPath(_ candidatePath: String) -> String? {
+        let path = Self.canonicalPath(candidatePath)
         lock.lock()
         let roots = configuration.roots
         lock.unlock()

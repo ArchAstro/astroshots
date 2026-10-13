@@ -56,6 +56,82 @@ struct WatcherResourceTests {
         #expect(watcher.scanAll().map(\.path) == [visible.path])
     }
 
+    @Test(arguments: [false, true])
+    func warmCacheEvictsExcludedTreesBeforeDelivery(includeVisible: Bool) async throws {
+        let root = try workspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = root.appendingPathComponent("index.json")
+        var cachedImages: [URL] = []
+        for excluded in ["_build", "deps", "node_modules", ".hidden"] {
+            cachedImages.append(try capture(root, "project/\(excluded)/.astroshot/feature/old.png"))
+            let story = root.appendingPathComponent("project/\(excluded)/.astroshot/stories/old")
+            try FileManager.default.createDirectory(at: story, withIntermediateDirectories: true)
+            try Data("# Old story\nExcluded tree".utf8).write(to: story.appendingPathComponent("prompt.md"))
+        }
+        // An explicitly watched root beneath an excluded ancestor stays valid,
+        // even when another watched root would exclude that same subtree.
+        let explicitRoot = root.appendingPathComponent("project/deps/explicit")
+        try FileManager.default.createDirectory(at: explicitRoot, withIntermediateDirectories: true)
+        let roots = [root, explicitRoot]
+        let visible = includeVisible
+            ? [try capture(explicitRoot, ".astroshot/deps/visible.png")]
+            : []
+        cachedImages.append(contentsOf: visible)
+        let visiblePaths = visible.map(\.path)
+        let visibleDirs = visiblePaths.compactMap { ShotIndexCache.astroshotDir(forImagePath: $0) }
+        // Model the durable index written before discovery exclusions changed.
+        ShotIndexCache.save(
+            roots: roots,
+            astroshotDirs: cachedImages.compactMap { ShotIndexCache.astroshotDir(forImagePath: $0.path) },
+            arrivalOrder: cachedImages.map(\.path), lastEventID: FSEventsGetCurrentEventId(),
+            cacheFileURL: cache
+        )
+        let watcher = AstroshotWatcher(configuration: .init(
+            roots: roots, settleNanos: 0, cacheFileURL: cache
+        ))
+        defer { watcher.stop() }
+        var snapshots: [[String]] = []
+        var arrivals: [String] = []
+        watcher.onNewShot = { arrivals.append($0.path) }
+        var storyCounts: [Int] = []
+        var completedScans = 0
+        watcher.onScanStateChanged = { if !$0 { completedScans += 1 } }
+        watcher.onShotsChanged = { snapshots.append($0.map(\.path)) }
+        watcher.onFrictionLogsChanged = { storyCounts.append($0.count) }
+        watcher.start()
+        // start() first emits a stop notification; the second false marks
+        // completion of startup, after the index has been saved.
+        try await waitUntil { completedScans >= 2 && !snapshots.isEmpty && !storyCounts.isEmpty }
+        #expect(snapshots.allSatisfy { $0 == visiblePaths })
+        #expect(storyCounts.allSatisfy { $0 == 0 })
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.astroshotDirs == visibleDirs)
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.arrivalOrder == visiblePaths)
+
+        // A real filesystem event persists the in-memory arrival order again.
+        // Excluded paths must not return after that write, without a restart.
+        let live = try capture(explicitRoot, ".astroshot/deps/live.png")
+        let expectedPaths = [live.path] + visiblePaths
+        let expectedDirs = [explicitRoot.appendingPathComponent(".astroshot").path]
+        try await waitUntil {
+            let saved = ShotIndexCache.load(for: roots, cacheFileURL: cache)
+            return arrivals.contains(live.path)
+                && saved?.arrivalOrder == expectedPaths && saved?.astroshotDirs == expectedDirs
+        }
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.arrivalOrder == expectedPaths)
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.astroshotDirs == expectedDirs)
+
+        // Full recovery must not resurrect still-existing excluded captures
+        // through its preservation of live-ingested state.
+        let previousCount = snapshots.count
+        let previousCompletions = completedScans
+        watcher.rescan()
+        try await waitUntil { completedScans > previousCompletions && snapshots.count > previousCount }
+        #expect(snapshots.last == expectedPaths)
+        #expect(snapshots.allSatisfy { Set($0).isSubset(of: Set(expectedPaths)) })
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.astroshotDirs == expectedDirs)
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.arrivalOrder == expectedPaths)
+    }
+
     @Test
     func deletedCaptureRefreshesOnlyItsFeatureAndPersistsRemoval() async throws {
         let root = try workspace()

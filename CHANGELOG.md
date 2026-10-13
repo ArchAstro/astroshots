@@ -13,6 +13,10 @@ The two tracks are versioned independently.
 
 ### Fixed
 
+- **Remove excluded captures from older indexes:** warm startup evicts cached
+  `_build`, `deps`, and other excluded trees before showing captures or stories,
+  so ignored filesystem events cannot leave stale entries in the stream.
+
 - **Lower macOS watcher resource use:** discovery releases temporary directory
   allocations promptly and skips Elixir `_build`/`deps` and directory symlinks.
   Deletions refresh their screenshot feature, and local filesystem recovery
