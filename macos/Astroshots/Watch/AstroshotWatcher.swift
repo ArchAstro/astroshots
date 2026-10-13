@@ -50,10 +50,11 @@ final class AstroshotWatcher: @unchecked Sendable {
     /// Live filesystem delivery must never wait behind a recursive workspace
     /// walk. Scan results are serialized back onto `queue` before mutation.
     private let queue = DispatchQueue(label: "ai.archastro.astroshots.fsevents", qos: .utility)
-    private let scanQueue = DispatchQueue(label: "ai.archastro.astroshots.scan", qos: .utility)
+    private let scanQueue: DispatchQueue
     private var scanGeneration = 0
     private var fullScanInFlight = false
     private var fullScanNeedsRerun = false
+    private var rerunRoots: Set<URL> = []
     private var rerunShouldPersistCache = false
     private var rerunShouldNotifyNewShots = false
 
@@ -62,11 +63,15 @@ final class AstroshotWatcher: @unchecked Sendable {
         "node_modules", ".git", "DerivedData", "build", ".build", "Pods",
         ".next", "dist", "out", "target", "vendor", "Checkouts", "xcuserdata",
         ".turbo", ".cache", "coverage", "tmp", ".pnpm-store", "Carthage",
-        "bazel-bin", "bazel-out", "bazel-testlogs", ".gradle",
+        "bazel-bin", "bazel-out", "bazel-testlogs", ".gradle", "_build", "deps",
     ]
 
-    init(configuration: Configuration) {
+    init(
+        configuration: Configuration,
+        scanQueue: DispatchQueue = DispatchQueue(label: "ai.archastro.astroshots.scan", qos: .utility)
+    ) {
         self.configuration = configuration
+        self.scanQueue = scanQueue
     }
 
     deinit {
@@ -120,6 +125,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         settleWorkItems.removeAll()
         fullScanInFlight = false
         fullScanNeedsRerun = false
+        rerunRoots.removeAll()
         rerunShouldPersistCache = false
         rerunShouldNotifyNewShots = false
         lock.unlock()
@@ -234,10 +240,13 @@ final class AstroshotWatcher: @unchecked Sendable {
 
     private func scheduleFullScan(
         persistCache: Bool,
-        notifyNewShots: Bool = false
+        notifyNewShots: Bool = false,
+        scanRoots: [URL]? = nil
     ) {
         lock.lock()
+        let requestedRoots = scanRoots ?? configuration.roots
         if fullScanInFlight {
+            rerunRoots.formUnion(requestedRoots)
             fullScanNeedsRerun = true
             rerunShouldPersistCache = rerunShouldPersistCache || persistCache
             rerunShouldNotifyNewShots =
@@ -254,7 +263,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         emitScanState(true)
         scanQueue.async { [weak self] in
             guard let self else { return }
-            let full = self.scanAllCollectingDirs()
+            let full = self.scanAllCollectingDirs(roots: requestedRoots)
             self.queue.async { [weak self] in
                 self?.applyFullScan(
                     full,
@@ -290,7 +299,9 @@ final class AstroshotWatcher: @unchecked Sendable {
         // before the result is applied. Preserve live-ingested paths that still
         // exist so reconciliation cannot erase a newer event.
         var shotsByPath = Dictionary(
-            uniqueKeysWithValues: full.shots.map { ($0.path, $0) }
+            uniqueKeysWithValues: full.shots
+                .filter { FileManager.default.fileExists(atPath: $0.path) }
+                .map { ($0.path, $0) }
         )
         for path in previouslyKnownPaths where shotsByPath[path] == nil {
             guard FileManager.default.fileExists(atPath: path),
@@ -322,10 +333,12 @@ final class AstroshotWatcher: @unchecked Sendable {
         arrivalOrder = reconciledOrder
         let lastEventID = self.lastEventID
         let shouldRerun = fullScanNeedsRerun
+        let pendingRoots = Array(rerunRoots)
         let rerunPersistCache = rerunShouldPersistCache
         let rerunNotifyNewShots = rerunShouldNotifyNewShots
         fullScanInFlight = false
         fullScanNeedsRerun = false
+        rerunRoots.removeAll()
         rerunShouldPersistCache = false
         rerunShouldNotifyNewShots = false
         lock.unlock()
@@ -349,7 +362,12 @@ final class AstroshotWatcher: @unchecked Sendable {
         } else {
             emitShots(orderedShots)
         }
-        emitFrictionLogs(full.frictionLogs)
+        // A scoped recovery must preserve stories in unaffected screenshot trees.
+        emitFrictionLogs(sortedFrictionLogs(reconciledDirs.flatMap { path in
+            autoreleasepool {
+                scanFrictionLogs(in: URL(fileURLWithPath: path, isDirectory: true))
+            }
+        }))
         if persistCache {
             ShotIndexCache.save(
                 roots: roots,
@@ -363,7 +381,8 @@ final class AstroshotWatcher: @unchecked Sendable {
         if shouldRerun {
             scheduleFullScan(
                 persistCache: rerunPersistCache,
-                notifyNewShots: rerunNotifyNewShots
+                notifyNewShots: rerunNotifyNewShots,
+                scanRoots: pendingRoots
             )
         } else {
             emitScanState(false)
@@ -394,17 +413,23 @@ final class AstroshotWatcher: @unchecked Sendable {
         scanAllCollectingDirs().frictionLogs
     }
 
-    private func scanAllCollectingDirs() -> ScanResult {
+    private func scanAllCollectingDirs(roots requestedRoots: [URL]? = nil) -> ScanResult {
         lock.lock()
-        let roots = configuration.roots
+        let roots = requestedRoots ?? configuration.roots
         lock.unlock()
 
         var shots: [Shot] = []
         var frictionLogs: [FrictionLog] = []
         var dirs: [String] = []
-        for root in roots {
+        let uniqueRoots = Set(roots.map { URL(fileURLWithPath: Self.canonicalPath($0.path)) })
+        let disjointRoots = uniqueRoots.filter { candidate in
+            !uniqueRoots.contains { other in
+                other != candidate && candidate.path.hasPrefix(other.path + "/")
+            }
+        }
+        for root in disjointRoots {
             guard FileManager.default.fileExists(atPath: root.path) else { continue }
-            let partial = scanAstroshotTrees(under: root)
+            let partial = autoreleasepool { scanAstroshotTrees(under: root) }
             shots.append(contentsOf: partial.shots)
             frictionLogs.append(contentsOf: partial.frictionLogs)
             dirs.append(contentsOf: partial.astroshotDirs)
@@ -451,29 +476,43 @@ final class AstroshotWatcher: @unchecked Sendable {
 
         func walk(_ dir: URL, depth: Int) {
             guard depth < 10 else { return }
-            guard let children = try? fm.contentsOfDirectory(
-                at: dir,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsPackageDescendants]
-            ) else { return }
+            // Drain Foundation's temporary URLs and resource caches per directory,
+            // rather than retaining them until the entire workspace scan finishes.
+            autoreleasepool {
+                guard let values = try? dir.resourceValues(forKeys: [.isSymbolicLinkKey]),
+                      values.isSymbolicLink != true
+                else { return }
+                if dir.lastPathComponent == ShotPath.astroshotDirName {
+                    dirs.append(dir.standardizedFileURL.path)
+                    results.append(contentsOf: scanFeatureDirs(in: dir))
+                    frictionLogs.append(contentsOf: scanFrictionLogs(in: dir))
+                    return
+                }
+                guard let children = try? fm.contentsOfDirectory(
+                    at: dir,
+                    includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                    options: [.skipsPackageDescendants]
+                ) else { return }
 
-            for child in children {
-                let name = child.lastPathComponent
-                if name == ShotPath.astroshotDirName {
-                    dirs.append(child.standardizedFileURL.path)
-                    results.append(contentsOf: scanFeatureDirs(in: child))
-                    frictionLogs.append(contentsOf: scanFrictionLogs(in: child))
-                    continue
+                for child in children {
+                    let name = child.lastPathComponent
+                    if Self.skipDirectoryNames.contains(name) { continue }
+                    if name.hasPrefix("."), name != ShotPath.astroshotDirName { continue }
+                    guard let values = try? child.resourceValues(
+                        forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+                    ), values.isDirectory == true, values.isSymbolicLink != true
+                    else { continue }
+                    // .astroshot at the discovery depth boundary is still a target.
+                    if name == ShotPath.astroshotDirName {
+                        autoreleasepool {
+                            dirs.append(child.standardizedFileURL.path)
+                            results.append(contentsOf: scanFeatureDirs(in: child))
+                            frictionLogs.append(contentsOf: scanFrictionLogs(in: child))
+                        }
+                    } else {
+                        walk(child, depth: depth + 1)
+                    }
                 }
-                if Self.skipDirectoryNames.contains(name) {
-                    continue
-                }
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: child.path, isDirectory: &isDir), isDir.boolValue else {
-                    continue
-                }
-                if name.hasPrefix("."), name != ShotPath.astroshotDirName { continue }
-                walk(child, depth: depth + 1)
             }
         }
 
@@ -490,26 +529,22 @@ final class AstroshotWatcher: @unchecked Sendable {
     }
 
     private func scanFeatureDirs(in astroshot: URL) -> [Shot] {
-        let fm = FileManager.default
-        guard let features = try? fm.contentsOfDirectory(
+        guard let features = try? FileManager.default.contentsOfDirectory(
             at: astroshot,
-            includingPropertiesForKeys: [.isDirectoryKey],
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles]
         ) else { return [] }
 
-        var shots: [Shot] = []
-        for featureDir in features {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: featureDir.path, isDirectory: &isDir), isDir.boolValue else {
-                continue
+        return features.flatMap { featureDir -> [Shot] in
+            autoreleasepool {
+                guard let values = try? featureDir.resourceValues(
+                    forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+                ), values.isDirectory == true, values.isSymbolicLink != true,
+                   !FrictionLogPath.isReserved(directoryName: featureDir.lastPathComponent)
+                else { return [] }
+                return shotsInFeatureDirectory(featureDir)
             }
-            // Reserved namespaces for agentic UX user stories — never shots.
-            if FrictionLogPath.isReserved(directoryName: featureDir.lastPathComponent) {
-                continue
-            }
-            shots.append(contentsOf: shotsInFeatureDirectory(featureDir))
         }
-        return shots
     }
 
     private func scanFrictionLogs(in astroshot: URL) -> [FrictionLog] {
@@ -649,15 +684,10 @@ final class AstroshotWatcher: @unchecked Sendable {
             let ids = Array(
                 UnsafeBufferPointer(start: eventIDs, count: numEvents)
             )
-            let recoveryFlags =
-                FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)
-                | FSEventStreamEventFlags(kFSEventStreamEventFlagUserDropped)
-                | FSEventStreamEventFlags(kFSEventStreamEventFlagKernelDropped)
-                | FSEventStreamEventFlags(kFSEventStreamEventFlagEventIdsWrapped)
             watcher.handleFSEvents(
                 paths: limited,
                 latestEventID: ids.max(),
-                requiresFullScan: flags.contains { $0 & recoveryFlags != 0 }
+                flags: flags
             )
         }
 
@@ -687,8 +717,14 @@ final class AstroshotWatcher: @unchecked Sendable {
     func handleFSEvents(
         paths: [String],
         latestEventID: FSEventStreamEventId? = nil,
-        requiresFullScan: Bool = false
+        requiresFullScan: Bool = false,
+        flags: [FSEventStreamEventFlags] = []
     ) {
+        let droppedHistoryFlags = FSEventStreamEventFlags(
+            kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped
+                | kFSEventStreamEventFlagEventIdsWrapped
+        )
+        let requiresFullScan = requiresFullScan || flags.contains { $0 & droppedHistoryFlags != 0 }
         if let latestEventID {
             lock.lock()
             lastEventID = max(lastEventID ?? 0, latestEventID)
@@ -703,13 +739,38 @@ final class AstroshotWatcher: @unchecked Sendable {
 
         var featureDirectories = Set<String>()
         var frictionLogTouched = false
-        for eventPath in paths {
-            let path = Self.canonicalPath(eventPath)
+        var recoveryRoots = Set<URL>()
+        for (index, eventPath) in paths.enumerated() {
+            guard let path = relevantEventPath(eventPath) else { continue }
+            let eventFlags = index < flags.count ? flags[index] : 0
+            let mustScan = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs) != 0
+            let directoryChanged = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir) != 0
+                && eventFlags & FSEventStreamEventFlags(
+                    kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemRemoved
+                        | kFSEventStreamEventFlagItemRenamed
+                ) != 0
+            if !requiresFullScan, mustScan || directoryChanged {
+                // Recovery within a feature is the same bounded refresh as a
+                // manifest change. Outside .astroshot, discover only this subtree.
+                if let range = path.range(of: "/\(ShotPath.astroshotDirName)/") {
+                    let tail = path[range.upperBound...]
+                    if let feature = tail.split(separator: "/").first {
+                        if FrictionLogPath.isReserved(directoryName: String(feature)) {
+                            frictionLogTouched = true
+                        } else {
+                            featureDirectories.insert(String(path[..<range.upperBound]) + feature)
+                        }
+                    }
+                } else {
+                    recoveryRoots.insert(URL(fileURLWithPath: path, isDirectory: true))
+                }
+            }
             if FrictionLogPath.containsPath(path) {
                 frictionLogTouched = true
                 continue
             }
-            if path.hasSuffix("manifest.json") || path.hasSuffix(ReviewStore.sidecarFileName) {
+            if path.contains("/\(ShotPath.astroshotDirName)/"),
+               path.hasSuffix("/manifest.json") || path.hasSuffix("/" + ReviewStore.sidecarFileName) {
                 featureDirectories.insert(
                     URL(fileURLWithPath: path)
                         .deletingLastPathComponent()
@@ -722,6 +783,15 @@ final class AstroshotWatcher: @unchecked Sendable {
             guard ShotPath.imageExtensions.contains(ext) else { continue }
             guard ShotPath.parse(imagePath: path) != nil else { continue }
             scheduleSettledIngest(path: path)
+        }
+        // Collapse ancestor/descendant requests in one batch before scheduling.
+        let scopes = recoveryRoots.filter { candidate in
+            !recoveryRoots.contains { other in
+                other != candidate && candidate.path.hasPrefix(other.path + "/")
+            }
+        }
+        if !scopes.isEmpty {
+            scheduleFullScan(persistCache: true, notifyNewShots: true, scanRoots: Array(scopes))
         }
         for directory in featureDirectories {
             // Never treat a reserved story root as a shot feature.
@@ -736,6 +806,31 @@ final class AstroshotWatcher: @unchecked Sendable {
         if frictionLogTouched {
             scheduleFrictionLogRefresh()
         }
+    }
+
+    /// Apply the discovery exclusions relative to a watch root, not to its
+    /// ancestors (a user may explicitly watch a checkout beneath /tmp).
+    private func relevantEventPath(_ eventPath: String) -> String? {
+        let path = Self.canonicalPath(eventPath)
+        lock.lock()
+        let roots = configuration.roots
+        lock.unlock()
+        for root in roots {
+            let rootPath = Self.canonicalPath(root.path)
+            guard path == rootPath || path.hasPrefix(rootPath + "/") else { continue }
+            let components = path.dropFirst(rootPath.count).split(separator: "/")
+            var excluded = false
+            for component in components {
+                if component == ShotPath.astroshotDirName { break }
+                let name = String(component)
+                if Self.skipDirectoryNames.contains(name) || name.hasPrefix(".") {
+                    excluded = true
+                    break
+                }
+            }
+            if !excluded { return path }
+        }
+        return nil
     }
 
     private func scheduleFrictionLogRefresh() {
@@ -774,10 +869,20 @@ final class AstroshotWatcher: @unchecked Sendable {
     /// `/var/...`. Canonicalize both boundaries so one file cannot enter the
     /// stream twice under symlink-equivalent paths.
     private static func canonicalPath(_ path: String) -> String {
-        URL(fileURLWithPath: path)
-            .standardizedFileURL
-            .resolvingSymlinksInPath()
-            .path
+        // Foundation leaves an absent leaf unresolved. Resolve the nearest
+        // surviving ancestor so deletion events retain their original identity
+        // (including macOS /private/var versus /var aliases).
+        var ancestor = URL(fileURLWithPath: path).standardizedFileURL
+        var missingComponents: [String] = []
+        while ancestor.path != "/", !FileManager.default.fileExists(atPath: ancestor.path) {
+            missingComponents.append(ancestor.lastPathComponent)
+            ancestor.deleteLastPathComponent()
+        }
+        var resolved = ancestor.resolvingSymlinksInPath()
+        for component in missingComponents.reversed() {
+            resolved.appendPathComponent(component)
+        }
+        return resolved.path
     }
 
     private func scheduleFeatureRefresh(directoryPath: String) {
@@ -812,7 +917,7 @@ final class AstroshotWatcher: @unchecked Sendable {
         lock.unlock()
 
         let directory = URL(fileURLWithPath: path, isDirectory: true)
-        let shots = uniqueSortedShots(shotsInFeatureDirectory(directory))
+        let shots = autoreleasepool { uniqueSortedShots(shotsInFeatureDirectory(directory)) }
         let featurePrefix = directory.standardizedFileURL.path + "/"
 
         lock.lock()
@@ -825,7 +930,22 @@ final class AstroshotWatcher: @unchecked Sendable {
         }
         knownPaths = knownPaths.filter { !$0.hasPrefix(featurePrefix) }
         knownPaths.formUnion(shots.map(\.path))
+        arrivalOrder.removeAll { !knownPaths.contains($0) }
+        arrivalOrder.insert(contentsOf: newlyDiscovered.map(\.path), at: 0)
+        if let dir = ShotIndexCache.astroshotDir(forImagePath: path + "/frame.png"),
+           FileManager.default.fileExists(atPath: dir) {
+            knownAstroshotDirs.insert(dir)
+        }
+        let roots = configuration.roots
+        let cacheFileURL = configuration.cacheFileURL
+        let dirs = Array(knownAstroshotDirs)
+        let order = arrivalOrder
+        let eventID = lastEventID
         lock.unlock()
+        ShotIndexCache.save(
+            roots: roots, astroshotDirs: dirs, arrivalOrder: order,
+            lastEventID: eventID, cacheFileURL: cacheFileURL
+        )
 
         // A manifest rename may be the only coalesced event we receive for a
         // rapid atomic capture batch. Treat frames found by that targeted scan
@@ -866,8 +986,11 @@ final class AstroshotWatcher: @unchecked Sendable {
             if known { knownPaths.remove(path) }
             lock.unlock()
             if known {
-                // Drop from UI via full list refresh (background).
-                scheduleFullScan(persistCache: true)
+                // Reconcile the containing feature, including its durable order,
+                // without rediscovering every repository in the workspace.
+                scheduleFeatureRefresh(
+                    directoryPath: URL(fileURLWithPath: path).deletingLastPathComponent().path
+                )
             }
             return
         }

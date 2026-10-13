@@ -36,6 +36,7 @@
 		699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */; };
 		6A5CD6AFFB34FD03BB0DA4BD /* Tools in Resources */ = {isa = PBXBuildFile; fileRef = DF7C943419309235AF15A9D1 /* Tools */; };
 		6A8F6DA71E32DD3A01ED8141 /* Manifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788CCB47877372A7EF96688 /* Manifest.swift */; };
+		72C3BD7FFE6CE293A047BCD3 /* WatcherResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */; };
 		76EB28B98DBFABBF892E3A7E /* FrictionLogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33713B379610D87587D40B40 /* FrictionLogListView.swift */; };
 		77469FC8404628A2CE0A1894 /* astroshots-app-icon-master.png in Resources */ = {isa = PBXBuildFile; fileRef = F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */; };
 		842084A0B15BCB986B44ADB1 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F5F7C7BB45AE1FD2CD699B /* ThemeTests.swift */; };
@@ -157,6 +158,7 @@
 		DFDC12CB9342C5E685FD8A25 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
 		E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogLoaderTests.swift; sourceTree = "<group>"; };
 		E9F84D4D30E15FCC4EECC1C2 /* NarrationJobQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationJobQueue.swift; sourceTree = "<group>"; };
+		EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatcherResourceTests.swift; sourceTree = "<group>"; };
 		EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowControllerTests.swift; sourceTree = "<group>"; };
 		F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "astroshots-app-icon-master.png"; sourceTree = "<group>"; };
 		F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStoreTests.swift; sourceTree = "<group>"; };
@@ -196,6 +198,7 @@
 				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
 				6A1584CFA29D0DD78764232C /* TestDefaults.swift */,
 				98F5F7C7BB45AE1FD2CD699B /* ThemeTests.swift */,
+				EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */,
 			);
 			path = AstroshotsTests;
 			sourceTree = "<group>";
@@ -529,6 +532,7 @@
 				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,
 				94FC5C4F6587ED4CFB98831C /* TestDefaults.swift in Sources */,
 				842084A0B15BCB986B44ADB1 /* ThemeTests.swift in Sources */,
+				72C3BD7FFE6CE293A047BCD3 /* WatcherResourceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -11,6 +11,14 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lower macOS watcher resource use:** discovery releases temporary directory
+  allocations promptly and skips Elixir `_build`/`deps` and directory symlinks.
+  Deletions refresh their screenshot feature, and local filesystem recovery
+  scans only the affected subtree. Lost event history still reconciles all
+  watched roots. Deleted paths retain their identity across macOS path aliases.
+
 ### Changed
 
 - **Friction logs are now user stories:** the `friction-log` skill is renamed
