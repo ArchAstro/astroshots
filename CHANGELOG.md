@@ -16,6 +16,8 @@ The two tracks are versioned independently.
 - **Remove excluded captures from older indexes:** warm startup evicts cached
   `_build`, `deps`, and other excluded trees before showing captures or stories,
   so ignored filesystem events cannot leave stale entries in the stream.
+  Empty indexes with an event cursor retain fast startup across restarts, and
+  watching the filesystem root preserves eligible cached captures.
 
 - **Lower macOS watcher resource use:** discovery releases temporary directory
   allocations promptly and skips Elixir `_build`/`deps` and directory symlinks.
