@@ -7,7 +7,7 @@ import Foundation
 /// Startup:
 /// 1. **Indexed** — re-scan `.astroshot` dirs from a persistent index (fast).
 /// 2. **Recovery** — recursively discover only when the index is missing,
-///    empty, stale, or the user explicitly requests a rescan.
+///    stale, empty without an event cursor, or explicitly rescanned.
 ///
 /// Full scans run on a background queue so the menu-bar status item can appear
 /// immediately even when a watched root is a large monorepo.
@@ -160,9 +160,10 @@ final class AstroshotWatcher: @unchecked Sendable {
             }
             self.lock.unlock()
 
-            // A non-empty, internally consistent index is authoritative at
-            // launch. FSEvents keeps it current after the stream starts.
-            if let cache, !cache.astroshotDirs.isEmpty {
+            // A consistent index is authoritative, even when empty, if its
+            // event cursor lets FSEvents replay changes since it was saved.
+            // Legacy non-empty indexes remain usable without a cursor.
+            if let cache, !cache.astroshotDirs.isEmpty || cache.lastEventID != nil {
                 // An older index may contain trees discovery now excludes.
                 // Evict them before publishing state whose events we ignore.
                 let eligibleDirs = cache.astroshotDirs.filter { self.relevantPath($0) != nil }
@@ -210,7 +211,7 @@ final class AstroshotWatcher: @unchecked Sendable {
 
             guard self.isScanCurrent(generation) else { return }
 
-            // Missing, empty, or stale index: recover with one full discovery.
+            // Missing, stale, or legacy empty index: recover with one full discovery.
             let full = self.scanAllCollectingDirs()
             let reconciledOrder = ShotIndexCache.reconciledArrivalOrder(
                 existing: cachedArrivalOrder,
@@ -823,7 +824,8 @@ final class AstroshotWatcher: @unchecked Sendable {
         lock.unlock()
         for root in roots {
             let rootPath = Self.canonicalPath(root.path)
-            guard path == rootPath || path.hasPrefix(rootPath + "/") else { continue }
+            let rootPrefix = rootPath == "/" ? "/" : rootPath + "/"
+            guard path == rootPath || path.hasPrefix(rootPrefix) else { continue }
             let components = path.dropFirst(rootPath.count).split(separator: "/")
             var excluded = false
             for component in components {

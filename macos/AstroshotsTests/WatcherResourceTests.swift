@@ -133,6 +133,71 @@ struct WatcherResourceTests {
     }
 
     @Test
+    func filesystemRootRetainsCachedCaptures() async throws {
+        let fixture = try workspace()
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let image = try capture(fixture, "project/.astroshot/feature/visible.png")
+        let roots = [URL(fileURLWithPath: "/", isDirectory: true)]
+        let cache = fixture.appendingPathComponent("index.json")
+        ShotIndexCache.save(
+            roots: roots,
+            astroshotDirs: [image.deletingLastPathComponent().deletingLastPathComponent().path],
+            arrivalOrder: [image.path], lastEventID: FSEventsGetCurrentEventId(), cacheFileURL: cache
+        )
+        let watcher = AstroshotWatcher(configuration: .init(
+            roots: roots, settleNanos: 0, cacheFileURL: cache
+        ))
+        defer { watcher.stop() }
+        var snapshots: [[String]] = []
+        var completions = 0
+        watcher.onShotsChanged = { snapshots.append($0.map(\.path)) }
+        watcher.onScanStateChanged = { if !$0 { completions += 1 } }
+        // Exercise real startup with / as the sole root. A valid warm cache
+        // should be retained without recursively scanning the host filesystem.
+        watcher.start()
+        try await waitUntil { completions >= 2 && !snapshots.isEmpty }
+        #expect(snapshots.first == [image.path])
+        #expect(ShotIndexCache.load(for: roots, cacheFileURL: cache)?.arrivalOrder == [image.path])
+        watcher.stop()
+        // Reuse the same root boundary for targeted event ingestion, without
+        // depending on unrelated filesystem activity under the host's / root.
+        var arrivals: [String] = []
+        watcher.onNewShot = { arrivals.append($0.path) }
+        watcher.handleFSEvents(paths: [image.path])
+        try await waitUntil { arrivals == [image.path] }
+    }
+
+    @Test(arguments: [false, true])
+    func emptyCacheUsesCursorToDecideWhetherDiscoveryIsNeeded(hasCursor: Bool) async throws {
+        let root = try workspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // This pre-existing unindexed capture reveals a recursive discovery;
+        // it predates the saved cursor, so event replay must not announce it.
+        let sentinel = try capture(root, "unindexed/.astroshot/feature/sentinel.png")
+        let cache = root.appendingPathComponent("index.json")
+        ShotIndexCache.save(
+            roots: [root], astroshotDirs: [], arrivalOrder: [],
+            lastEventID: hasCursor ? FSEventsGetCurrentEventId() : nil, cacheFileURL: cache
+        )
+        // Cross two startup/persistence cycles. Legacy empty indexes recover
+        // once; empty indexes with a cursor stay authoritative across restarts.
+        for _ in 0..<2 {
+            let watcher = AstroshotWatcher(configuration: .init(roots: [root], cacheFileURL: cache))
+            defer { watcher.stop() }
+            var snapshots: [[String]] = []
+            var completions = 0
+            watcher.onShotsChanged = { snapshots.append($0.map(\.path)) }
+            watcher.onScanStateChanged = { if !$0 { completions += 1 } }
+            watcher.start()
+            try await waitUntil { completions >= 2 && !snapshots.isEmpty }
+            let expected = hasCursor ? [] : [sentinel.path]
+            #expect(snapshots.first == expected)
+            #expect(ShotIndexCache.load(for: [root], cacheFileURL: cache)?.arrivalOrder == expected)
+            #expect(ShotIndexCache.load(for: [root], cacheFileURL: cache)?.lastEventID != nil)
+        }
+    }
+
+    @Test
     func deletedCaptureRefreshesOnlyItsFeatureAndPersistsRemoval() async throws {
         let root = try workspace()
         defer { try? FileManager.default.removeItem(at: root) }
