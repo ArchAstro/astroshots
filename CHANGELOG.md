@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.9] (macos) - 2026-10-15
+
 ### Fixed
 
 - **Remove excluded captures from older indexes:** warm startup evicts cached
