@@ -93,18 +93,8 @@ if [[ "$ACTUAL_LENGTH" != "$DECLARED_LENGTH" ]]; then
 fi
 unzip -tq "$ARCHIVE" >/dev/null
 
-SIGN_UPDATE="${SPARKLE_BIN_DIR:+${SPARKLE_BIN_DIR}/sign_update}"
-if [[ -z "$SIGN_UPDATE" || ! -x "$SIGN_UPDATE" ]]; then
-  SIGN_UPDATE="$(
-    find "$ROOT/build" "$HOME/Library/Developer/Xcode/DerivedData" \
-      -path '*/artifacts/sparkle/Sparkle/bin/sign_update' \
-      -type f -perm +111 2>/dev/null | head -1
-  )"
-fi
-if [[ -z "$SIGN_UPDATE" || ! -x "$SIGN_UPDATE" ]]; then
-  echo "error: Sparkle sign_update tool not found" >&2
-  exit 1
-fi
+SPARKLE_BIN_DIR="$(bash "$ROOT/scripts/sparkle-tools.sh")"
+SIGN_UPDATE="$SPARKLE_BIN_DIR/sign_update"
 
 if [[ -n "${SPARKLE_ED_KEY_FILE:-}" ]]; then
   "$SIGN_UPDATE" --verify --ed-key-file "$SPARKLE_ED_KEY_FILE" "$ARCHIVE" "$SIGNATURE"

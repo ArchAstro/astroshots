@@ -171,13 +171,21 @@ struct WatcherResourceTests {
     func emptyCacheUsesCursorToDecideWhetherDiscoveryIsNeeded(hasCursor: Bool) async throws {
         let root = try workspace()
         defer { try? FileManager.default.removeItem(at: root) }
-        // This pre-existing unindexed capture reveals a recursive discovery;
-        // it predates the saved cursor, so event replay must not announce it.
+        // Observe the write before sampling the cursor: writing a file does
+        // not imply the asynchronous FSEvents daemon has assigned its ID yet.
+        let events = try FilesystemEventCheckpoint(root: root)
+        defer { events.stop() }
         let sentinel = try capture(root, "unindexed/.astroshot/feature/sentinel.png")
-        let cache = root.appendingPathComponent("index.json")
+        try await events.waitForEvent(at: sentinel.path)
+        let cursor = events.flushedCursor()
+        // Keep persistence outside the watched tree so it cannot provoke
+        // coalesced directory recovery while testing an authoritative index.
+        let storage = try workspace()
+        defer { try? FileManager.default.removeItem(at: storage) }
+        let cache = storage.appendingPathComponent("index.json")
         ShotIndexCache.save(
             roots: [root], astroshotDirs: [], arrivalOrder: [],
-            lastEventID: hasCursor ? FSEventsGetCurrentEventId() : nil, cacheFileURL: cache
+            lastEventID: hasCursor ? cursor : nil, cacheFileURL: cache
         )
         // Cross two startup/persistence cycles. Legacy empty indexes recover
         // once; empty indexes with a cursor stay authoritative across restarts.
@@ -195,6 +203,52 @@ struct WatcherResourceTests {
             #expect(ShotIndexCache.load(for: [root], cacheFileURL: cache)?.arrivalOrder == expected)
             #expect(ShotIndexCache.load(for: [root], cacheFileURL: cache)?.lastEventID != nil)
         }
+    }
+
+    @Test
+    func capturesAfterSavedCursorAreRecoveredAcrossRestart() async throws {
+        let root = try workspace()
+        let storage = try workspace()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: storage)
+        }
+        let events = try FilesystemEventCheckpoint(root: root)
+        defer { events.stop() }
+        let sentinel = try capture(root, "old/.astroshot/feature/sentinel.png")
+        try await events.waitForEvent(at: sentinel.path)
+        let cache = storage.appendingPathComponent("index.json")
+        ShotIndexCache.save(
+            roots: [root], astroshotDirs: [], arrivalOrder: [],
+            lastEventID: events.flushedCursor(), cacheFileURL: cache
+        )
+        // First launch preserves the empty index. Then write while stopped,
+        // wait for real OS delivery, and restart from the persisted cursor.
+        let watcher = AstroshotWatcher(configuration: .init(
+            roots: [root], settleNanos: 0, cacheFileURL: cache
+        ))
+        defer { watcher.stop() }
+        var completions = 0
+        var arrivals: [String] = []
+        watcher.onScanStateChanged = { if !$0 { completions += 1 } }
+        watcher.onNewShot = { arrivals.append($0.path) }
+        watcher.start()
+        try await waitUntil { completions >= 2 }
+        watcher.stop()
+        let saved = try #require(ShotIndexCache.load(for: [root], cacheFileURL: cache))
+        #expect(saved.arrivalOrder.isEmpty)
+        let recovered = try capture(root, "new/.astroshot/feature/recovered.png")
+        let excluded = try capture(root, "project/node_modules/.astroshot/feature/ignored.png")
+        try await events.waitForEvent(at: recovered.path)
+        try await events.waitForEvent(at: excluded.path)
+        #expect(events.flushedCursor() > (saved.lastEventID ?? 0))
+        watcher.start()
+        try await waitUntil {
+            arrivals.contains(recovered.path)
+                && ShotIndexCache.load(for: [root], cacheFileURL: cache)?.arrivalOrder == [recovered.path]
+        }
+        #expect(!arrivals.contains(sentinel.path))
+        #expect(!arrivals.contains(excluded.path))
     }
 
     @Test

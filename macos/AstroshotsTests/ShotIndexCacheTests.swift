@@ -230,6 +230,9 @@ final class ShotIndexCacheTests: XCTestCase {
     @MainActor
     func testValidIndexSkipsRecursiveDiscoveryUntilExplicitRescan() async throws {
         let root = tempSupport.appendingPathComponent("indexed-root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let events = try FilesystemEventCheckpoint(root: root)
+        defer { events.stop() }
         let indexedFeature = root.appendingPathComponent(
             "indexed/.astroshot/feature",
             isDirectory: true
@@ -250,6 +253,10 @@ final class ShotIndexCacheTests: XCTestCase {
         let unindexedImage = unindexedFeature.appendingPathComponent("0001-unindexed.png")
         try Data("indexed".utf8).write(to: indexedImage)
         try Data("unindexed".utf8).write(to: unindexedImage)
+        // The legacy index intentionally omits this image. Ensure its write
+        // precedes start()'s cursor rather than asking replay to ignore it.
+        try await events.waitForEvent(at: unindexedImage.path)
+        _ = events.flushedCursor()
 
         let cacheURL = tempSupport.appendingPathComponent("authoritative-index.json")
         ShotIndexCache.save(

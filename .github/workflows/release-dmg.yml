@@ -141,6 +141,13 @@ jobs:
           fi
           ls -lh "$GITHUB_WORKSPACE/dist/"
 
+      - name: Resolve Sparkle tools for generation and verification
+        working-directory: macos
+        run: |
+          set -euo pipefail
+          sparkle_bin_dir="$(bash scripts/sparkle-tools.sh --download)"
+          echo "SPARKLE_BIN_DIR=$sparkle_bin_dir" >> "$GITHUB_ENV"
+
       - name: Generate Sparkle appcast
         working-directory: macos
         env:

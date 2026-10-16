@@ -58,60 +58,8 @@ fi
 DOWNLOAD_URL_PREFIX="${DOWNLOAD_URL_PREFIX:-https://github.com/ArchAstro/astroshots/releases/download/v${VERSION}/}"
 LINK="${SPARKLE_PRODUCT_LINK:-https://github.com/ArchAstro/astroshots/releases}"
 
-find_sparkle_bin() {
-  if [[ -n "${SPARKLE_BIN_DIR:-}" && -x "${SPARKLE_BIN_DIR}/generate_appcast" ]]; then
-    echo "$SPARKLE_BIN_DIR"
-    return 0
-  fi
-
-  # SPM artifact layout after resolving Sparkle in DerivedData.
-  local candidate
-  while IFS= read -r candidate; do
-    if [[ -x "$candidate/generate_appcast" ]]; then
-      echo "$candidate"
-      return 0
-    fi
-  done < <(
-    find "${HOME}/Library/Developer/Xcode/DerivedData" \
-      -path '*/artifacts/sparkle/Sparkle/bin' \
-      -type d 2>/dev/null | head -20
-  )
-
-  # Download a release tool bundle if nothing local is cached.
-  local tools_dir="$ROOT/build/sparkle-tools"
-  local archive="$tools_dir/Sparkle-for-Swift-Package-Manager.zip"
-  mkdir -p "$tools_dir"
-  if [[ ! -x "$tools_dir/bin/generate_appcast" ]]; then
-    # stdout is reserved for find_sparkle_bin's returned path.
-    echo "==> Downloading Sparkle tools (2.9.5)" >&2
-    curl -fsSL \
-      -o "$archive" \
-      "https://github.com/sparkle-project/Sparkle/releases/download/2.9.5/Sparkle-for-Swift-Package-Manager.zip"
-    rm -rf "$tools_dir/extract"
-    mkdir -p "$tools_dir/extract"
-    unzip -q "$archive" -d "$tools_dir/extract"
-    # Layout: artifacts/sparkle/Sparkle/bin or top-level bin
-    if [[ -d "$tools_dir/extract/bin" ]]; then
-      ln -sfn "$tools_dir/extract/bin" "$tools_dir/bin"
-    else
-      local found
-      found="$(find "$tools_dir/extract" -type d -name bin | head -1)"
-      if [[ -z "$found" ]]; then
-        echo "error: could not locate Sparkle bin/ in release archive" >&2
-        exit 1
-      fi
-      ln -sfn "$found" "$tools_dir/bin"
-    fi
-  fi
-  echo "$tools_dir/bin"
-}
-
-SPARKLE_BIN="$(find_sparkle_bin)"
-GENERATE_APPCAST="$SPARKLE_BIN/generate_appcast"
-if [[ ! -x "$GENERATE_APPCAST" ]]; then
-  echo "error: generate_appcast not executable at $GENERATE_APPCAST" >&2
-  exit 1
-fi
+SPARKLE_BIN_DIR="$(bash "$ROOT/scripts/sparkle-tools.sh" --download)"
+GENERATE_APPCAST="$SPARKLE_BIN_DIR/generate_appcast"
 
 KEY_ARGS=()
 KEY_FILE=""
