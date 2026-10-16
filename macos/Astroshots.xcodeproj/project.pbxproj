@@ -39,6 +39,7 @@
 		72C3BD7FFE6CE293A047BCD3 /* WatcherResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */; };
 		76EB28B98DBFABBF892E3A7E /* FrictionLogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33713B379610D87587D40B40 /* FrictionLogListView.swift */; };
 		77469FC8404628A2CE0A1894 /* astroshots-app-icon-master.png in Resources */ = {isa = PBXBuildFile; fileRef = F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */; };
+		80DD13D51B3DC7C99B321420 /* FilesystemEventCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB203E932406C37E98E0EAA /* FilesystemEventCheckpoint.swift */; };
 		842084A0B15BCB986B44ADB1 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F5F7C7BB45AE1FD2CD699B /* ThemeTests.swift */; };
 		86F48D75FA114B1E154B6595 /* FrictionLogLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */; };
 		87D9D684AF70B41C69A9A1C7 /* ReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D528EB0C9FF62471B7103498 /* ReviewStore.swift */; };
@@ -126,6 +127,7 @@
 		69B305D438A9936B01365E65 /* PreferenceLeakGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceLeakGuardTests.swift; sourceTree = "<group>"; };
 		6A1584CFA29D0DD78764232C /* TestDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDefaults.swift; sourceTree = "<group>"; };
 		6CFF7CFF1BF190796F3D35F4 /* PerformanceLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceLog.swift; sourceTree = "<group>"; };
+		6FB203E932406C37E98E0EAA /* FilesystemEventCheckpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesystemEventCheckpoint.swift; sourceTree = "<group>"; };
 		70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCacheTests.swift; sourceTree = "<group>"; };
 		71AECECE88B0D8F41B06334C /* ReviewTakeoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewTakeoverView.swift; sourceTree = "<group>"; };
 		75955E0D26EB206BCE2025ED /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 			children = (
 				39A1E2488E103600176B240E /* AstroshotWatcherTests.swift */,
 				0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */,
+				6FB203E932406C37E98E0EAA /* FilesystemEventCheckpoint.swift */,
 				E835F1DA4729DEB7570B9FBC /* FrictionLogLoaderTests.swift */,
 				BE183D1FC1B91442E70D281A /* ImageClipboardTests.swift */,
 				4705ECE07E4CA31E16A35EDC /* ImagePagingTests.swift */,
@@ -517,6 +520,7 @@
 			files = (
 				F4ADD26B485AABC510D0CD7E /* AstroshotWatcherTests.swift in Sources */,
 				601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */,
+				80DD13D51B3DC7C99B321420 /* FilesystemEventCheckpoint.swift in Sources */,
 				86F48D75FA114B1E154B6595 /* FrictionLogLoaderTests.swift in Sources */,
 				9E7A5FC5E617434C14891B39 /* ImageClipboardTests.swift in Sources */,
 				AC6530122CF24B9A06DCF3E6 /* ImagePagingTests.swift in Sources */,

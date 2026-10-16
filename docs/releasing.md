@@ -27,6 +27,14 @@ gh workflow run "Cut release" --repo ArchAstro/astroshots -f bump=patch
 gh workflow run "Cut npm release" --repo ArchAstro/astroshots -f bump=patch
 ```
 
+Release PRs created with `GITHUB_TOKEN` require a maintainer with write access
+to select **Approve workflows to run** in the GitHub PR merge box. An
+`action_required` CI run with zero jobs is this approval gate, not a test
+failure. See [GitHub's workflow trigger policy](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+Approval starts PR checks; it does not require rerunning **Release DMG**.
+Do not rerun that release workflow just to verify an existing release: its
+uploads use `--clobber` and can replace published assets.
+
 Before cutting either track, put notes under `## [Unreleased]` in
 `CHANGELOG.md`. The cut workflow promotes that section into a dated release
 header and leaves a fresh empty Unreleased block.
@@ -71,3 +79,26 @@ GitHub Release appcast, however they were installed. The Homebrew cask declares
 fight the app's own self-update.
 
 See [`install.md`](install.md) for every install path.
+
+## Sparkle verification
+
+`macos/scripts/sparkle-tools.sh` resolves a shared tool directory containing
+`generate_appcast` and `sign_update`. An explicit `SPARKLE_BIN_DIR` is
+authoritative; otherwise it checks `macos/build/sparkle-tools/bin`, then SPM
+artifacts in the local build directory and Xcode DerivedData. Missing optional
+search roots are skipped. `--download` permits the pinned 2.9.5 fallback bundle.
+Release DMG resolves once and exports `SPARKLE_BIN_DIR` for both generation and
+published-feed verification.
+
+Run `python3 macos/scripts/test-update-feed-fixture.py` on macOS for the local
+HTTP feed/archive proof using real Sparkle tools and a disposable random key
+(no production keys or Keychain entries). It checks successful verification,
+valid-ZIP signature tampering, fallback discovery, missing optional roots,
+and invalid explicit configuration. It runs automatically in `.github/workflows/ci.yml`,
+job `test` (**macOS app**), step **Verify Sparkle feed with real signing tools**.
+The same job's **Test** step runs `WatcherResourceTests`, including the empty
+index cursor test and `capturesAfterSavedCursorAreRecoveredAcrossRestart`,
+which both use real FSEvents to establish filesystem ordering.
+The legacy-index ordering case is
+`ShotIndexCacheTests.testValidIndexSkipsRecursiveDiscoveryUntilExplicitRescan`
+in `macos/AstroshotsTests/ShotIndexCacheTests.swift`, also run by that **Test** step.

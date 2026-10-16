@@ -350,6 +350,9 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build-for-testing
 
+      - name: Verify Sparkle feed with real signing tools
+        run: python3 macos/scripts/test-update-feed-fixture.py
+
       - name: Package branded DMG end-to-end proof
         working-directory: macos
         run: ./scripts/test-package-dmg.sh
