@@ -25,11 +25,28 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Validate user-supplied dispatch input before checking out or executing
+      # release-tree code in this secrets-bearing workflow.
+      - name: Validate release tag
+        env:
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: expected a semantic version tag (vX.Y.Z), got: $TAG" >&2
+            exit 1
+          fi
+          git ls-remote --exit-code --refs \
+            "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$TAG" >/dev/null || {
+            echo "error: $TAG is not an existing tag" >&2
+            exit 1
+          }
+
       - uses: actions/checkout@v4
         with:
-          # For workflow_dispatch with a tag input, still check out default ref;
-          # packaging builds from the tree at that ref if you check out the tag.
-          ref: ${{ inputs.tag != '' && inputs.tag || github.ref }}
+          # Always use the immutable tag namespace; a semver-shaped branch
+          # must never supply code to this signing workflow.
+          ref: refs/tags/${{ inputs.tag != '' && inputs.tag || github.ref_name }}
 
       - name: Check signing secrets
         id: secrets
