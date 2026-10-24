@@ -12,7 +12,7 @@ change; only the directory name did.
   runs/<run-id>/
     prompt.md               # frozen snapshot of the scenario prompt
     log.jsonl
-    meta.json               # optional per-run status
+    meta.json               # per-run status (caller-reported), run_id, provenance, prompt_sha256
     NNNN-slug.png
 ```
 
@@ -78,9 +78,19 @@ these commands operate on the layout above:
 | `slug` | string | no | Should match directory name |
 | `title` | string | no | Tray title; default humanized slug |
 | `description` | string | no | One-line summary |
-| `status` | string | no | `draft` \| `ready` \| `running` \| `complete` \| `failed` |
+| `status` | string | no | `draft` \| `ready` \| `running` \| `complete` \| `failed`; set by the harness from what happened, never assumed `complete` |
 | `updated_at` | string | no | ISO-8601 UTC |
-| `provenance` | object | no | Capture-time `source_path`, `worktree`, `repo`, `commit`, `branch`, `dirty`. Never global identity. |
+| `provenance` | object | no | Capture-time `source_path`, `worktree`, `repo`, `commit`, `branch`, `dirty` of the first attempt. Never global identity. Each run keeps its own in `runs/<id>/meta.json`. |
+
+### Writing an attempt
+
+`writeFrictionAttempt(scenarioDir, runId, steps, { status })` (exported by
+`@archastro/astroshot-review`) stages the run in a hidden `runs/.staging-*`
+directory and renames it to `runs/<runId>/` when complete. It refuses an
+existing run id, requires `runId` and screenshot names to be plain file names,
+copies `prompt.md` into the run as the frozen snapshot, and writes the status
+the caller passes. Run `meta.json` carries `run_id`, `scenario_id`, `status`,
+its own `provenance` and `prompt_sha256`.
 
 ## log.jsonl
 

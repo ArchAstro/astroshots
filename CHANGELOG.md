@@ -11,6 +11,16 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Added
+
+- **Stable capture identities:** manifests, run metadata and log entries carry
+  additive `scenario_id`, `run_id`, `entry_id` and asset ids plus per-run git
+  provenance, so copied worktrees keep one scenario identity and distinct
+  attempts never merge. A new run archives the previous one under
+  `previous_runs`. `importPortableRecord` reads legacy and identified captures
+  into versioned records and reports malformed lines, missing media and
+  ambiguous legacy identity.
+
 ## [0.2.9] (macos) - 2026-10-15
 
 ### Fixed

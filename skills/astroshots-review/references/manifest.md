@@ -19,6 +19,7 @@ execution and image metadata. Human feedback is a separate sibling file:
 | `description` | string | no | Journey one-liner |
 | `provenance` | object | no | `source_path`, `worktree`, `repo`, `commit`, `branch`, `dirty`, optional `task_id` / `pr`. `dirty: true` means captured bytes are not claimed to be `commit`. |
 | `shots` | array | yes | Append-only during a run |
+| `previous_runs` | array | no | Earlier attempts archived when a new `run_id` takes over the directory. Each item: `run_id`, `status`, optional `provenance`, `shots`. `scenario_id` stays; `provenance` above always describes the current run. A `run_id` never appears twice (current plus archived); `astroshot-capture` and the movie sink refuse to reuse an archived id, and the same `run_id` as the current run continues that attempt. |
 
 ## Shot entry
 
@@ -110,7 +111,7 @@ Path: `<worktree>/.astroshot/<feature>/review.json`
 | `decision` | string | no | Human acknowledgement: `seen` |
 | `reviewed_at` | string | conditional | Required with `decision`; absent for comment-only unseen feedback |
 | `image_sha256` | string | conditional | Required with `decision`; lowercase SHA-256 of the reviewed file bytes |
-| `content_revision` | string | no | Optional digest of ordered text plus asset hashes. Never substitutes for `image_sha256`. Poster-only / log-only Seen stays valid without it. |
+| `content_revision` | string | no | Optional digest over ordered title, description, transcript, url, notes, chapters and asset hashes (length-prefixed fields; `identity.ts` `contentRevision`). Never substitutes for `image_sha256`. Poster-only / log-only Seen stays valid without it. |
 | `comments` | array | yes | Ordered agent-readable feedback |
 
 Each comment has required string fields `id`, `body`, and `created_at`.

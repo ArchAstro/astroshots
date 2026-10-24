@@ -184,6 +184,15 @@ function runRevision(entries: PortableEntry[], promptSha256: string | null): str
       title: entry.title,
       description: entry.description,
       transcript: entry.transcript,
+      url: entry.url ?? "",
+      good: entry.good,
+      improve: entry.improve,
+      chapters: entry.chapters.map((chapter) => ({
+        slug: chapter.slug ?? "",
+        title: chapter.title ?? "",
+        tMs: chapter.tMs ?? null,
+        note: chapter.note ?? "",
+      })),
       assetDigests: entry.assets.map((asset) => asset.sha256 ?? missingAssetDigest(asset.fileName)),
     })),
   });
@@ -226,10 +235,56 @@ async function entryFromShot(
     title: shotTitle(entry, fileName),
     description: entry?.description ?? "",
     transcript: "",
+    url: asString(entry?.url),
+    good: [],
+    improve: [],
     capturedAt: entry?.captured_at ?? null,
     assets,
     chapters: chaptersOf(entry),
     review: null,
+  };
+}
+
+function storedProvenance(value: unknown): CaptureProvenance | null {
+  if (!isRecord(value)) return null;
+  const p = provenanceFrom({ provenance: value }, "", "");
+  return { ...p, sourcePath: asString(value.source_path) ?? "unknown", worktree: asString(value.worktree) ?? "unknown" };
+}
+
+async function shotRun(
+  featureDir: string,
+  manifest: FeatureManifest | null,
+  run: {
+    runId: string | null;
+    status: string | null;
+    provenance: CaptureProvenance | null;
+    shots: ManifestShot[];
+    listImagesWhenEmpty: boolean;
+  },
+  diagnostics: ImportDiagnostic[],
+): Promise<PortableRun> {
+  const orderedFiles = run.shots
+    .map((shot) => shot.file ?? shot.poster)
+    .filter((name): name is string => Boolean(name));
+  const files = orderedFiles.length > 0 || !run.listImagesWhenEmpty ? orderedFiles : await listImageFiles(featureDir);
+  const scoped: FeatureManifest = { ...manifest, shots: run.shots };
+  const entries: PortableEntry[] = [];
+  for (const [index, fileName] of files.entries()) {
+    entries.push(await entryFromShot(featureDir, fileName, index + 1, scoped, diagnostics));
+  }
+  const revision = runRevision(entries, null);
+  const poster = entries[0]?.assets[0] ?? null;
+  const review = poster ? await reviewClaim(featureDir, poster.fileName, run.runId, poster.sha256, revision) : null;
+  if (entries[0]) entries[0].review = review;
+  return {
+    runId: run.runId ?? "latest",
+    capturedAt: entries[0]?.capturedAt ?? null,
+    status: run.status,
+    provenance: run.provenance,
+    promptSnapshot: null,
+    contentRevision: revision,
+    entries,
+    review,
   };
 }
 
@@ -248,31 +303,39 @@ export async function importShotRecord(featureDir: string): Promise<PortableReco
     });
   }
 
-  const orderedFiles = (manifest?.shots ?? [])
-    .map((shot) => shot.file ?? shot.poster)
-    .filter((name): name is string => Boolean(name));
-  const files = orderedFiles.length > 0 ? orderedFiles : await listImageFiles(resolved);
-  const entries: PortableEntry[] = [];
-  for (const [index, fileName] of files.entries()) {
-    entries.push(await entryFromShot(resolved, fileName, index + 1, manifest, diagnostics));
+  const runs: PortableRun[] = [];
+  // Archived attempts first (oldest to newest), then the attempt that owns the directory now.
+  for (const previous of manifest?.previous_runs ?? []) {
+    runs.push(
+      await shotRun(
+        resolved,
+        manifest,
+        {
+          runId: asString(previous.run_id),
+          status: asString(previous.status),
+          provenance: storedProvenance(previous.provenance),
+          shots: previous.shots ?? [],
+          listImagesWhenEmpty: false,
+        },
+        diagnostics,
+      ),
+    );
   }
-
-  const runId = asString(manifest?.run_id) ?? "latest";
-  const revision = runRevision(entries, null);
-  const posterName = entries[0]?.assets[0]?.fileName ?? null;
-  const posterSha = entries[0]?.assets[0]?.sha256 ?? null;
-  const runReview = posterName ? await reviewClaim(resolved, posterName, asString(manifest?.run_id), posterSha, revision) : null;
-  if (entries[0]) entries[0].review = runReview;
-
-  const run: PortableRun = {
-    runId,
-    capturedAt: entries[0]?.capturedAt ?? null,
-    status: asString(manifest?.status),
-    promptSnapshot: null,
-    contentRevision: revision,
-    entries,
-    review: runReview,
-  };
+  runs.push(
+    await shotRun(
+      resolved,
+      manifest,
+      {
+        runId: asString(manifest?.run_id),
+        status: asString(manifest?.status),
+        provenance: storedProvenance(manifest?.provenance),
+        shots: manifest?.shots ?? [],
+        listImagesWhenEmpty: (manifest?.previous_runs ?? []).length === 0,
+      },
+      diagnostics,
+    ),
+  );
+  reportDuplicateRunIds(runs, diagnostics, resolved);
 
   return {
     schemaVersion: PORTABLE_SCHEMA_VERSION,
@@ -283,9 +346,23 @@ export async function importShotRecord(featureDir: string): Promise<PortableReco
     title: asString(manifest?.feature) ?? humanize(slug),
     description: asString(manifest?.description) ?? "",
     provenance: provenanceFrom(manifest as Record<string, unknown> | null, resolved, worktree),
-    runs: [run],
+    runs,
     diagnostics,
   };
+}
+
+function reportDuplicateRunIds(runs: PortableRun[], diagnostics: ImportDiagnostic[], where: string): void {
+  const seen = new Set<string>();
+  for (const run of runs) {
+    if (seen.has(run.runId)) {
+      diagnostics.push({
+        kind: "duplicate-run-id",
+        message: `run id ${run.runId} appears more than once; distinct attempts must not share an id`,
+        path: where,
+      });
+    }
+    seen.add(run.runId);
+  }
 }
 
 async function promptSnapshot(
@@ -344,6 +421,9 @@ async function entriesFromJsonl(
       title: step.title,
       description: step.description,
       transcript: step.transcript,
+      url: step.url,
+      good: step.good,
+      improve: step.improve,
       capturedAt: step.capturedAt,
       assets,
       chapters: [],
@@ -380,6 +460,9 @@ async function importFrictionRun(
             title: humanize(sequenceAndSlug(fileName).slug),
             description: "",
             transcript: "",
+            url: null,
+            good: [],
+            improve: [],
             capturedAt: null,
             assets: [asset],
             chapters: [],
@@ -398,6 +481,7 @@ async function importFrictionRun(
     runId: asString(meta?.run_id) ?? runId,
     capturedAt: asString(meta?.captured_at) ?? entries[0]?.capturedAt ?? null,
     status: asString(meta?.status),
+    provenance: isRecord(meta?.provenance) ? provenanceFrom(meta, "", "") : null,
     promptSnapshot: snapshot,
     contentRevision: revision,
     entries,
@@ -443,10 +527,13 @@ export async function importFrictionRecord(scenarioDir: string): Promise<Portabl
     const run = await importFrictionRun(resolved, runDir, entry.name, diagnostics);
     if (run) runs.push(run);
   }
+  runs.sort((a, b) => a.runId.localeCompare(b.runId));
   if (runs.length === 0 && (await exists(path.join(resolved, LOG_FILE)))) {
     const flat = await importFrictionRun(resolved, resolved, "latest", diagnostics);
     if (flat) runs.push(flat);
   }
+
+  reportDuplicateRunIds(runs, diagnostics, resolved);
 
   return {
     schemaVersion: PORTABLE_SCHEMA_VERSION,
@@ -470,11 +557,26 @@ export async function importPortableRecord(directory: string): Promise<PortableR
   return importShotRecord(resolved);
 }
 
-/** Copy the live scenario prompt into a run so later edits cannot rewrite history. */
+function requireBasename(value: string, label: string): string {
+  if (
+    !value ||
+    value !== path.basename(value) ||
+    value === "." ||
+    value === ".." ||
+    value.startsWith(".") ||
+    value.includes("\\")
+  ) {
+    throw new Error(`${label} must be a plain file name, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/** Copy the live scenario prompt into a run directory so later edits cannot rewrite history. */
 export async function snapshotFrictionPrompt(scenarioDir: string, runDir: string): Promise<PortablePromptSnapshot> {
   const live = path.join(scenarioDir, PROMPT_FILE);
   const dest = path.join(runDir, PROMPT_SNAPSHOT_FILE);
-  await fs.promises.copyFile(live, dest);
+  // COPYFILE_EXCL: an existing snapshot is history, never replaced.
+  await fs.promises.copyFile(live, dest, fs.constants.COPYFILE_EXCL);
   const hashed = await hashIfPresent(dest);
   return { path: dest, sha256: hashed?.sha256 ?? null, frozen: true };
 }
@@ -491,68 +593,130 @@ export interface FrictionRunStepInput {
   url?: string;
 }
 
-/** Local producer used by the documented friction-run contract. */
+export interface WriteFrictionAttemptOptions {
+  /**
+   * Execution status of this attempt as the caller observed it (for example
+   * `running`, `complete`, `failed`). The writer never infers one.
+   */
+  status: string;
+  /** Overrides git and environment discovery, mainly for tests. */
+  provenance?: CaptureProvenance;
+}
+
+async function writeJsonAtomic(filePath: string, value: unknown): Promise<void> {
+  const tmp = `${filePath}.${process.pid}.${newStableId()}.tmp`;
+  await fs.promises.writeFile(tmp, `${JSON.stringify(value, null, 2)}\n`);
+  await fs.promises.rename(tmp, filePath);
+}
+
+const timestamp = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+
+/**
+ * Local producer used by the documented friction-run contract.
+ *
+ * Builds the run in a hidden staging directory and renames it into
+ * `runs/<runId>/` once complete, so a reader never sees a half-written attempt
+ * and a failed attempt leaves nothing behind. An existing run id is refused.
+ */
 export async function writeFrictionAttempt(
   scenarioDir: string,
   runId: string,
   steps: FrictionRunStepInput[],
+  options: WriteFrictionAttemptOptions,
 ): Promise<{ runDir: string; runId: string }> {
-  const resolved = path.resolve(scenarioDir);
-  const runDir = path.join(resolved, RUNS_DIR, runId);
-  await fs.promises.mkdir(runDir, { recursive: true });
-  const snapshot = await snapshotFrictionPrompt(resolved, runDir);
-  const metaPath = path.join(resolved, META_FILE);
-  const existing = (await readJsonRecord(metaPath)) ?? {};
-  const scenarioId = asString(existing.scenario_id) ?? newStableId();
-  const provenance = collectProvenance(resolved);
-  const nextMeta = {
-    ...existing,
-    version: 1,
-    schema_version: 1,
-    slug: path.basename(resolved),
-    scenario_id: scenarioId,
-    provenance: provenanceFields(provenance),
-    status: "complete",
-    updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-  };
-  await fs.promises.writeFile(metaPath, `${JSON.stringify(nextMeta, null, 2)}\n`);
-
-  const lines: string[] = [];
-  for (const [index, step] of steps.entries()) {
-    const dest = path.join(runDir, step.screenshotName);
-    await fs.promises.copyFile(step.screenshotPath, dest);
-    lines.push(
-      JSON.stringify({
-        step: index + 1,
-        id: step.id,
-        entry_id: newStableId(),
-        title: step.title,
-        description: step.description,
-        transcript: step.transcript,
-        screenshots: [step.screenshotName],
-        asset_ids: { [step.screenshotName]: newStableId() },
-        good: step.good ?? [],
-        improve: step.improve ?? [],
-        url: step.url,
-        captured_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-      }),
-    );
+  requireBasename(runId, "runId");
+  if (!options?.status?.trim()) throw new Error("status is required: pass the attempt's execution status");
+  const names = steps.map((step) => requireBasename(step.screenshotName, "screenshotName"));
+  for (const name of names) {
+    if ([LOG_FILE, META_FILE, PROMPT_SNAPSHOT_FILE].includes(name) || !isImageFile(name)) {
+      throw new Error(`screenshotName ${JSON.stringify(name)} must be an image file name that does not collide with run files`);
+    }
   }
-  await fs.promises.writeFile(path.join(runDir, LOG_FILE), `${lines.join("\n")}\n`);
-  await fs.promises.writeFile(
-    path.join(runDir, META_FILE),
-    `${JSON.stringify(
-      {
-        version: 1,
-        schema_version: 1,
-        run_id: runId,
-        status: "complete",
-        prompt_sha256: snapshot.sha256,
-        captured_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  if (new Set(names).size !== names.length) throw new Error("screenshotName values must be unique within a run");
+
+  const resolved = path.resolve(scenarioDir);
+  const runsDir = path.join(resolved, RUNS_DIR);
+  const runDir = path.join(runsDir, runId);
+  if (await lstatExists(runDir)) {
+    throw new Error(`run ${runId} already exists at ${runDir}; attempts are never overwritten`);
+  }
+  await fs.promises.mkdir(runsDir, { recursive: true });
+
+  const staging = path.join(runsDir, `.staging-${runId}-${newStableId()}`);
+  await fs.promises.mkdir(staging);
+  try {
+    const snapshot = await snapshotFrictionPrompt(resolved, staging);
+    const metaPath = path.join(resolved, META_FILE);
+    const existing = (await readJsonRecord(metaPath)) ?? {};
+    if (Object.keys(existing).length === 0 && (await lstatExists(metaPath)) && (await fs.promises.readFile(metaPath, "utf8")).trim() !== "") {
+      throw new Error(`${metaPath} exists but is not a JSON object; refusing to replace the scenario identity`);
+    }
+    const scenarioId = asString(existing.scenario_id) ?? newStableId();
+    const provenance = provenanceFields(options.provenance ?? collectProvenance(resolved));
+    const capturedAt = timestamp();
+
+    const lines: string[] = [];
+    for (const [index, step] of steps.entries()) {
+      const name = names[index]!;
+      await fs.promises.copyFile(step.screenshotPath, path.join(staging, name), fs.constants.COPYFILE_EXCL);
+      lines.push(
+        JSON.stringify({
+          step: index + 1,
+          id: step.id,
+          entry_id: newStableId(),
+          title: step.title,
+          description: step.description,
+          transcript: step.transcript,
+          screenshots: [name],
+          asset_ids: { [name]: newStableId() },
+          good: step.good ?? [],
+          improve: step.improve ?? [],
+          url: step.url,
+          captured_at: timestamp(),
+        }),
+      );
+    }
+    await fs.promises.writeFile(path.join(staging, LOG_FILE), lines.length ? `${lines.join("\n")}\n` : "");
+    await writeJsonAtomic(path.join(staging, META_FILE), {
+      version: 1,
+      schema_version: 1,
+      run_id: runId,
+      scenario_id: scenarioId,
+      status: options.status,
+      provenance,
+      prompt_sha256: snapshot.sha256,
+      captured_at: capturedAt,
+    });
+
+    // Re-check right before publishing: rename onto an empty directory would succeed.
+    if (await lstatExists(runDir)) {
+      throw new Error(`run ${runId} already exists at ${runDir}; attempts are never overwritten`);
+    }
+    await fs.promises.rename(staging, runDir);
+
+    // Scenario meta keeps the identity and the provenance of the first attempt;
+    // each run's own provenance lives in its run meta.
+    await writeJsonAtomic(metaPath, {
+      ...existing,
+      version: 1,
+      schema_version: 1,
+      slug: path.basename(resolved),
+      scenario_id: scenarioId,
+      provenance: existing.provenance ?? provenance,
+      status: options.status,
+      updated_at: capturedAt,
+    });
+  } finally {
+    await fs.promises.rm(staging, { recursive: true, force: true });
+  }
   return { runDir, runId };
+}
+
+async function lstatExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.promises.lstat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -66,7 +66,7 @@ export function collectProvenance(
       pr: emptyToNull(env.ASTROSHOT_PR),
     };
   }
-  const status = git(cwd, ["status", "--porcelain"]);
+  const status = git(cwd, ["status", "--porcelain", "--", ":/", ":(exclude,glob)**/.astroshot/**"]);
   return {
     source_path: resolved,
     worktree,

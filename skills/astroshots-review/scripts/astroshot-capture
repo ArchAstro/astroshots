@@ -380,7 +380,7 @@ collect_provenance_json() {
     [[ -n "$repo" ]] || repo="$toplevel"
     commit="$(git -C "$git_cwd" rev-parse HEAD 2>/dev/null || true)"
     branch="$(git -C "$git_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-    status="$(git -C "$git_cwd" status --porcelain 2>/dev/null || true)"
+    status="$(git -C "$git_cwd" status --porcelain -- ":/" ":(exclude,glob)**/.astroshot/**" 2>/dev/null || true)"
     if [[ -n "$status" ]]; then dirty="true"; else dirty="false"; fi
   else
     toplevel="$git_cwd"
@@ -447,6 +447,12 @@ elif [[ -n "$EXISTING_RUN_ID" && "$EXISTING_STATUS" == "running" ]]; then
 else
   RUN_ID="${FEATURE}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
   NEW_RUN=1
+fi
+
+if [[ "$FINALIZE" != "1" && "$NEW_RUN" == "1" && -f "$MANIFEST" ]] &&
+  jq -e --arg run_id "$RUN_ID" '[.previous_runs[]? | .run_id] | index($run_id) != null' "$MANIFEST" >/dev/null 2>&1; then
+  echo "error: run id $RUN_ID was already recorded for feature $FEATURE; pick a new --run-id" >&2
+  exit 1
 fi
 
 if [[ ! -f "$MANIFEST" ]]; then
@@ -561,11 +567,20 @@ replace_manifest jq \
   --arg scenario_id "$(new_stable_id)" \
   --argjson provenance "$PROVENANCE_JSON" \
   '
-    .status = $status
+    # A new attempt archives the previous one (id, status, provenance, shots)
+    # under previous_runs, keeps scenario_id, and starts with its own provenance.
+    (if $new_run == "1" and ((.run_id // "") != "") and .run_id != $run_id then
+       .previous_runs = ((.previous_runs // []) + [{
+         run_id: .run_id,
+         status: (.status // null),
+         shots: (.shots // [])
+       } + (if .provenance then {provenance: .provenance} else {} end)])
+     else . end)
+    | .status = $status
     | .run_id = $run_id
     | .schema_version = 1
     | .scenario_id = (.scenario_id // $scenario_id)
-    | .provenance = (.provenance // $provenance)
+    | .provenance = (if $new_run == "1" then $provenance else (.provenance // $provenance) end)
     | .shots = (if $new_run == "1" then [] else (.shots // []) end)
     | .shots += [{
         id: $id,

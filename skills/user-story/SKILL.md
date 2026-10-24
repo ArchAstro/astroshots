@@ -259,9 +259,11 @@ echo "User story run dir: $RUN_DIR"
 ```
 
 Set slug `meta.json` status to `running` while active; `complete` or `failed`
-when finished. Keep `scenario_id` if it already exists so copies of this
+when finished; write what actually happened, never `complete` by default. Never
+reuse or overwrite an existing `runs/<id>/`; pick a new id. Keep `scenario_id` if it already exists so copies of this
 scenario stay the same identity. Optional per-run `runs/<id>/meta.json` with
-the same `status` field is fine. The copied `runs/<id>/prompt.md` is the frozen
+the same `status` field is fine; it should also record this attempt's
+`provenance` (commit, branch, `dirty`) so later attempts do not overwrite it. The copied `runs/<id>/prompt.md` is the frozen
 attempt snapshot; later edits to the live prompt must not rewrite it.
 
 Astroshots lists **every** non-empty `runs/<id>/` under the slug (newest by

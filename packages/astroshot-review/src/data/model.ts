@@ -10,7 +10,8 @@ export type ImportDiagnosticKind =
   | "malformed-line"
   | "missing-asset"
   | "ambiguous-identity"
-  | "unfrozen-prompt";
+  | "unfrozen-prompt"
+  | "duplicate-run-id";
 
 export interface ImportDiagnostic {
   kind: ImportDiagnosticKind;
@@ -60,6 +61,9 @@ export interface PortableEntry {
   title: string;
   description: string;
   transcript: string;
+  url: string | null;
+  good: string[];
+  improve: string[];
   capturedAt: string | null;
   assets: PortableAsset[];
   chapters: Chapter[];
@@ -77,6 +81,8 @@ export interface PortableRun {
   capturedAt: string | null;
   /** Harness/agent execution status only; never a human review. */
   status: string | null;
+  /** This attempt's own capture location and git state, not the scenario's. */
+  provenance: CaptureProvenance | null;
   promptSnapshot: PortablePromptSnapshot | null;
   contentRevision: string;
   entries: PortableEntry[];
@@ -100,6 +106,7 @@ export interface Chapter {
   slug?: string;
   title?: string;
   tMs?: number;
+  note?: string;
 }
 
 export interface ReviewComment {

@@ -45,12 +45,16 @@ function initRepo(root: string) {
   git(root, ["commit", "-m", "seed"]);
 }
 
-function capture(root: string, feature: string, slug: string, source: string) {
-  const result = spawnSync(
+function runCapture(root: string, feature: string, slug: string, source: string, extra: string[] = []) {
+  return spawnSync(
     captureHelper,
-    ["--root", root, "--feature", feature, "--slug", slug, "--source", source, "--title", slug],
+    ["--root", root, "--feature", feature, "--slug", slug, "--source", source, "--title", slug, ...extra],
     { encoding: "utf8" },
   );
+}
+
+function capture(root: string, feature: string, slug: string, source: string, extra: string[] = []) {
+  const result = runCapture(root, feature, slug, source, extra);
   if (result.status !== 0) {
     throw new Error(`astroshot-capture failed: ${result.stderr || result.stdout}`);
   }
@@ -136,9 +140,10 @@ describe("portable records across worktrees", () => {
           screenshotPath: sourcePng,
           screenshotName: "0001-land.png",
         },
-      ]);
+      ], { status: "running" });
 
-      capture(identifiedRoot, "install-wizard", "configure", sourcePng);
+      // Phase: the helper records attempt one of a still feature.
+      capture(identifiedRoot, "install-wizard", "configure", sourcePng, ["--run-id", "wizard-run-1", "--status", "fail"]);
 
       const copyRoot = path.join(temp, "copied-tree");
       fs.cpSync(identifiedRoot, copyRoot, { recursive: true });
@@ -153,7 +158,18 @@ describe("portable records across worktrees", () => {
           screenshotPath: sourcePng,
           screenshotName: "0001-land.png",
         },
-      ]);
+      ], { status: "failed" });
+
+      // Phase: the copied worktree records a second, distinct attempt of the same feature.
+      capture(copyRoot, "install-wizard", "configure-again", sourcePng, ["--run-id", "wizard-run-2", "--status", "pass"]);
+
+      // Phase: attempts are never overwritten, and an archived run id is never reused.
+      await expect(
+        writeFrictionAttempt(copiedFriction, "20260915T130000Z", [], { status: "complete" }),
+      ).rejects.toThrow(/already exists/);
+      const reuse = runCapture(copyRoot, "install-wizard", "late", sourcePng, ["--run-id", "wizard-run-1"]);
+      expect(reuse.status).not.toBe(0);
+      expect(reuse.stderr).toContain("already recorded");
 
       const [legacyShot, legacyLog, identifiedShot, identifiedLog, copiedShot, copiedLog] =
         readWithProductionProcess([
@@ -178,17 +194,32 @@ describe("portable records across worktrees", () => {
       expect(identifiedShot!.identity).toBe("identified");
       expect(identifiedShot!.scenarioId).toBe(copiedShot!.scenarioId);
       expect(identifiedShot!.runs).toHaveLength(1);
+      expect(identifiedShot!.runs[0]!.runId).toBe("wizard-run-1");
       expect(identifiedShot!.runs[0]!.entries).toHaveLength(1);
       expect(identifiedShot!.provenance.dirty).toBe(true);
       expect(identifiedShot!.provenance.commit).toBeTruthy();
       expect(identifiedShot!.runs[0]!.entries[0]!.assets[0]!.sha256).toBeTruthy();
-      expect(identifiedShot!.runs[0]!.contentRevision).toBe(copiedShot!.runs[0]!.contentRevision);
+      // The copy archives attempt one (same bytes, same revision) and adds its own.
+      expect(copiedShot!.runs.map((run) => [run.runId, run.status])).toEqual([
+        ["wizard-run-1", "fail"],
+        ["wizard-run-2", "pass"],
+      ]);
+      expect(copiedShot!.runs[0]!.contentRevision).toBe(identifiedShot!.runs[0]!.contentRevision);
+      expect(copiedShot!.runs[0]!.entries[0]!.assets[0]!.fileName).toBe("0001-configure.png");
+      expect(copiedShot!.runs[1]!.entries[0]!.assets[0]!.fileName).toBe("0002-configure-again.png");
+      expect(copiedShot!.runs[0]!.provenance?.dirty).toBe(true);
+      expect(copiedShot!.diagnostics.map((item) => item.kind)).not.toContain("duplicate-run-id");
 
       expect(identifiedLog!.scenarioId).toBe(copiedLog!.scenarioId);
       expect(identifiedLog!.identity).toBe("identified");
       expect(copiedLog!.runs.map((run) => run.runId).sort()).toEqual(
         ["20260915T120000Z", "20260915T130000Z"].sort(),
       );
+      // Execution status is what the caller reported; each run carries its own provenance.
+      expect(identifiedLog!.runs[0]!.status).toBe("running");
+      expect(copiedLog!.runs.map((run) => run.status)).toEqual(["running", "failed"]);
+      expect(copiedLog!.runs.every((run) => run.provenance?.commit)).toBe(true);
+      expect(copiedLog!.runs[1]!.provenance?.worktree).toContain("copied-tree");
       expect(identifiedLog!.runs).toHaveLength(1);
       expect(identifiedLog!.runs[0]!.runId).not.toBe(
         copiedLog!.runs.find((run) => run.runId === "20260915T130000Z")!.runId,

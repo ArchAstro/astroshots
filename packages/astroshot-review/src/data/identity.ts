@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, type Hash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -55,7 +55,7 @@ export function collectProvenance(
       pr: emptyToNull(env.ASTROSHOT_PR),
     };
   }
-  const status = git(cwd, ["status", "--porcelain"]);
+  const status = git(cwd, ["status", "--porcelain", "--", ":/", ":(exclude,glob)**/.astroshot/**"]);
   return {
     sourcePath: resolved,
     worktree,
@@ -73,37 +73,69 @@ function emptyToNull(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+export interface ContentRevisionChapter {
+  slug: string;
+  title: string;
+  tMs: number | null;
+  note: string;
+}
+
 export interface ContentRevisionEntry {
   title: string;
   description: string;
   transcript: string;
+  url: string;
+  good: string[];
+  improve: string[];
+  chapters: ContentRevisionChapter[];
   assetDigests: string[];
 }
 
-/** Deterministic digest over ordered entry text and asset hashes. */
+/** Every field is written as `tag`, an 8-byte big-endian byte length, then the bytes. */
+function writeField(hash: Hash, tag: string, value: string): void {
+  const bytes = Buffer.from(value, "utf8");
+  const length = Buffer.alloc(8);
+  length.writeBigUInt64BE(BigInt(bytes.length));
+  hash.update(`${tag}:`);
+  hash.update(length);
+  hash.update(bytes);
+}
+
+function writeList(hash: Hash, tag: string, values: string[]): void {
+  writeField(hash, `${tag}.count`, String(values.length));
+  for (const value of values) writeField(hash, tag, value);
+}
+
+/**
+ * Deterministic digest over the reviewed content: the prompt snapshot digest,
+ * then each ordered entry's title, description, transcript, url, notes,
+ * chapters and asset digests. Length-prefixed fields keep `["ab","c"]` and
+ * `["a","bc"]` distinct. Separate from the legacy poster-only / log-only
+ * `image_sha256` claim, which stays its own Seen check.
+ */
 export function contentRevision(input: {
   entries: ContentRevisionEntry[];
   promptSha256?: string | null;
 }): string {
   const hash = createHash("sha256");
-  hash.update("astroshot-content-revision-v1\n");
-  if (input.promptSha256) {
-    hash.update("prompt\n");
-    hash.update(input.promptSha256);
-    hash.update("\n");
-  }
-  for (const [index, entry] of input.entries.entries()) {
-    hash.update(`entry ${index}\n`);
-    hash.update(entry.title);
-    hash.update("\n");
-    hash.update(entry.description);
-    hash.update("\n");
-    hash.update(entry.transcript);
-    hash.update("\n");
-    for (const digest of entry.assetDigests) {
-      hash.update(digest);
-      hash.update("\n");
+  writeField(hash, "version", "astroshot-content-revision-v2");
+  writeField(hash, "prompt", input.promptSha256 ?? "");
+  writeField(hash, "entries.count", String(input.entries.length));
+  for (const entry of input.entries) {
+    writeField(hash, "title", entry.title);
+    writeField(hash, "description", entry.description);
+    writeField(hash, "transcript", entry.transcript);
+    writeField(hash, "url", entry.url);
+    writeList(hash, "good", entry.good);
+    writeList(hash, "improve", entry.improve);
+    writeField(hash, "chapters.count", String(entry.chapters.length));
+    for (const chapter of entry.chapters) {
+      writeField(hash, "chapter.slug", chapter.slug);
+      writeField(hash, "chapter.title", chapter.title);
+      writeField(hash, "chapter.t_ms", chapter.tMs === null ? "" : String(chapter.tMs));
+      writeField(hash, "chapter.note", chapter.note);
     }
+    writeList(hash, "asset", entry.assetDigests);
   }
   return hash.digest("hex");
 }
