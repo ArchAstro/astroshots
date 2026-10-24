@@ -11,6 +11,12 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+### Improved
+
+- **Faster menu-bar tray open (macOS):** clicking the icon reuses the tray built
+  at launch instead of rebuilding it, and stream rows show cached downsampled
+  thumbnails decoded off the main thread instead of full-size PNGs.
+
 ## [0.2.9] (macos) - 2026-10-15
 
 ### Fixed

@@ -510,8 +510,8 @@ final class StatusItemController: NSObject {
 
     private func showPopover() {
         guard let button = statusItem?.button, let popover else { return }
+        // The hosting controller is built once in setup; reopening just shows it.
         PerformanceLog.interval(PerformanceLog.clickToShown) {
-            reloadPopoverContent()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             button.highlight(true)
