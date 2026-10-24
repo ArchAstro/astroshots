@@ -468,4 +468,36 @@ jq -e '
   fail "bash helper did not publish the skeleton image"
 
 echo "PASS: runner skeleton capture resolution (archdev shots, bash helper)"
+# Legacy manifest without run_id: its shots are archived, never overwritten.
+LEG_ROOT="$TEST_ROOT/legacy-rollover"
+mkdir -p "$LEG_ROOT/.astroshot/old"
+cp "$SOURCE" "$LEG_ROOT/.astroshot/old/0001-before.png"
+printf '%s' '{"version":1,"feature":"old","shots":[{"id":"0001","file":"0001-before.png","slug":"before"}]}' >"$LEG_ROOT/.astroshot/old/manifest.json"
+"$CAPTURE" --root "$LEG_ROOT" --feature old --slug after --source "$SOURCE" --run-id fresh-run >/dev/null
+jq -e '
+  .run_id == "fresh-run"
+  and (.shots | length) == 1 and .shots[0].slug == "after"
+  and (.previous_runs | length) == 1
+  and .previous_runs[0].run_id == "legacy-1"
+  and .previous_runs[0].shots[0].file == "0001-before.png"
+' "$LEG_ROOT/.astroshot/old/manifest.json" >/dev/null ||
+  fail "legacy manifest without run_id was not archived on rollover"
+
+# ensure-scenario-id mints once, keeps an existing id, and survives concurrency.
+ENSURE="$REPO_ROOT/skills/user-story/scripts/ensure-scenario-id"
+STORY="$TEST_ROOT/story"
+printf '%s' '{"version":1,"title":"Keep me"}' >"$TEST_ROOT/story-seed.json"
+mkdir -p "$STORY" && cp "$TEST_ROOT/story-seed.json" "$STORY/meta.json"
+ids="$(for _ in 1 2 3 4 5 6; do "$ENSURE" "$STORY" & done; wait)"
+[[ "$(printf '%s\n' "$ids" | sort -u | wc -l | tr -d ' ')" == "1" ]] ||
+  fail "concurrent ensure-scenario-id minted different ids: $ids"
+jq -e --arg id "$(printf '%s\n' "$ids" | head -1)" '.scenario_id == $id and .title == "Keep me"' "$STORY/meta.json" >/dev/null ||
+  fail "ensure-scenario-id did not persist the id or dropped existing fields"
+[[ "$("$ENSURE" "$STORY")" == "$(jq -r .scenario_id "$STORY/meta.json")" ]] ||
+  fail "ensure-scenario-id replaced an existing id"
+[[ ! -e "$STORY/.scenario.lock" ]] || fail "ensure-scenario-id left its lock behind"
+FRESH="$TEST_ROOT/fresh-story"
+[[ -n "$("$ENSURE" "$FRESH")" ]] && jq -e '.scenario_id and .slug == "fresh-story"' "$FRESH/meta.json" >/dev/null ||
+  fail "ensure-scenario-id did not create meta.json for a new story"
+echo "PASS: legacy rollover and story scenario id"
 echo "PASS: astroshot-capture atomicity and concurrency"

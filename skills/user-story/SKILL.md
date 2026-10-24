@@ -255,14 +255,19 @@ RUN_ID="$(basename "$RUN_DIR")"
 mkdir -p "$RUN_DIR"
 : > "$RUN_DIR/log.jsonl"
 cp "$ROOT/prompt.md" "$RUN_DIR/prompt.md"
+# Mint scenario_id into $ROOT/meta.json when absent; keeps an existing one.
+bash "<skill-dir>/scripts/ensure-scenario-id" "$ROOT" >/dev/null
 echo "User story run dir: $RUN_DIR"
 ```
 
 Set slug `meta.json` status to `running` while active; `complete` or `failed`
 when finished; write what actually happened, never `complete` by default. Never
-reuse or overwrite an existing `runs/<id>/`; pick a new id. Keep `scenario_id` if it already exists so copies of this
-scenario stay the same identity. Optional per-run `runs/<id>/meta.json` with
-the same `status` field is fine; it should also record this attempt's
+reuse or overwrite an existing `runs/<id>/`; pick a new id.
+`ensure-scenario-id` (in this skill's `scripts/` directory; replace
+`<skill-dir>` with where the skill is installed) mints `scenario_id` when it is
+absent and keeps an existing one, so copies of this scenario stay the same
+identity. Optional per-run `runs/<id>/meta.json` with the same `status` field is
+fine; it should also record this attempt's
 `provenance` (commit, branch, `dirty`) so later attempts do not overwrite it. The copied `runs/<id>/prompt.md` is the frozen
 attempt snapshot; later edits to the live prompt must not rewrite it.
 

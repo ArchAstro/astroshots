@@ -137,11 +137,12 @@ export function sinkMovie(request: SinkMovieRequest): SinkMovieResult {
   const provenance = collectProvenance(dir);
   const scenarioId = existing?.scenario_id ?? newStableId();
   const archived: PreviousRun[] =
-    existing && !continueRun && existing.run_id
+    existing && !continueRun && (existing.run_id || existing.shots.length > 0)
       ? [
           ...(existing.previous_runs ?? []),
           {
-            run_id: existing.run_id,
+            // A legacy manifest without run_id still archives its shots, under a synthesized id.
+            run_id: existing.run_id || `legacy-${(existing.previous_runs ?? []).length + 1}`,
             status: existing.status,
             ...(existing.provenance ? { provenance: existing.provenance } : {}),
             shots: existing.shots,

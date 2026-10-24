@@ -291,3 +291,45 @@ describe("writeFrictionAttempt guards", () => {
     expect(fs.readFileSync(path.join(scenario, "meta.json"), "utf8")).toBe("{");
   });
 });
+
+describe("writeFrictionAttempt identity under crashes and concurrency", () => {
+  function scenarioWithPrompt() {
+    const root = tempDir();
+    const scenario = path.join(root, "s");
+    fs.mkdirSync(scenario, { recursive: true });
+    fs.writeFileSync(path.join(scenario, "prompt.md"), "p\n");
+    const pngPath = path.join(root, "pixel.png");
+    fs.writeFileSync(pngPath, png);
+    return { scenario, pngPath };
+  }
+  const runMeta = (scenario: string, id: string) =>
+    JSON.parse(fs.readFileSync(path.join(scenario, "runs", id, "meta.json"), "utf8"));
+
+  it("recovers the scenario id from an earlier run when the crash skipped the scenario meta", async () => {
+    const { scenario, pngPath } = scenarioWithPrompt();
+    await writeFrictionAttempt(scenario, "run-a", [step(pngPath, "a")], { status: "complete" });
+    const id = runMeta(scenario, "run-a").scenario_id;
+    fs.rmSync(path.join(scenario, "meta.json"));
+    await writeFrictionAttempt(scenario, "run-b", [step(pngPath, "b")], { status: "complete" });
+    expect(runMeta(scenario, "run-b").scenario_id).toBe(id);
+    expect(JSON.parse(fs.readFileSync(path.join(scenario, "meta.json"), "utf8")).scenario_id).toBe(id);
+  });
+
+  it("serializes concurrent first attempts onto one scenario id", async () => {
+    const { scenario, pngPath } = scenarioWithPrompt();
+    await Promise.all(
+      ["r1", "r2", "r3", "r4"].map((id) => writeFrictionAttempt(scenario, id, [step(pngPath, id)], { status: "complete" })),
+    );
+    const ids = new Set(["r1", "r2", "r3", "r4"].map((id) => runMeta(scenario, id).scenario_id));
+    expect(ids.size).toBe(1);
+    expect(fs.existsSync(path.join(scenario, ".attempt.lock"))).toBe(false);
+  });
+
+  it("takes over a lock whose owner process is gone", async () => {
+    const { scenario, pngPath } = scenarioWithPrompt();
+    fs.mkdirSync(path.join(scenario, ".attempt.lock"));
+    fs.writeFileSync(path.join(scenario, ".attempt.lock", "pid"), "2147483646");
+    await writeFrictionAttempt(scenario, "run-a", [step(pngPath, "a")], { status: "complete" });
+    expect(runMeta(scenario, "run-a").run_id).toBe("run-a");
+  });
+});

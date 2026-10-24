@@ -73,3 +73,16 @@ describe("sinkMovie run rollover", () => {
     expect(manifest().shots).toHaveLength(1);
   });
 });
+
+describe("sinkMovie legacy rollover", () => {
+  it("archives shots of a manifest without run_id under a synthesized id", () => {
+    const { sink, manifest, dir } = setup();
+    fs.mkdirSync(dir, { recursive: true });
+    const legacyShots = [{ id: "0001", file: "0001-old.png", slug: "old" }];
+    fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ version: 1, feature: "flow", shots: legacyShots }));
+    sink("run-1");
+    const doc = manifest();
+    expect(doc.run_id).toBe("run-1");
+    expect(doc.previous_runs).toEqual([{ run_id: "legacy-1", status: undefined, shots: legacyShots }].map((r) => JSON.parse(JSON.stringify(r))));
+  });
+});

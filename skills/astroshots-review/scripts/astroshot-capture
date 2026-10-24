@@ -569,9 +569,10 @@ replace_manifest jq \
   '
     # A new attempt archives the previous one (id, status, provenance, shots)
     # under previous_runs, keeps scenario_id, and starts with its own provenance.
-    (if $new_run == "1" and ((.run_id // "") != "") and .run_id != $run_id then
+    (if $new_run == "1" and (((.run_id // "") != "" and .run_id != $run_id) or ((.run_id // "") == "" and ((.shots // []) | length) > 0)) then
+       # A legacy manifest without run_id still archives its shots, under a synthesized id.
        .previous_runs = ((.previous_runs // []) + [{
-         run_id: .run_id,
+         run_id: (if (.run_id // "") != "" then .run_id else "legacy-\(((.previous_runs // []) | length) + 1)" end),
          status: (.status // null),
          shots: (.shots // [])
        } + (if .provenance then {provenance: .provenance} else {} end)])

@@ -624,6 +624,74 @@ export async function writeFrictionAttempt(
   steps: FrictionRunStepInput[],
   options: WriteFrictionAttemptOptions,
 ): Promise<{ runDir: string; runId: string }> {
+  const resolved = path.resolve(scenarioDir);
+  await fs.promises.mkdir(resolved, { recursive: true });
+  return withScenarioLock(resolved, () => writeFrictionAttemptLocked(resolved, runId, steps, options));
+}
+
+const LOCK_DIR = ".attempt.lock";
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * Scenario-level lock: an atomic `mkdir` holding the owner pid. Concurrent first
+ * attempts serialize, so only one mints the scenario id. A lock whose owner
+ * died is taken over.
+ */
+async function withScenarioLock<T>(scenarioDir: string, fn: () => Promise<T>): Promise<T> {
+  const lock = path.join(scenarioDir, LOCK_DIR);
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    try {
+      await fs.promises.mkdir(lock);
+      await fs.promises.writeFile(path.join(lock, "pid"), String(process.pid));
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const owner = Number.parseInt(await fs.promises.readFile(path.join(lock, "pid"), "utf8").catch(() => ""), 10);
+      if (Number.isInteger(owner) && owner > 0 && !processAlive(owner)) {
+        await fs.promises.rm(lock, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() > deadline) throw new Error(`timed out waiting for ${lock}`);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await fs.promises.rm(lock, { recursive: true, force: true });
+  }
+}
+
+/** The scenario id recorded by any earlier run, for recovery after a crash before scenario meta was written. */
+async function scenarioIdFromRuns(runsDir: string): Promise<string | null> {
+  let names: string[];
+  try {
+    names = (await fs.promises.readdir(runsDir)).filter((name) => !name.startsWith(".")).sort();
+  } catch {
+    return null;
+  }
+  for (const name of names) {
+    const id = asString((await readJsonRecord(path.join(runsDir, name, META_FILE)))?.scenario_id);
+    if (id) return id;
+  }
+  return null;
+}
+
+async function writeFrictionAttemptLocked(
+  resolved: string,
+  runId: string,
+  steps: FrictionRunStepInput[],
+  options: WriteFrictionAttemptOptions,
+): Promise<{ runDir: string; runId: string }> {
   requireBasename(runId, "runId");
   if (!options?.status?.trim()) throw new Error("status is required: pass the attempt's execution status");
   const names = steps.map((step) => requireBasename(step.screenshotName, "screenshotName"));
@@ -634,7 +702,6 @@ export async function writeFrictionAttempt(
   }
   if (new Set(names).size !== names.length) throw new Error("screenshotName values must be unique within a run");
 
-  const resolved = path.resolve(scenarioDir);
   const runsDir = path.join(resolved, RUNS_DIR);
   const runDir = path.join(runsDir, runId);
   if (await lstatExists(runDir)) {
@@ -651,7 +718,7 @@ export async function writeFrictionAttempt(
     if (Object.keys(existing).length === 0 && (await lstatExists(metaPath)) && (await fs.promises.readFile(metaPath, "utf8")).trim() !== "") {
       throw new Error(`${metaPath} exists but is not a JSON object; refusing to replace the scenario identity`);
     }
-    const scenarioId = asString(existing.scenario_id) ?? newStableId();
+    const scenarioId = asString(existing.scenario_id) ?? (await scenarioIdFromRuns(runsDir)) ?? newStableId();
     const provenance = provenanceFields(options.provenance ?? collectProvenance(resolved));
     const capturedAt = timestamp();
 

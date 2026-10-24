@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Print the story's scenario_id, minting one into <story-root>/meta.json when it
+# is absent. Existing ids, titles and other fields are preserved. Safe to run
+# concurrently: an atomic mkdir lock serializes first writers.
+#
+# Usage: ensure-scenario-id <story-root>   # e.g. .astroshot/stories/checkout
+set -euo pipefail
+
+ROOT="${1:-}"
+if [[ -z "$ROOT" ]]; then
+  echo "usage: ensure-scenario-id <story-root>" >&2
+  exit 2
+fi
+command -v jq >/dev/null 2>&1 || { echo "error: jq is required" >&2; exit 1; }
+mkdir -p "$ROOT"
+META="$ROOT/meta.json"
+LOCK="$ROOT/.scenario.lock"
+
+new_id() {
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  else
+    od -An -N 16 -t x1 /dev/urandom | tr -d '[:space:]' | awk '{
+      printf "%s-%s-%s-%s-%s\n", substr($0,1,8), substr($0,9,4), substr($0,13,4), substr($0,17,4), substr($0,21,12)
+    }'
+  fi
+}
+
+tries=0
+until mkdir "$LOCK" 2>/dev/null; do
+  tries=$((tries + 1))
+  if (( tries > 600 )); then
+    echo "error: timed out waiting for $LOCK" >&2
+    exit 1
+  fi
+  sleep 0.05
+done
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
+if [[ -s "$META" ]] && ! jq -e 'type == "object"' "$META" >/dev/null 2>&1; then
+  echo "error: $META is not a JSON object; refusing to replace the story identity" >&2
+  exit 1
+fi
+EXISTING="$(jq -r '.scenario_id // empty' "$META" 2>/dev/null || true)"
+if [[ -n "$EXISTING" ]]; then
+  printf '%s\n' "$EXISTING"
+  exit 0
+fi
+ID="$(new_id)"
+TMP="$META.$$.tmp"
+if [[ -s "$META" ]]; then
+  jq --arg id "$ID" '.schema_version = 1 | .scenario_id = $id' "$META" > "$TMP"
+else
+  jq -n --arg id "$ID" --arg slug "$(basename "$ROOT")" '{version: 1, schema_version: 1, slug: $slug, scenario_id: $id}' > "$TMP"
+fi
+mv "$TMP" "$META"
+printf '%s\n' "$ID"
