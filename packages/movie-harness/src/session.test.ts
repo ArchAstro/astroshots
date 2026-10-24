@@ -76,6 +76,13 @@ describe("MovieSession frames path", () => {
     expect(manifest.shots[0].video).toBe("0001-flow.webm");
     expect(manifest.shots[0].file).toBe("0001-flow.png");
     expect(manifest.shots[0].chapters[0].slug).toBe("mid");
+    expect(manifest.schema_version).toBe(1);
+    expect(typeof manifest.scenario_id).toBe("string");
+    expect(manifest.scenario_id.length).toBeGreaterThan(8);
+    expect(typeof manifest.shots[0].entry_id).toBe("string");
+    expect(typeof manifest.shots[0].asset_id).toBe("string");
+    expect(typeof manifest.shots[0].video_asset_id).toBe("string");
+    expect(manifest.provenance).toMatchObject({ source_path: expect.any(String) });
   }, 120_000);
 });
 

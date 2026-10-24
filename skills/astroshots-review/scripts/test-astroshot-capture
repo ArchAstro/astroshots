@@ -3,6 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAPTURE="$SCRIPT_DIR/astroshot-capture"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cmp -s "$CAPTURE" "$REPO_ROOT/bin/astroshot-capture" || {
+  echo "FAIL: bin/astroshot-capture is not identical to the skill helper" >&2
+  exit 1
+}
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/astroshot-capture-test.XXXXXX")"
 observer_pid=""
 

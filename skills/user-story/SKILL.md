@@ -254,12 +254,17 @@ done
 RUN_ID="$(basename "$RUN_DIR")"
 mkdir -p "$RUN_DIR"
 : > "$RUN_DIR/log.jsonl"
+cp "$ROOT/prompt.md" "$RUN_DIR/prompt.md"
 echo "User story run dir: $RUN_DIR"
 ```
 
 Set slug `meta.json` status to `running` while active; `complete` or `failed`
-when finished. Optional per-run `runs/<id>/meta.json` with the same `status`
-field is fine.
+when finished; write what actually happened, never `complete` by default. Never
+reuse or overwrite an existing `runs/<id>/`; pick a new id. Keep `scenario_id` if it already exists so copies of this
+scenario stay the same identity. Optional per-run `runs/<id>/meta.json` with
+the same `status` field is fine; it should also record this attempt's
+`provenance` (commit, branch, `dirty`) so later attempts do not overwrite it. The copied `runs/<id>/prompt.md` is the frozen
+attempt snapshot; later edits to the live prompt must not rewrite it.
 
 Astroshots lists **every** non-empty `runs/<id>/` under the slug (newest by
 directory mtime first). The tray User stories row shows the run count; open the

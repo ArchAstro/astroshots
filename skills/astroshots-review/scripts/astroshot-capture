@@ -351,6 +351,61 @@ humanize() {
   printf '%s\n' "$result"
 }
 
+new_stable_id() {
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+    return
+  fi
+  od -An -N 16 -t x1 /dev/urandom | tr -d '[:space:]' | awk '{
+    printf "%s-%s-%s-%s-%s\n", substr($0,1,8), substr($0,9,4), substr($0,13,4), substr($0,17,4), substr($0,21,12)
+  }'
+}
+
+collect_provenance_json() {
+  local source_path="$1"
+  local git_cwd="$source_path"
+  local inside=""
+  local toplevel=""
+  local repo=""
+  local commit=""
+  local branch=""
+  local dirty="null"
+  local status=""
+  if [[ ! -d "$git_cwd" ]]; then
+    git_cwd="$(dirname "$git_cwd")"
+  fi
+  if inside="$(git -C "$git_cwd" rev-parse --is-inside-work-tree 2>/dev/null)" && [[ "$inside" == "true" ]]; then
+    toplevel="$(git -C "$git_cwd" rev-parse --show-toplevel 2>/dev/null || true)"
+    repo="$(git -C "$git_cwd" remote get-url origin 2>/dev/null || true)"
+    [[ -n "$repo" ]] || repo="$toplevel"
+    commit="$(git -C "$git_cwd" rev-parse HEAD 2>/dev/null || true)"
+    branch="$(git -C "$git_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    status="$(git -C "$git_cwd" status --porcelain -- ":/" ":(exclude,glob)**/.astroshot/**" 2>/dev/null || true)"
+    if [[ -n "$status" ]]; then dirty="true"; else dirty="false"; fi
+  else
+    toplevel="$git_cwd"
+  fi
+  jq -n \
+    --arg source_path "$source_path" \
+    --arg worktree "$toplevel" \
+    --arg repo "$repo" \
+    --arg commit "$commit" \
+    --arg branch "$branch" \
+    --argjson dirty "$dirty" \
+    --arg task_id "${ASTROSHOT_TASK_ID:-}" \
+    --arg pr "${ASTROSHOT_PR:-}" \
+    '{
+      source_path: $source_path,
+      worktree: $worktree,
+      repo: (if $repo == "" then null else $repo end),
+      commit: (if $commit == "" then null else $commit end),
+      branch: (if $branch == "" then null else $branch end),
+      dirty: $dirty,
+      task_id: (if $task_id == "" then null else $task_id end),
+      pr: (if $pr == "" then null else $pr end)
+    }'
+}
+
 if [[ "$FINALIZE" != "1" ]]; then
   if [[ -z "$SLUG" ]]; then
     echo "error: --slug is required unless --finalize" >&2
@@ -394,16 +449,29 @@ else
   NEW_RUN=1
 fi
 
+if [[ "$FINALIZE" != "1" && "$NEW_RUN" == "1" && -f "$MANIFEST" ]] &&
+  jq -e --arg run_id "$RUN_ID" '[.previous_runs[]? | .run_id] | index($run_id) != null' "$MANIFEST" >/dev/null 2>&1; then
+  echo "error: run id $RUN_ID was already recorded for feature $FEATURE; pick a new --run-id" >&2
+  exit 1
+fi
+
 if [[ ! -f "$MANIFEST" ]]; then
+  SCENARIO_ID="$(new_stable_id)"
+  PROVENANCE_JSON="$(collect_provenance_json "$DIR")"
   replace_manifest jq -n \
     --arg feature "$FEATURE" \
     --arg run_id "$RUN_ID" \
     --arg status "$STATUS" \
+    --arg scenario_id "$SCENARIO_ID" \
+    --argjson provenance "$PROVENANCE_JSON" \
     '{
       version: 1,
+      schema_version: 1,
       feature: $feature,
+      scenario_id: $scenario_id,
       run_id: $run_id,
       status: $status,
+      provenance: $provenance,
       shots: []
     }'
   MANIFEST_CREATED=1
@@ -478,6 +546,10 @@ CAPTURE_TMP=""
 rmdir "$CAPTURE_TMP_DIR"
 CAPTURE_TMP_DIR=""
 
+ENTRY_ID="$(new_stable_id)"
+ASSET_ID="$(new_stable_id)"
+PROVENANCE_JSON="$(collect_provenance_json "$DIR")"
+
 replace_manifest jq \
   --arg status "$STATUS" \
   --arg run_id "$RUN_ID" \
@@ -490,9 +562,25 @@ replace_manifest jq \
   --arg url "$URL" \
   --arg viewport "$VIEWPORT" \
   --arg captured_at "$CAPTURED_AT" \
+  --arg entry_id "$ENTRY_ID" \
+  --arg asset_id "$ASSET_ID" \
+  --arg scenario_id "$(new_stable_id)" \
+  --argjson provenance "$PROVENANCE_JSON" \
   '
-    .status = $status
+    # A new attempt archives the previous one (id, status, provenance, shots)
+    # under previous_runs, keeps scenario_id, and starts with its own provenance.
+    (if $new_run == "1" and ((.run_id // "") != "") and .run_id != $run_id then
+       .previous_runs = ((.previous_runs // []) + [{
+         run_id: .run_id,
+         status: (.status // null),
+         shots: (.shots // [])
+       } + (if .provenance then {provenance: .provenance} else {} end)])
+     else . end)
+    | .status = $status
     | .run_id = $run_id
+    | .schema_version = 1
+    | .scenario_id = (.scenario_id // $scenario_id)
+    | .provenance = (if $new_run == "1" then $provenance else (.provenance // $provenance) end)
     | .shots = (if $new_run == "1" then [] else (.shots // []) end)
     | .shots += [{
         id: $id,
@@ -500,7 +588,9 @@ replace_manifest jq \
         slug: $slug,
         title: $title,
         description: $description,
-        captured_at: $captured_at
+        captured_at: $captured_at,
+        entry_id: $entry_id,
+        asset_id: $asset_id
       }
       + (if $url == "" then {} else {url: $url} end)
       + (if $viewport == "" then {} else {viewport: $viewport} end)]

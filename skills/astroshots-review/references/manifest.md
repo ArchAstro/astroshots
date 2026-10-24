@@ -11,11 +11,15 @@ execution and image metadata. Human feedback is a separate sibling file:
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `version` | number | no | Use `1` |
+| `schema_version` | number | no | Portable record contract; currently `1`. Additive; old readers ignore it. |
 | `feature` | string | yes | Same as directory name |
-| `run_id` | string | recommended | Stable for one harness run |
+| `scenario_id` | string | recommended | Stable scenario identity. Copies keep this value. Path, worktree, and git metadata are provenance, never this identity. |
+| `run_id` | string | recommended | One attempt. Distinct attempts never share this id. |
 | `status` | string | recommended | Harness execution only: `running` \| `pass` \| `fail` \| `idle` |
 | `description` | string | no | Journey one-liner |
+| `provenance` | object | no | `source_path`, `worktree`, `repo`, `commit`, `branch`, `dirty`, optional `task_id` / `pr`. `dirty: true` means captured bytes are not claimed to be `commit`. |
 | `shots` | array | yes | Append-only during a run |
+| `previous_runs` | array | no | Earlier attempts archived when a new `run_id` takes over the directory. Each item: `run_id`, `status`, optional `provenance`, `shots`. `scenario_id` stays; `provenance` above always describes the current run. A `run_id` never appears twice (current plus archived); `astroshot-capture` and the movie sink refuse to reuse an archived id, and the same `run_id` as the current run continues that attempt. |
 
 ## Shot entry
 
@@ -29,6 +33,9 @@ execution and image metadata. Human feedback is a separate sibling file:
 | `captured_at` | string | no | ISO-8601 UTC |
 | `url` | string | no | Route or UI context |
 | `viewport` | string | no | e.g. `1280x1100` |
+| `entry_id` | string | recommended | Stable entry identity for this shot |
+| `asset_id` | string | recommended | Stable identity for the still / poster bytes |
+| `video_asset_id` | string | recommended | Movie video identity; omit for stills |
 
 ### Movie fields
 
@@ -104,6 +111,7 @@ Path: `<worktree>/.astroshot/<feature>/review.json`
 | `decision` | string | no | Human acknowledgement: `seen` |
 | `reviewed_at` | string | conditional | Required with `decision`; absent for comment-only unseen feedback |
 | `image_sha256` | string | conditional | Required with `decision`; lowercase SHA-256 of the reviewed file bytes |
+| `content_revision` | string | no | Optional digest over ordered title, description, transcript, url, notes, chapters and asset hashes (length-prefixed fields; `identity.ts` `contentRevision`). Never substitutes for `image_sha256`. Poster-only / log-only Seen stays valid without it. |
 | `comments` | array | yes | Ordered agent-readable feedback |
 
 Each comment has required string fields `id`, `body`, and `created_at`.

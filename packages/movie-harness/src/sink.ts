@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { collectProvenance, newStableId, type CaptureProvenance } from "./identity.js";
 import {
   assertKebabCase,
   assertSlug,
@@ -24,15 +25,29 @@ interface ManifestShot {
   duration_ms: number;
   source: string;
   chapters: { slug: string; t_ms: number; note?: string }[];
+  entry_id: string;
+  asset_id: string;
+  video_asset_id: string;
+}
+
+interface PreviousRun {
+  run_id: string;
+  status: string;
+  provenance?: CaptureProvenance;
+  shots: ManifestShot[];
 }
 
 interface Manifest {
   version: 1;
+  schema_version: 1;
   feature: string;
+  scenario_id: string;
   run_id: string;
   status: string;
   description?: string;
+  provenance?: CaptureProvenance;
   shots: ManifestShot[];
+  previous_runs?: PreviousRun[];
 }
 
 function readManifest(manifestPath: string): Manifest | null {
@@ -64,6 +79,20 @@ export function sinkMovie(request: SinkMovieRequest): SinkMovieResult {
 
   const dir = featureDir(request.root, request.feature);
   ensureDir(dir);
+  const manifestPath = path.join(dir, "manifest.json");
+  const existing = readManifest(manifestPath);
+  // The same run id always continues that attempt; a different id starts a new
+  // attempt and must not reuse an id the feature has already recorded.
+  const continueRun = Boolean(existing && existing.run_id === request.runId);
+  if (
+    existing &&
+    !continueRun &&
+    (existing.previous_runs ?? []).some((run) => run.run_id === request.runId)
+  ) {
+    throw new Error(
+      `run id ${request.runId} was already recorded for feature ${request.feature}; pick a new run id`,
+    );
+  }
   const sequence = nextSequence(dir);
   const posterName = `${sequence}-${request.slug}.png`;
   const videoExt = path.extname(request.videoPath).toLowerCase() || ".webm";
@@ -80,13 +109,6 @@ export function sinkMovie(request: SinkMovieRequest): SinkMovieResult {
 
   fs.copyFileSync(request.posterPath, posterDest);
   fs.copyFileSync(request.videoPath, videoDest);
-
-  const manifestPath = path.join(dir, "manifest.json");
-  const existing = readManifest(manifestPath);
-  const continueRun =
-    existing &&
-    existing.run_id === request.runId &&
-    existing.status === "running";
 
   const shot: ManifestShot = {
     id: sequence,
@@ -107,23 +129,48 @@ export function sinkMovie(request: SinkMovieRequest): SinkMovieResult {
       t_ms: Math.round(chapter.tMs),
       note: chapter.note,
     })),
+    entry_id: newStableId(),
+    asset_id: newStableId(),
+    video_asset_id: newStableId(),
   };
 
-  const manifest: Manifest = continueRun
-    ? {
-        ...existing,
-        status: request.status ?? existing.status,
-        description: request.description ?? existing.description,
-        shots: [...existing.shots, shot],
-      }
-    : {
-        version: 1,
-        feature: request.feature,
-        run_id: request.runId,
-        status: request.status ?? "running",
-        description: request.description,
-        shots: [shot],
-      };
+  const provenance = collectProvenance(dir);
+  const scenarioId = existing?.scenario_id ?? newStableId();
+  const archived: PreviousRun[] =
+    existing && !continueRun && existing.run_id
+      ? [
+          ...(existing.previous_runs ?? []),
+          {
+            run_id: existing.run_id,
+            status: existing.status,
+            ...(existing.provenance ? { provenance: existing.provenance } : {}),
+            shots: existing.shots,
+          },
+        ]
+      : (existing?.previous_runs ?? []);
+  const manifest: Manifest =
+    existing && continueRun
+      ? {
+          ...existing,
+          schema_version: 1,
+          scenario_id: scenarioId,
+          status: request.status ?? existing.status,
+          description: request.description ?? existing.description,
+          provenance: existing.provenance ?? provenance,
+          shots: [...existing.shots, shot],
+        }
+      : {
+          version: 1,
+          schema_version: 1,
+          feature: request.feature,
+          scenario_id: scenarioId,
+          run_id: request.runId,
+          status: request.status ?? "running",
+          description: request.description,
+          provenance,
+          shots: [shot],
+          ...(archived.length > 0 ? { previous_runs: archived } : {}),
+        };
 
   writeAtomic(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -152,9 +199,12 @@ export function finalizeManifest(
       `${JSON.stringify(
         {
           version: 1,
+          schema_version: 1,
           feature,
+          scenario_id: newStableId(),
           run_id: runId,
           status,
+          provenance: collectProvenance(dir),
           shots: [],
         },
         null,

@@ -9,6 +9,18 @@ export interface ManifestChapter {
   title?: string;
   t_ms?: number;
   tMs?: number;
+  note?: string;
+}
+
+export interface ManifestProvenance {
+  source_path?: string;
+  worktree?: string;
+  repo?: string;
+  commit?: string;
+  branch?: string;
+  dirty?: boolean;
+  task_id?: string;
+  pr?: string;
 }
 
 export interface ManifestShot {
@@ -26,15 +38,30 @@ export interface ManifestShot {
   duration_ms?: number;
   source?: string;
   chapters?: ManifestChapter[];
+  entry_id?: string;
+  asset_id?: string;
+  video_asset_id?: string;
+}
+
+/** An earlier attempt archived when a new run takes over the feature directory. */
+export interface ManifestPreviousRun {
+  run_id?: string;
+  status?: string;
+  provenance?: ManifestProvenance;
+  shots?: ManifestShot[];
 }
 
 export interface FeatureManifest {
   version?: number;
+  schema_version?: number;
   feature?: string;
+  scenario_id?: string;
   run_id?: string;
   status?: string;
   description?: string;
+  provenance?: ManifestProvenance;
   shots?: ManifestShot[];
+  previous_runs?: ManifestPreviousRun[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,6 +138,7 @@ export function chaptersOf(entry: ManifestShot | null): Chapter[] {
   return entry.chapters.filter(isRecord).map((chapter) => ({
     slug: typeof chapter.slug === "string" ? chapter.slug : undefined,
     title: typeof chapter.title === "string" ? chapter.title : undefined,
+    note: typeof chapter.note === "string" ? chapter.note : undefined,
     tMs:
       typeof chapter.t_ms === "number"
         ? chapter.t_ms
