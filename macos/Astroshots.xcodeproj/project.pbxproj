@@ -11,6 +11,7 @@
 		08F526815789732E0FE35991 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A0AA92FD0D7D7B2179262BCF /* MLXAudioTTS */; };
 		0FBA61FD5886CA5737CC4E50 /* FrictionLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAD7F3727B1878855A2E92 /* FrictionLog.swift */; };
 		17BFA74EE76E1E71A5627F33 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */; };
+		190CA34C998C71D5832FB7AA /* ShotThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B11806A75BD09BB590C6BD /* ShotThumbnailCache.swift */; };
 		1B4177ACA9522A6931715AEE /* NarrationJobQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F84D4D30E15FCC4EECC1C2 /* NarrationJobQueue.swift */; };
 		2D553CAC72BEA7D1BD03057F /* PerformanceSignpostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FBB0FBF526371CBB687543 /* PerformanceSignpostTests.swift */; };
 		2F836D593A00F10CAF192EAB /* SoftwareUpdateLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC5FF9EEBB57A3DF50450A /* SoftwareUpdateLog.swift */; };
@@ -65,6 +66,7 @@
 		DABF75392039DF313BC24487 /* FrictionLogTrayJourneyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */; };
 		DBEB11EF1CEE72FB28DE70E6 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA84FE9C55670A027F3776D /* SettingsPane.swift */; };
 		DCD8CB2F02CA756A627DDE3F /* FrictionStepTakeoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D93DC067ACDFDE15388414 /* FrictionStepTakeoverView.swift */; };
+		E58139E72C910F81836A4542 /* ShotThumbnailCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233CEFE6E66BF393DD8DC75D /* ShotThumbnailCacheTests.swift */; };
 		E732A80EEE2599B95028CF66 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009EED7A72CCCCF8A86260D /* Preferences.swift */; };
 		F11BF431B7AA2EC329838BAB /* ManifestParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A331496EBB7CAF55CCDEF017 /* ManifestParserTests.swift */; };
 		F39BFBFFE1979733110EA44D /* FrictionLogDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */; };
@@ -104,6 +106,7 @@
 		180276769F3E77F32E31F62F /* NarrationBrief.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationBrief.swift; sourceTree = "<group>"; };
 		182E7298047007414ABC9862 /* ReviewFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFlowUITests.swift; sourceTree = "<group>"; };
 		2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogTrayJourneyUITests.swift; sourceTree = "<group>"; };
+		233CEFE6E66BF393DD8DC75D /* ShotThumbnailCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotThumbnailCacheTests.swift; sourceTree = "<group>"; };
 		239B5944E0638F1D931913A7 /* ShotIndexCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotIndexCache.swift; sourceTree = "<group>"; };
 		254EBDA4241BCDB153C61736 /* AstroshotsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstroshotsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		26844F440291050990A83490 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
@@ -153,6 +156,7 @@
 		C7975C24FB04A3D1A9DA4227 /* NarrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationTests.swift; sourceTree = "<group>"; };
 		C91C394D6B3C96C99B77EDD7 /* ReviewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewModels.swift; sourceTree = "<group>"; };
 		CEA37DEE55FC5E2992C0612C /* ImageClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageClipboard.swift; sourceTree = "<group>"; };
+		D1B11806A75BD09BB590C6BD /* ShotThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotThumbnailCache.swift; sourceTree = "<group>"; };
 		D528EB0C9FF62471B7103498 /* ReviewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStore.swift; sourceTree = "<group>"; };
 		DA1C1D41FE4A3E9F7E7EB1F9 /* OverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayView.swift; sourceTree = "<group>"; };
 		DBA84FE9C55670A027F3776D /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
@@ -198,6 +202,7 @@
 				EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */,
 				70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */,
 				5089282794B5A6E6B3636886 /* ShotPathTests.swift */,
+				233CEFE6E66BF393DD8DC75D /* ShotThumbnailCacheTests.swift */,
 				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
 				6A1584CFA29D0DD78764232C /* TestDefaults.swift */,
 				98F5F7C7BB45AE1FD2CD699B /* ThemeTests.swift */,
@@ -240,6 +245,7 @@
 				2A2EE3350232CD98BC7DF3D0 /* FrictionStepDetailView.swift */,
 				DBA84FE9C55670A027F3776D /* SettingsPane.swift */,
 				B56B2FBBA1C2EC2C3395C15B /* ShotThumbnail.swift */,
+				D1B11806A75BD09BB590C6BD /* ShotThumbnailCache.swift */,
 				5679FA304E48ED78A5B24170 /* StreamView.swift */,
 				0B03ABCA3ACC16E733DE7B00 /* TrayView.swift */,
 			);
@@ -533,6 +539,7 @@
 				A1624B4638732301C92739FB /* ReviewWindowControllerTests.swift in Sources */,
 				A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */,
 				D862C2464A53C71CC3BD45DF /* ShotPathTests.swift in Sources */,
+				E58139E72C910F81836A4542 /* ShotThumbnailCacheTests.swift in Sources */,
 				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,
 				94FC5C4F6587ED4CFB98831C /* TestDefaults.swift in Sources */,
 				842084A0B15BCB986B44ADB1 /* ThemeTests.swift in Sources */,
@@ -576,6 +583,7 @@
 				CC1AB34915DE5E511D611E67 /* Shot.swift in Sources */,
 				57ED4434B7E830DD91FE67B9 /* ShotIndexCache.swift in Sources */,
 				A9E0B90E6788FF3B7F892333 /* ShotThumbnail.swift in Sources */,
+				190CA34C998C71D5832FB7AA /* ShotThumbnailCache.swift in Sources */,
 				AD510E9E9E9507B92967E0BE /* SoftwareUpdateDelegate.swift in Sources */,
 				2F836D593A00F10CAF192EAB /* SoftwareUpdateLog.swift in Sources */,
 				01F71C7E4F92A354272E716C /* StatusItemController.swift in Sources */,
@@ -698,7 +706,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -712,7 +720,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.2.8;
+				MARKETING_VERSION = 0.2.9;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -812,7 +820,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -832,7 +840,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.2.8;
+				MARKETING_VERSION = 0.2.9;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

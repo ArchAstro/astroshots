@@ -351,7 +351,7 @@ struct ShotRow: View {
             Button {
                 reviewChrome.open(shot)
             } label: {
-                ShotThumbnail(path: shot.path)
+                ShotThumbnail(path: shot.path, rowSize: CGSize(width: 88, height: 56))
                     .frame(width: 88, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
