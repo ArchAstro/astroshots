@@ -32,6 +32,7 @@
 		59D026A94170B682B76CDA23 /* AstroshotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5239CF46065A15D17D2B56CF /* AstroshotsApp.swift */; };
 		601957951D6AA32CCB74C8A4 /* BrandAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0630BF1E47F07BB59808C525 /* BrandAssetsTests.swift */; };
 		6230ED340A03AF06501BE206 /* PerformanceLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFF7CFF1BF190796F3D35F4 /* PerformanceLog.swift */; };
+		65488DE90AB734D16E9D2154 /* ToolsInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E7519C48EF56537269FF42 /* ToolsInstallerTests.swift */; };
 		6646659397470D89CDBB4DAC /* ReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91C394D6B3C96C99B77EDD7 /* ReviewModels.swift */; };
 		699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */; };
 		6A5CD6AFFB34FD03BB0DA4BD /* Tools in Resources */ = {isa = PBXBuildFile; fileRef = DF7C943419309235AF15A9D1 /* Tools */; };
@@ -49,6 +50,7 @@
 		94FC5C4F6587ED4CFB98831C /* TestDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A1584CFA29D0DD78764232C /* TestDefaults.swift */; };
 		967A58CBD25BFB06C924D2DD /* NarrationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28BEB6B07761BB8C9BE0687 /* NarrationModels.swift */; };
 		96FF7A41FF2B21E652A0DB9F /* AstroshotWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E87A9FC5F5847878A8A64 /* AstroshotWatcher.swift */; };
+		98C3FD896CB4BBD6AF2EA8A4 /* ToolsInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85A5599590CA5613C10E271 /* ToolsInstaller.swift */; };
 		9E7A5FC5E617434C14891B39 /* ImageClipboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE183D1FC1B91442E70D281A /* ImageClipboardTests.swift */; };
 		A1624B4638732301C92739FB /* ReviewWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */; };
 		A1C2A497863C6149280EDF41 /* ShotIndexCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B6A1CB8442F588999CF4B1 /* ShotIndexCacheTests.swift */; };
@@ -101,6 +103,7 @@
 		0B730D3DA7EA103359F22B14 /* FrictionLogDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogDetailView.swift; sourceTree = "<group>"; };
 		10EF202600AB264B34CDB2D7 /* NarrationPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationPaths.swift; sourceTree = "<group>"; };
 		10FBB0FBF526371CBB687543 /* PerformanceSignpostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceSignpostTests.swift; sourceTree = "<group>"; };
+		13E7519C48EF56537269FF42 /* ToolsInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsInstallerTests.swift; sourceTree = "<group>"; };
 		180276769F3E77F32E31F62F /* NarrationBrief.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NarrationBrief.swift; sourceTree = "<group>"; };
 		182E7298047007414ABC9862 /* ReviewFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFlowUITests.swift; sourceTree = "<group>"; };
 		2300722B17A148F2A115D3BC /* FrictionLogTrayJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrictionLogTrayJourneyUITests.swift; sourceTree = "<group>"; };
@@ -163,6 +166,7 @@
 		EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatcherResourceTests.swift; sourceTree = "<group>"; };
 		EE5C4C01CF0926A78558F5F1 /* ReviewWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWindowControllerTests.swift; sourceTree = "<group>"; };
 		F217601C57C50DA926C31AF2 /* astroshots-app-icon-master.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "astroshots-app-icon-master.png"; sourceTree = "<group>"; };
+		F85A5599590CA5613C10E271 /* ToolsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsInstaller.swift; sourceTree = "<group>"; };
 		F9EA16401CCC820E6AD2BC9A /* ReviewStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -201,6 +205,7 @@
 				8C127AB1558EF7894B101A53 /* StreamGroupingTests.swift */,
 				6A1584CFA29D0DD78764232C /* TestDefaults.swift */,
 				98F5F7C7BB45AE1FD2CD699B /* ThemeTests.swift */,
+				13E7519C48EF56537269FF42 /* ToolsInstallerTests.swift */,
 				EE2EB3423D2A4074AD1CC223 /* WatcherResourceTests.swift */,
 			);
 			path = AstroshotsTests;
@@ -261,6 +266,14 @@
 				D528EB0C9FF62471B7103498 /* ReviewStore.swift */,
 			);
 			path = Review;
+			sourceTree = "<group>";
+		};
+		3D85A4C5197188F09B9F64C7 /* Tools */ = {
+			isa = PBXGroup;
+			children = (
+				F85A5599590CA5613C10E271 /* ToolsInstaller.swift */,
+			);
+			path = Tools;
 			sourceTree = "<group>";
 		};
 		4D65A7C0651E7AC4CBD0D13E /* Models */ = {
@@ -377,6 +390,7 @@
 				797776DFC44DDFA0E00939BC /* Narration */,
 				D5CEAF8F149110D109A6B5F5 /* Resources */,
 				35F499E0DA470CC488E7FE3E /* Review */,
+				3D85A4C5197188F09B9F64C7 /* Tools */,
 				D4EF0F79F6F530148E78A7AA /* Watch */,
 			);
 			path = Astroshots;
@@ -536,6 +550,7 @@
 				699399301E1BE2AFEAEF81CA /* StreamGroupingTests.swift in Sources */,
 				94FC5C4F6587ED4CFB98831C /* TestDefaults.swift in Sources */,
 				842084A0B15BCB986B44ADB1 /* ThemeTests.swift in Sources */,
+				65488DE90AB734D16E9D2154 /* ToolsInstallerTests.swift in Sources */,
 				72C3BD7FFE6CE293A047BCD3 /* WatcherResourceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -581,6 +596,7 @@
 				01F71C7E4F92A354272E716C /* StatusItemController.swift in Sources */,
 				F8857D65FAC69AB00ED2A558 /* StreamView.swift in Sources */,
 				F57D0C06CCA71E8AED668D7D /* Theme.swift in Sources */,
+				98C3FD896CB4BBD6AF2EA8A4 /* ToolsInstaller.swift in Sources */,
 				342EE4D3FEAB0CACA902F0F3 /* TrayView.swift in Sources */,
 				B6692FB16CC577D445C39EBF /* UpdaterSettingsModel.swift in Sources */,
 			);
@@ -698,7 +714,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -712,7 +728,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.2.8;
+				MARKETING_VERSION = 0.2.9;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -812,7 +828,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -832,7 +848,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.2.8;
+				MARKETING_VERSION = 0.2.9;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
