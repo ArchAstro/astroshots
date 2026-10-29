@@ -492,6 +492,7 @@
 			packageReferences = (
 				E1468B51650BF95A1383EAE9 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				AEA07F9C6D8218B742DF9C79 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
+				5FA4C3DBE2417948A70B6AF4 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 985C787322D9CC2C5AAA3F9D /* Products */;
@@ -895,12 +896,20 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		5FA4C3DBE2417948A70B6AF4 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 0.32.3;
+			};
+		};
 		AEA07F9C6D8218B742DF9C79 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Blaizzy/mlx-audio-swift";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = e8dd23f6930bff365aed82e0c3a3bfceafd4702e;
 			};
 		};
 		E1468B51650BF95A1383EAE9 /* XCRemoteSwiftPackageReference "Sparkle" */ = {

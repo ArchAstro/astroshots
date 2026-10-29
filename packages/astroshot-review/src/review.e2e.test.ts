@@ -161,8 +161,10 @@ describe("astroshot review in a kitty-capable PTY", () => {
       await session.waitFor(() => session.screen().includes("Share feedback"), "the composer");
       session.write("Needs more contrast\r");
       const reviewPath = path.join(feature, "review.json");
+      // Typing hides the placeholder before save finishes. Wait for the action
+      // row to return so the composer no longer owns the next keyboard command.
       await session.waitFor(
-        () => fs.existsSync(reviewPath) && session.screen().includes("Reviewer") && !session.screen().includes("Share feedback"),
+        () => fs.existsSync(reviewPath) && session.screen().includes("Reviewer") && session.screen().includes("s Seen") && !session.screen().includes("esc cancel"),
         "the comment to land",
       );
       let review = JSON.parse(fs.readFileSync(reviewPath, "utf8"));
@@ -182,7 +184,7 @@ describe("astroshot review in a kitty-capable PTY", () => {
 
       // History shows it again as Seen.
       session.write("u");
-      await session.waitFor(() => session.screen().includes("History (1)"), "the history filter");
+      await session.waitFor(() => session.screen().includes("History (1)") && session.screen().includes("● Seen"), "the seen row in history");
       expect(session.screen()).toContain("● Seen");
 
       // Full-screen review pages run siblings oldest → newest, seen ones included.

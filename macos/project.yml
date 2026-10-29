@@ -10,7 +10,11 @@ options:
 packages:
   mlx-audio-swift:
     url: https://github.com/Blaizzy/mlx-audio-swift
-    branch: main
+    revision: e8dd23f6930bff365aed82e0c3a3bfceafd4702e
+  # Match the audio revision upstream; MLX 0.33 introduces a conflicting compile overload.
+  mlx-swift:
+    url: https://github.com/ml-explore/mlx-swift
+    exactVersion: 0.32.3
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.9.5
