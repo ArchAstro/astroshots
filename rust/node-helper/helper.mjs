@@ -768,6 +768,10 @@ async function cmdBrowserScript({ wsEndpoint, targetId, url, scriptPath }) {
 // ------------------------------------------------------------------ dispatch
 
 const COMMANDS = {
+  "check-dependencies": async () => {
+    await Promise.all(["tsx/esm/api", "vite", "@vitejs/plugin-react", "playwright-core"].map(importOwn));
+    return {};
+  },
   ping: async () => ({ protocol: PROTOCOL, node: process.version }),
   "load-config": cmdLoadConfig,
   "react-serve": cmdReactServe,
@@ -819,7 +823,25 @@ async function handle(line) {
 // Exported for `helper.test.mjs` (ports react-shot/src/create-server.test.ts).
 export { resolveInstalledModule, resolveInstalledPackage };
 
+// Native tools execute inside Node, whose architecture/libc can differ from
+// the host Rust executable (for example Rosetta or a musl binary on glibc).
+function checkDistributionRuntime() {
+  const targetFile = path.join(HELPER_DIR, "target");
+  if (!fs.existsSync(targetFile)) return; // Custom/source helper owns its tools.
+  const target = fs.readFileSync(targetFile, "utf8").trim();
+  const arch = target.startsWith("aarch64-") ? "arm64" : "x64";
+  const platform = target.includes("apple-darwin") ? "darwin"
+    : target.includes("windows") ? "win32" : "linux";
+  const libc = process.platform === "linux"
+    ? (process.report.getReport().header.glibcVersionRuntime ? "gnu" : "musl") : null;
+  if (process.arch !== arch || process.platform !== platform ||
+      (platform === "linux" && !target.endsWith(`-${libc}`))) {
+    throw new Error(`Astroshots helper for ${target} cannot run with Node ${process.platform}/${process.arch}${libc ? `/${libc}` : ""}. Install Node matching the engine target, or select a compatible custom helper with ASTROSHOT_NODE_HELPER.`);
+  }
+}
+
 if (IS_MAIN) {
+  checkDistributionRuntime();
   const lines = readline.createInterface({ input: process.stdin });
   let queue = Promise.resolve();
   let running = true;

@@ -207,6 +207,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up helper build tools
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@1.99.0
         with:

@@ -10,6 +10,7 @@
 pub mod browser;
 pub mod movie_harness;
 pub mod node_helper;
+pub mod node_helper_distribution;
 pub mod raster;
 pub mod react_shot;
 pub mod review_data;
