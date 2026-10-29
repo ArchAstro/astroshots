@@ -184,6 +184,21 @@ jobs:
         working-directory: rust
         run: cargo test --workspace --no-fail-fast
 
+      # Keep the arm64 Rust binary and exercise it with x64 Node under Rosetta.
+      # Native packages must follow Node, not the engine's compilation target.
+      - name: Set up alternate Node architecture (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          architecture: x64
+          package-manager-cache: false
+
+      - name: Packaged helper with alternate Node architecture (macOS)
+        if: runner.os == 'macOS'
+        working-directory: rust
+        run: cargo test -p astroshot-engine --test node_helper packaged_helper_runs_project_fixtures_without_source_checkout
+
   rust-target-check:
     # archdev links the astroshot-engine and astroshot-review crates into a
     # binary released for these seven targets. `cargo check` needs only the target's std, no cross linker, so

@@ -404,7 +404,7 @@ export default {component: <div id="version">{React.version}</div>};"#,
 
         // Scripted browser mode imports Playwright from the packaged helper and
         // mutates the real Chrome page; Rust observes the resulting DOM.
-        let script = root.join("script.ts");
+        let script = root.join("script.mjs");
         std::fs::write(&script, "export default async (page) => { await page.locator('#version').evaluate(el => el.textContent += ' scripted'); };").unwrap();
         helper
             .browser_script(
@@ -435,31 +435,4 @@ export default {component: <div id="version">{React.version}</div>};"#,
             .unwrap();
     warm.check_dependencies().await.unwrap();
     warm.shutdown().await.unwrap();
-}
-
-#[tokio::test]
-async fn packaged_helper_reports_incompatible_node_runtime() {
-    let root = tempfile::tempdir().unwrap();
-    let script = root.path().join("helper.mjs");
-    std::fs::write(&script, astroshot_engine::node_helper::EMBEDDED_HELPER).unwrap();
-    let wrong = if cfg!(target_os = "windows") {
-        "aarch64-apple-darwin"
-    } else {
-        "x86_64-pc-windows-msvc"
-    };
-    std::fs::write(root.path().join("target"), wrong).unwrap();
-    let error = NodeHelper::spawn_with(
-        &astroshot_engine::node_helper::find_node().unwrap(),
-        &script,
-        Duration::from_secs(10),
-    )
-    .await
-    .err()
-    .unwrap();
-    assert!(
-        error
-            .to_string()
-            .contains("Install Node matching the engine target"),
-        "{error}"
-    );
 }
