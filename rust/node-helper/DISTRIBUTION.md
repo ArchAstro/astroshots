@@ -2,8 +2,8 @@
 
 `astroshot-engine` builds a complete helper distribution from this directory's
 `package.json` and `package-lock.json`. Cargo's build script runs `npm ci` in
-`OUT_DIR`, with install scripts disabled and the target OS, CPU and libc selected
-explicitly. Consumers building the Rust crate need Node >=22.14.0 and npm >=11
+`OUT_DIR`, with install scripts disabled. It installs every supported Node architecture
+and libc variant for the target OS, then merges their native packages. Consumers building the Rust crate need Node >=22.14.0 and npm >=11
 on PATH, plus registry access or an npm cache containing the locked packages.
 Use npm's normal cache/offline configuration for offline builds. No root workspace
 `node_modules` or TypeScript package build is needed to build the distribution.
@@ -16,47 +16,41 @@ contents, helper version and target together. Rust consumers need no sidecar fil
 Updating this lockfile changes the distribution identity; old cache entries remain
 usable by older binaries. Cache pruning is an explicit user operation.
 
-A Darwin arm64 installation measured 58 MiB unpacked and approximately 16 MiB
-compressed before the small helper/manifest additions. Sizes vary by target.
 The pinned direct tools are tsx 4.23.1, Vite 6.4.3, React plugin 5.2.0 and
 playwright-core 1.61.1. This lock resolves esbuild 0.28.2 for tsx, esbuild 0.25.12
 for Vite, and Rollup 4.66.0. Both esbuild trees must retain their own native package.
 The plugin requires Node >=22.12 on the supported Node 22 line; the engine enforces
 the repository's stricter >=22.14.0 minimum. Node 24 is also supported.
 
-| Rust target | npm OS / CPU | Rollup suffix |
+| Rust target family | Bundled Node architectures | Rollup variants |
 | --- | --- | --- |
-| aarch64-apple-darwin | darwin / arm64 | darwin-arm64 |
-| x86_64-apple-darwin | darwin / x64 | darwin-x64 |
-| aarch64-unknown-linux-gnu | linux / arm64 | linux-arm64-gnu |
-| x86_64-unknown-linux-gnu | linux / x64 | linux-x64-gnu |
-| x86_64-unknown-linux-musl | linux / x64 | linux-x64-musl |
-| x86_64-pc-windows-msvc | win32 / x64 | win32-x64-msvc |
-| aarch64-pc-windows-msvc | win32 / arm64 | win32-arm64-msvc |
+| apple-darwin | arm64, x64 | darwin-arm64, darwin-x64 |
+| unknown-linux-gnu / unknown-linux-musl | arm64, x64 | linux-arm64-gnu, linux-arm64-musl, linux-x64-gnu, linux-x64-musl |
+| pc-windows-msvc | arm64, x64 | win32-arm64-msvc, win32-x64-msvc |
 
-esbuild uses the corresponding OS/CPU pair (no libc distinction). The build checks
-that both esbuild native packages and the selected Rollup package were installed;
+Both esbuild versions include each corresponding OS/CPU pair (no libc distinction).
+The build checks every native package before merging its scope into the distribution;
 npm silently skipping optional dependencies cannot produce a successful bundle.
-Cross-compilation installs target binaries without executing them. Node must match
-that target's OS, architecture and (on Linux) libc. The helper reports an explicit
-compatibility error before capture for mixed runtimes, including x64 Rust with
-arm64 Node under Rosetta and musl Rust with glibc Node. Install matching Node or
-provide a custom helper with matching dependencies for those configurations.
+Cross-compilation installs native binaries without executing them. At capture time,
+esbuild and Rollup select packages for the running Node process. Node's architecture
+and Linux libc can differ from the Rust engine's, including Rosetta and musl Rust
+running with glibc Node. The host must still be able to execute that Node binary.
 
 Measured compressed payload sizes (2026-10-29, built by the production build script):
 
 | Target | Bytes |
 | --- | ---: |
-| aarch64-apple-darwin | 16119806 |
-| x86_64-apple-darwin | 16917767 |
-| aarch64-unknown-linux-gnu | 15827685 |
-| x86_64-unknown-linux-gnu | 17418382 |
-| x86_64-unknown-linux-musl | 16795292 |
-| x86_64-pc-windows-msvc | 17935850 |
-| aarch64-pc-windows-msvc | 15906509 |
+| aarch64-apple-darwin | 26230330 |
+| x86_64-apple-darwin | 26230330 |
+| aarch64-unknown-linux-gnu | 27656421 |
+| x86_64-unknown-linux-gnu | 27656421 |
+| x86_64-unknown-linux-musl | 27656422 |
+| x86_64-pc-windows-msvc | 27053803 |
+| aarch64-pc-windows-msvc | 27053801 |
 
 Two consecutive Darwin arm64 builds produced identical archive bytes. This is a
-local reproducibility check; native execution was verified on Darwin arm64 only.
+local reproducibility check. The same Darwin arm64 Rust test binary was exercised
+with native arm64 Node and x64 Node under Rosetta.
 
 ## Runtime and compatibility
 
@@ -93,7 +87,8 @@ is test setup; materialization and capture do not use npm or download dependenci
 
 Integration matrix: React, Ink and scripted browser commands cross the Rust/Node
 process boundary; React/browser script also cross HTTP and Chrome CDP. The canonical
-proof covers separate project dependency versions and cold/warm cache. The distribution
+proof covers separate project dependency versions and cold/warm cache. macOS CI
+repeats it with x64 Node after running with arm64 Node, using the same arm64 engine. The distribution
 unit tests cover concurrent first publication, interrupted staging and altered dependency
 files. Node tests cover missing executables and unsupported version boundaries.
 Fidelity: all helper tools, engine code, npm fixture trees and Chrome run for real.

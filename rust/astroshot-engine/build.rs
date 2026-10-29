@@ -8,15 +8,25 @@ fn main() {
     println!("cargo:rerun-if-changed=../node-helper/package.json");
     println!("cargo:rerun-if-changed=../node-helper/package-lock.json");
     let target = env::var("TARGET").unwrap();
-    let (os, cpu, libc) = match target.as_str() {
-        "aarch64-apple-darwin" => ("darwin", "arm64", ""),
-        "x86_64-apple-darwin" => ("darwin", "x64", ""),
-        "aarch64-unknown-linux-gnu" => ("linux", "arm64", "glibc"),
-        "x86_64-unknown-linux-gnu" => ("linux", "x64", "glibc"),
-        "x86_64-unknown-linux-musl" => ("linux", "x64", "musl"),
-        "x86_64-pc-windows-msvc" => ("win32", "x64", ""),
-        "aarch64-pc-windows-msvc" => ("win32", "arm64", ""),
+    let os = match target.as_str() {
+        "aarch64-apple-darwin" | "x86_64-apple-darwin" => "darwin",
+        "aarch64-unknown-linux-gnu" | "x86_64-unknown-linux-gnu" | "x86_64-unknown-linux-musl" => {
+            "linux"
+        }
+        "x86_64-pc-windows-msvc" | "aarch64-pc-windows-msvc" => "win32",
         _ => panic!("no Astroshots helper distribution mapping for {target}"),
+    };
+    // Node chooses native packages using its own architecture and libc, not
+    // Rust's target. Include every supported Node runtime for this OS.
+    let variants: &[(&str, &str)] = if os == "linux" {
+        &[
+            ("arm64", "glibc"),
+            ("arm64", "musl"),
+            ("x64", "glibc"),
+            ("x64", "musl"),
+        ]
+    } else {
+        &[("arm64", ""), ("x64", "")]
     };
     let out = std::path::PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let stage = out.join("node-helper-build");
@@ -25,9 +35,38 @@ fn main() {
         fs::copy(Path::new("../node-helper").join(name), stage.join(name)).unwrap();
     }
     fs::write(stage.join("target"), &target).unwrap();
+    install(&stage, os, variants[0].0, variants[0].1);
+    let native = out.join("node-helper-native");
+    fs::create_dir_all(&native).unwrap();
+    for name in ["package.json", "package-lock.json"] {
+        fs::copy(stage.join(name), native.join(name)).unwrap();
+    }
+    for &(cpu, libc) in &variants[1..] {
+        install(&native, os, cpu, libc);
+        // Common JS is identical under the lockfile. Merge only native package
+        // scopes, retaining the two different esbuild dependency trees.
+        for scope in [
+            "node_modules/@esbuild",
+            "node_modules/vite/node_modules/@esbuild",
+            "node_modules/@rollup",
+        ] {
+            copy_tree(&native.join(scope), &stage.join(scope)).unwrap();
+        }
+    }
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut archive = tar::Builder::new(encoder);
+    append(&mut archive, &stage, &stage).unwrap();
+    let bytes = archive.into_inner().unwrap().finish().unwrap();
+    let hash = format!("{:x}", Sha256::digest(&bytes));
+    fs::write(out.join("node-helper.tar.gz"), bytes).unwrap();
+    println!("cargo:rustc-env=ASTROSHOT_HELPER_DIGEST={hash}");
+    println!("cargo:rustc-env=ASTROSHOT_HELPER_TARGET={target}");
+}
+
+fn install(stage: &Path, os: &str, cpu: &str, libc: &str) {
     let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
     let output = Command::new(npm)
-        .current_dir(&stage)
+        .current_dir(stage)
         .args([
             "ci",
             "--ignore-scripts",
@@ -79,14 +118,23 @@ fn main() {
             .is_file(),
         "missing target Rollup"
     );
-    let encoder = GzEncoder::new(Vec::new(), Compression::default());
-    let mut archive = tar::Builder::new(encoder);
-    append(&mut archive, &stage, &stage).unwrap();
-    let bytes = archive.into_inner().unwrap().finish().unwrap();
-    let hash = format!("{:x}", Sha256::digest(&bytes));
-    fs::write(out.join("node-helper.tar.gz"), bytes).unwrap();
-    println!("cargo:rustc-env=ASTROSHOT_HELPER_DIGEST={hash}");
-    println!("cargo:rustc-env=ASTROSHOT_HELPER_TARGET={target}");
+}
+
+fn copy_tree(source: &Path, destination: &Path) -> io::Result<()> {
+    fs::create_dir_all(destination)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let target = destination.join(entry.file_name());
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &target)?;
+        } else if kind.is_file() {
+            fs::copy(entry.path(), target)?;
+        } else {
+            return Err(io::Error::other("unexpected native package symlink"));
+        }
+    }
+    Ok(())
 }
 
 fn append<W: io::Write>(archive: &mut tar::Builder<W>, root: &Path, dir: &Path) -> io::Result<()> {
