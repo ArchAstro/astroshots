@@ -326,3 +326,140 @@ async fn http_get(base: &str, path: &str) -> String {
     stream.read_to_string(&mut body).await.unwrap();
     body
 }
+
+/// Real Rust -> packaged Node -> Vite/Ink/Playwright -> Chrome proof. The helper
+/// and both fixture dependency trees live outside the source checkout.
+#[tokio::test]
+async fn packaged_helper_runs_project_fixtures_without_source_checkout() {
+    use astroshot_engine::browser::{Browser, LaunchOptions, PageOptions, WaitUntil};
+    use astroshot_engine::node_helper::{find_node, write_embedded_helper};
+    let isolated = tempfile::tempdir().unwrap();
+    let helper_path = write_embedded_helper(&isolated.path().join("cache")).unwrap();
+    assert!(!helper_path.starts_with(repo()));
+    let mut helper =
+        NodeHelper::spawn_with(&find_node().unwrap(), &helper_path, Duration::from_secs(30))
+            .await
+            .unwrap();
+    helper.check_dependencies().await.unwrap();
+    let browser = Browser::launch(LaunchOptions::default()).await.unwrap();
+
+    for (project, version) in [("react18", "18.3.1"), ("react19", "19.2.4")] {
+        // Only fixture-owned dependencies are installed here; no helper tools.
+        let root = isolated.path().join(project);
+        std::fs::create_dir(&root).unwrap();
+        for name in ["package.json", "package-lock.json"] {
+            std::fs::copy(
+                repo()
+                    .join("rust/node-helper/fixtures")
+                    .join(project)
+                    .join(name),
+                root.join(name),
+            )
+            .unwrap();
+        }
+        let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+        let install = std::process::Command::new(npm)
+            .current_dir(&root)
+            .args(["ci", "--ignore-scripts", "--no-audit", "--no-fund"])
+            .output()
+            .unwrap();
+        assert!(
+            install.status.success(),
+            "{}",
+            String::from_utf8_lossy(&install.stderr)
+        );
+        assert!(!root.join("node_modules/tsx").exists());
+        assert!(!root.join("node_modules/vite").exists());
+        let ink = root.join("terminal.tsx");
+        std::fs::write(
+            &ink,
+            r#"import React from 'react'; import {Text} from 'ink';
+export default { component: <Text>{React.version}</Text> };"#,
+        )
+        .unwrap();
+        let frame = helper.ink_render(&ink, Some(60), Some(5)).await.unwrap();
+        assert!(frame.ansi.contains(version), "{}", frame.ansi);
+
+        // Browser rendering proves fixture-local React, not only Vite's host HTML.
+        let react = root.join("browser.tsx");
+        std::fs::write(
+            &react,
+            r#"import React from 'react';
+export default {component: <div id="version">{React.version}</div>};"#,
+        )
+        .unwrap();
+        let served = helper.react_serve(&react, Some(&root), None).await.unwrap();
+        let page = browser.new_page(PageOptions::new(400, 300)).await.unwrap();
+        page.goto(
+            &served.url,
+            WaitUntil::DomContentLoaded,
+            Duration::from_secs(20),
+        )
+        .await
+        .unwrap();
+        page.wait_for_selector("#version", Duration::from_secs(20))
+            .await
+            .unwrap();
+        assert_eq!(page.inner_text("#version").await.unwrap(), version);
+
+        // Scripted browser mode imports Playwright from the packaged helper and
+        // mutates the real Chrome page; Rust observes the resulting DOM.
+        let script = root.join("script.ts");
+        std::fs::write(&script, "export default async (page) => { await page.locator('#version').evaluate(el => el.textContent += ' scripted'); };").unwrap();
+        helper
+            .browser_script(
+                browser.ws_endpoint(),
+                Some(&page.target_id()),
+                Some(&served.url),
+                &script,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            page.inner_text("#version").await.unwrap(),
+            format!("{version} scripted")
+        );
+        page.close().await.unwrap();
+        helper.react_stop(served.server_id).await.unwrap();
+    }
+    helper.shutdown().await.unwrap();
+    browser.close().await.unwrap();
+    // A subsequent process uses the same complete cached distribution.
+    assert_eq!(
+        write_embedded_helper(&isolated.path().join("cache")).unwrap(),
+        helper_path
+    );
+    let mut warm =
+        NodeHelper::spawn_with(&find_node().unwrap(), &helper_path, Duration::from_secs(30))
+            .await
+            .unwrap();
+    warm.check_dependencies().await.unwrap();
+    warm.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn packaged_helper_reports_incompatible_node_runtime() {
+    let root = tempfile::tempdir().unwrap();
+    let script = root.path().join("helper.mjs");
+    std::fs::write(&script, astroshot_engine::node_helper::EMBEDDED_HELPER).unwrap();
+    let wrong = if cfg!(target_os = "windows") {
+        "aarch64-apple-darwin"
+    } else {
+        "x86_64-pc-windows-msvc"
+    };
+    std::fs::write(root.path().join("target"), wrong).unwrap();
+    let error = NodeHelper::spawn_with(
+        &astroshot_engine::node_helper::find_node().unwrap(),
+        &script,
+        Duration::from_secs(10),
+    )
+    .await
+    .err()
+    .unwrap();
+    assert!(
+        error
+            .to_string()
+            .contains("Install Node matching the engine target"),
+        "{error}"
+    );
+}

@@ -34,6 +34,8 @@ use crate::react_shot::types::{ReactShotConfig, ReactShotFixtureMeta};
 pub const PROTOCOL_VERSION: u32 = 1;
 /// Minimum supported Node major version.
 pub const MIN_NODE_MAJOR: u32 = 22;
+/// Minimum version supported by the pinned helper dependencies.
+pub const MIN_NODE_VERSION: &str = "22.14.0";
 /// Env var overriding the helper script location.
 pub const HELPER_ENV: &str = "ASTROSHOT_NODE_HELPER";
 /// Env var overriding the `node` executable.
@@ -46,10 +48,10 @@ const STDERR_TAIL: usize = 8 * 1024;
 #[derive(Debug, Error)]
 pub enum NodeHelperError {
     #[error(
-        "React and Ink shots need Node.js ≥{MIN_NODE_MAJOR}, but `node` was not found on PATH. Install Node.js from https://nodejs.org and retry."
+        "React and Ink shots need Node.js ≥{MIN_NODE_VERSION}, but `node` was not found on PATH. Install Node.js from https://nodejs.org and retry."
     )]
     NodeMissing,
-    #[error("React and Ink shots need Node.js ≥{MIN_NODE_MAJOR}, but found {found}.")]
+    #[error("React and Ink shots need Node.js ≥{MIN_NODE_VERSION}, but found {found}.")]
     NodeTooOld { found: String },
     #[error("could not find the astroshot Node helper (searched: {}). Set {HELPER_ENV} to helper.mjs.", .searched.join(", "))]
     HelperNotFound { searched: Vec<String> },
@@ -89,6 +91,8 @@ fn fmt_stderr(stderr: &str) -> String {
 )]
 pub enum Command {
     Ping,
+    /// Import the managed helper tools to check readiness (no browser launch).
+    CheckDependencies,
     /// Evaluate `react-shot.config.*` (`config.ts` `loadConfig`).
     LoadConfig {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -232,7 +236,7 @@ pub fn find_node() -> Result<PathBuf, NodeHelperError> {
 
 /// Candidate helper locations in priority order: env override, next to the
 /// executable (`node-helper/`, `../share/astroshot/node-helper/`,
-/// `../lib/astroshot/node-helper/`), then the source checkout.
+/// `../lib/astroshot/node-helper/`). Source development uses the explicit override.
 pub fn helper_candidates() -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Some(explicit) = std::env::var_os(HELPER_ENV) {
@@ -246,8 +250,7 @@ pub fn helper_candidates() -> Vec<PathBuf> {
             out.push(dir.join("../lib/astroshot/node-helper/helper.mjs"));
         }
     }
-    // Dev fallback: rust/astroshot/../node-helper in a source checkout.
-    out.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../node-helper/helper.mjs"));
+
     out
 }
 
@@ -274,27 +277,13 @@ pub fn find_helper() -> Result<PathBuf, NodeHelperError> {
     }
 }
 
-/// Write [`EMBEDDED_HELPER`] to `<cache>/astroshot/node-helper/<hash>/helper.mjs`
-/// unless that file already holds it, and return the path. The hash keeps
-/// different engine versions from overwriting each other; the write goes
-/// through a temp file and a rename so concurrent starts never see a partial
-/// script.
+/// Materialize the complete pinned, target-specific helper distribution offline.
+/// Returns a useful error for corrupt caches rather than overwriting live files.
 pub fn write_embedded_helper(cache_dir: &Path) -> std::io::Result<PathBuf> {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(EMBEDDED_HELPER.as_bytes());
-    let hash: String = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
-    let dir = cache_dir.join("astroshot").join("node-helper").join(hash);
-    let target = dir.join("helper.mjs");
-    if std::fs::read_to_string(&target).is_ok_and(|text| text == EMBEDDED_HELPER) {
-        return Ok(target);
-    }
-    std::fs::create_dir_all(&dir)?;
-    let temp = dir.join(format!("helper.mjs.{}.tmp", std::process::id()));
-    std::fs::write(&temp, EMBEDDED_HELPER)?;
-    std::fs::rename(&temp, &target)?;
-    Ok(target)
+    crate::node_helper_distribution::materialize(cache_dir)
 }
 
+#[cfg(test)]
 fn node_major(version: &str) -> Option<u32> {
     version
         .trim_start_matches('v')
@@ -302,6 +291,21 @@ fn node_major(version: &str) -> Option<u32> {
         .next()?
         .parse()
         .ok()
+}
+
+fn supported_node(version: &str) -> bool {
+    let parts: Vec<_> = version.trim_start_matches('v').split('.').collect();
+    match parts.as_slice() {
+        [major, minor, patch] => match (
+            major.parse::<u32>(),
+            minor.parse::<u32>(),
+            patch.parse::<u32>(),
+        ) {
+            (Ok(major), Ok(minor), Ok(patch)) => (major, minor, patch) >= (22, 14, 0),
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 // -------------------------------------------------------------------- client
@@ -383,7 +387,7 @@ impl NodeHelper {
                 ready.protocol
             )));
         }
-        if node_major(&ready.node).is_none_or(|major| major < MIN_NODE_MAJOR) {
+        if !supported_node(&ready.node) {
             return Err(NodeHelperError::NodeTooOld { found: ready.node });
         }
         helper.node_version = ready.node;
@@ -459,6 +463,13 @@ impl NodeHelper {
             return serde_json::from_value(value)
                 .map_err(|e| NodeHelperError::Protocol(format!("bad result shape: {e}")));
         }
+    }
+
+    /// Check the helper-owned npm tools using the helper's own resolution.
+    /// Custom helpers may report an unsupported command without being modified.
+    pub async fn check_dependencies(&mut self) -> Result<(), NodeHelperError> {
+        let _: serde_json::Value = self.call(&Command::CheckDependencies).await?;
+        Ok(())
     }
 
     pub async fn ping(&mut self) -> Result<PingReply, NodeHelperError> {
@@ -640,11 +651,15 @@ mod tests {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../node-helper/helper.mjs");
         assert_eq!(std::fs::read_to_string(source).unwrap(), EMBEDDED_HELPER);
 
-        // A second call reuses the file; a damaged copy is rewritten.
+        // A second call reuses the files; corruption is reported without overwriting a live helper.
         assert_eq!(write_embedded_helper(cache.path()).unwrap(), path);
         std::fs::write(&path, "damaged").unwrap();
-        assert_eq!(write_embedded_helper(cache.path()).unwrap(), path);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), EMBEDDED_HELPER);
+        assert!(
+            write_embedded_helper(cache.path())
+                .unwrap_err()
+                .to_string()
+                .contains("corrupt")
+        );
     }
 
     #[test]
@@ -664,8 +679,12 @@ mod tests {
     }
 
     #[test]
-    fn helper_candidates_end_with_source_checkout() {
-        let last = helper_candidates().pop().unwrap();
-        assert!(last.ends_with("node-helper/helper.mjs"));
+    fn node_version_matches_the_dependency_minimum() {
+        for version in ["v22.0.0", "v22.12.0", "v22.13.9", "v20.19.0", "junk"] {
+            assert!(!supported_node(version), "{version}");
+        }
+        for version in ["v22.14.0", "v22.16.0", "v24.0.0"] {
+            assert!(supported_node(version), "{version}");
+        }
     }
 }
