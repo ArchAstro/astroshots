@@ -11,20 +11,65 @@ pub const TARGET: &str = env!("ASTROSHOT_HELPER_TARGET");
 pub const DIGEST: &str = env!("ASTROSHOT_HELPER_DIGEST");
 const ARCHIVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/node-helper.tar.gz"));
 
+/// Read-only state of the complete embedded distribution, not runtime readiness.
+#[derive(Debug, serde::Serialize)]
+pub struct Inspection {
+    pub helper: PathBuf,
+    pub source: &'static str,
+    pub status: &'static str,
+    pub detail: String,
+}
+
+fn destination(cache: &Path) -> PathBuf {
+    cache
+        .join("astroshot/node-helper")
+        .join(TARGET)
+        .join(DIGEST)
+}
+
+/// Inspect without extracting, repairing, launching Node or loading user code.
+/// A cold cache is available from the embedded archive; it is not a missing dependency.
+pub fn inspect(cache: &Path) -> Inspection {
+    let root = destination(cache);
+    let (status, detail) = match fs::symlink_metadata(&root) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => (
+            "embedded",
+            "Complete distribution embedded; first capture extracts it offline".to_owned(),
+        ),
+        Err(error) => (
+            "unknown",
+            format!("Cannot inspect {}: {error}", root.display()),
+        ),
+        Ok(_) => match verify(&root) {
+            Ok(()) => (
+                "ready",
+                "Cached distribution matches the embedded archive; runtime not executed".to_owned(),
+            ),
+            Err(error) => ("corrupt", error.to_string()),
+        },
+    };
+    Inspection {
+        helper: root.join("helper.mjs"),
+        source: "embedded",
+        status,
+        detail,
+    }
+}
+
 /// Materialize the complete helper offline. Concurrent first use publishes only
 /// complete directories. Interrupted staging directories are never selected.
 /// Corruption is reported instead of rewriting files used by running helpers.
 pub fn materialize(cache: &Path) -> io::Result<PathBuf> {
-    let parent = cache.join("astroshot/node-helper").join(TARGET);
-    let destination = parent.join(DIGEST);
+    let destination = destination(cache);
+    let parent = destination.parent().expect("distribution has a parent");
     if destination.exists() {
         verify(&destination)?;
         return Ok(destination.join("helper.mjs"));
     }
-    fs::create_dir_all(&parent)?;
+    fs::create_dir_all(parent)?;
     let temporary = tempfile::Builder::new()
         .prefix(".staging-")
-        .tempdir_in(&parent)?;
+        .tempdir_in(parent)?;
     tar::Archive::new(GzDecoder::new(ARCHIVE)).unpack(temporary.path())?;
     verify(temporary.path())?;
     match fs::rename(temporary.path(), &destination) {
@@ -36,6 +81,9 @@ pub fn materialize(cache: &Path) -> io::Result<PathBuf> {
 }
 
 fn verify(root: &Path) -> io::Result<()> {
+    if !fs::symlink_metadata(root).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink()) {
+        return Err(corrupt(root, Path::new(".")));
+    }
     let mut archive = tar::Archive::new(GzDecoder::new(ARCHIVE));
     for entry in archive.entries()? {
         let mut entry = entry?;
@@ -48,6 +96,9 @@ fn verify(root: &Path) -> io::Result<()> {
             if fs::symlink_metadata(&component).map_or(true, |m| m.file_type().is_symlink()) {
                 return Err(corrupt(root, &relative));
             }
+        }
+        if !fs::symlink_metadata(&file).is_ok_and(|m| m.is_file()) {
+            return Err(corrupt(root, &relative));
         }
         let bytes = fs::read(&file).map_err(|_| corrupt(root, &relative))?;
         let mut expected = Vec::new();
@@ -79,6 +130,32 @@ fn corrupt(root: &Path, file: &Path) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn inspection_observes_the_capture_distribution_without_extracting_or_repairing() {
+        let cache = tempfile::tempdir().unwrap();
+        // A cold cache is usable offline but diagnosis must not materialize it.
+        let cold = inspect(cache.path());
+        assert_eq!(cold.status, "embedded");
+        assert_eq!(fs::read_dir(cache.path()).unwrap().count(), 0);
+        // Capture's real owner creates the complete archive; inspect verifies it.
+        let helper = materialize(cache.path()).unwrap();
+        assert_eq!(cold.helper, helper);
+        assert_eq!(inspect(cache.path()).status, "ready");
+        let dependency = helper
+            .parent()
+            .unwrap()
+            .join("node_modules/tsx/package.json");
+        fs::write(&dependency, "damaged").unwrap();
+        assert_eq!(inspect(cache.path()).status, "corrupt");
+        assert_eq!(fs::read_to_string(&dependency).unwrap(), "damaged");
+        assert!(materialize(cache.path()).is_err());
+        // A special entry must never be opened: replacing a dependency with a
+        // directory provides a portable regression for non-regular cache files.
+        fs::remove_file(&dependency).unwrap();
+        fs::create_dir(&dependency).unwrap();
+        assert_eq!(inspect(cache.path()).status, "corrupt");
+    }
+
     #[test]
     fn concurrent_first_use_publishes_complete_helper_and_detects_corruption() {
         let cache = tempfile::tempdir().unwrap();
