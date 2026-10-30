@@ -258,14 +258,33 @@ pub fn helper_candidates() -> Vec<PathBuf> {
 /// files next to it.
 pub const EMBEDDED_HELPER: &str = include_str!("../../node-helper/helper.mjs");
 
+/// Inspect the same helper selection capture uses, without starting a process or writing cache.
+/// Overrides and adjacent helpers own their dependencies and cannot be verified as embedded.
+pub fn inspect_helper() -> crate::node_helper_distribution::Inspection {
+    if let Some(helper) = selected_helper() {
+        return crate::node_helper_distribution::Inspection {
+            helper,
+            source: "external",
+            status: "unknown",
+            detail: "Selected external helper owns its dependencies; not executed or verified"
+                .to_owned(),
+        };
+    }
+    crate::node_helper_distribution::inspect(&dirs::cache_dir().unwrap_or_else(std::env::temp_dir))
+}
+
+fn selected_helper() -> Option<PathBuf> {
+    helper_candidates().into_iter().find(|path| path.is_file())
+}
+
 /// Locate `helper.mjs`: the first existing [`helper_candidates`] path
 /// (`ASTROSHOT_NODE_HELPER` first), else the embedded copy written to the
 /// cache directory.
 pub fn find_helper() -> Result<PathBuf, NodeHelperError> {
-    let candidates = helper_candidates();
-    if let Some(found) = candidates.iter().find(|path| path.is_file()) {
-        return Ok(found.clone());
+    if let Some(found) = selected_helper() {
+        return Ok(found);
     }
+    let candidates = helper_candidates();
     let mut searched: Vec<String> = candidates.iter().map(|p| p.display().to_string()).collect();
     let cache = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
     match write_embedded_helper(&cache) {
