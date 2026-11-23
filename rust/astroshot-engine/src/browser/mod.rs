@@ -42,7 +42,7 @@ mod record;
 mod watchdog;
 mod webm;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -83,10 +83,12 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 #[derive(Debug, thiserror::Error)]
 pub enum BrowserError {
     #[error(
-        "No Chrome or Chromium found. Set ASTROSHOT_CHROME (or CHROME_PATH) to a browser executable, or install Chrome. Searched:\n{}",
+        "No Chrome or Chromium found. Set ASTROSHOT_CHROME, CHROME_PATH, or PLAYWRIGHT_MCP_EXECUTABLE_PATH to a browser executable, or install Chrome. Searched:\n{}",
         .searched.iter().map(|s| format!("  - {s}")).collect::<Vec<_>>().join("\n")
     )]
     ChromeNotFound { searched: Vec<String> },
+    #[error("Invalid Chromium executable in ${var}: {} is not a file", path.display())]
+    InvalidChromeOverride { var: &'static str, path: PathBuf },
     #[error("Could not launch Chromium.\n{0}")]
     Launch(String),
     #[error("Timed out after {ms}ms waiting for {what}")]
@@ -231,13 +233,45 @@ const EXTRA_ARGS: [&str; 4] = [
     "--font-render-hinting=none",
 ];
 
+fn launch_config(
+    options: &LaunchOptions,
+    user_data_dir: &Path,
+    find_chrome: impl FnOnce(bool) -> Result<PathBuf>,
+    mcp_sandbox: Option<&str>,
+    linux_root: bool,
+) -> Result<(PathBuf, BrowserConfig)> {
+    let exe = match &options.chrome_path {
+        Some(path) => path.clone(),
+        None => find_chrome(options.headed)?,
+    };
+    let mut builder = BrowserConfig::builder()
+        .chrome_executable(&exe)
+        .user_data_dir(user_data_dir)
+        .headless_mode(if options.headed {
+            HeadlessMode::False
+        } else {
+            HeadlessMode::True
+        })
+        .viewport(None)
+        .args(EXTRA_ARGS)
+        .args(options.args.iter().cloned());
+    // Match Playwright MCP's exact, case-sensitive boolean syntax. A missing
+    // or unrecognized value keeps Astroshot's existing Linux-root exception.
+    let no_sandbox = match mcp_sandbox {
+        Some("false" | "0") => true,
+        Some("true" | "1") => false,
+        _ => linux_root,
+    };
+    if no_sandbox {
+        builder = builder.no_sandbox();
+    }
+    let config = builder.build().map_err(BrowserError::Launch)?;
+    Ok((exe, config))
+}
+
 impl Browser {
     /// Launch a new Chrome (not shared).
     pub async fn launch(options: LaunchOptions) -> Result<Browser> {
-        let exe = match &options.chrome_path {
-            Some(path) => path.clone(),
-            None => discover::find_chrome_for(options.headed)?,
-        };
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
@@ -249,21 +283,13 @@ impl Browser {
             std::process::id()
         ));
 
-        let mut builder = BrowserConfig::builder()
-            .chrome_executable(&exe)
-            .user_data_dir(&user_data_dir)
-            .headless_mode(if options.headed {
-                HeadlessMode::False
-            } else {
-                HeadlessMode::True
-            })
-            .viewport(None)
-            .args(EXTRA_ARGS)
-            .args(options.args.iter().cloned());
-        if running_as_root() {
-            builder = builder.no_sandbox();
-        }
-        let config = builder.build().map_err(BrowserError::Launch)?;
+        let (exe, config) = launch_config(
+            &options,
+            &user_data_dir,
+            discover::find_chrome_for,
+            std::env::var("PLAYWRIGHT_MCP_SANDBOX").ok().as_deref(),
+            running_as_root(),
+        )?;
 
         let (mut browser, mut handler) = chromiumoxide::Browser::launch(config)
             .await
@@ -446,6 +472,92 @@ impl Browser {
 
 fn running_as_root() -> bool {
     cfg!(target_os = "linux") && std::env::var("USER").is_ok_and(|u| u == "root")
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_override_and_defaults_are_reflected_in_browser_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("harness chrome");
+        std::fs::write(&executable, b"").unwrap();
+        let env = |key: &str| {
+            (key == "PLAYWRIGHT_MCP_EXECUTABLE_PATH").then(|| executable.as_os_str().to_owned())
+        };
+        let find_chrome = |headed| {
+            discover::find_chrome_with(&discover::Probe {
+                env: &env,
+                home: None,
+                app_dirs: Vec::new(),
+                which: &|_| panic!("harness executable must precede PATH discovery"),
+                headed,
+            })
+        };
+
+        for linux_root in [false, true] {
+            for (sandbox, enabled) in [
+                (Some("false"), false),
+                (Some("0"), false),
+                (Some("true"), true),
+                (Some("1"), true),
+                (None, !linux_root),
+                (Some(""), !linux_root),
+                (Some("False"), !linux_root),
+                (Some(" true "), !linux_root),
+                (Some("invalid"), !linux_root),
+            ] {
+                let (path, config) = launch_config(
+                    &LaunchOptions::default(),
+                    &dir.path().join("profile"),
+                    find_chrome,
+                    sandbox,
+                    linux_root,
+                )
+                .unwrap();
+                assert_eq!(path, executable);
+                // chromiumoxide 0.7 keeps its launch fields private. Inspect
+                // the built config without spawning a child: sandbox=false
+                // is what adds --no-sandbox and --disable-setuid-sandbox.
+                let config = format!("{config:?}");
+                assert!(
+                    config.contains(&format!("executable: {executable:?},")),
+                    "{config}"
+                );
+                assert!(
+                    config.contains(&format!("sandbox: {enabled},")),
+                    "sandbox env={sandbox:?}, linux_root={linux_root}: {config}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn explicit_launch_path_and_args_are_preserved() {
+        let executable = PathBuf::from("explicit-chrome");
+        let options = LaunchOptions {
+            headed: true,
+            chrome_path: Some(executable.clone()),
+            args: vec!["--disable-gpu".into()],
+        };
+        let (path, config) = launch_config(
+            &options,
+            Path::new("profile"),
+            |_| panic!("explicit launch path must bypass discovery"),
+            Some("true"),
+            false,
+        )
+        .unwrap();
+        assert_eq!(path, executable);
+        let config = format!("{config:?}");
+        assert!(
+            config.contains(&format!("executable: {executable:?},")),
+            "{config}"
+        );
+        assert!(config.contains("headless: False,"), "{config}");
+        assert!(config.contains("\"--disable-gpu\""), "{config}");
+    }
 }
 
 /// How long [`Page::refresh_screencast`] waits for a frame after each ask.

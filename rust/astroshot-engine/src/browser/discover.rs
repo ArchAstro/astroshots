@@ -1,9 +1,9 @@
 //! Chrome discovery. Playwright downloaded its own Chromium; the Rust port
 //! uses whatever Chrome-family binary is on the machine.
 //!
-//! Search order (first existing file wins):
-//! 1. `ASTROSHOT_CHROME`, then `CHROME_PATH` (a set-but-missing path is an
-//!    error rather than a silent fallthrough)
+//! Search order:
+//! 1. First non-blank override: `ASTROSHOT_CHROME`, `CHROME_PATH`, then
+//!    `PLAYWRIGHT_MCP_EXECUTABLE_PATH`. An invalid override stops discovery.
 //! 2. installed Chrome/Chromium: macOS app bundles, then Linux names via `which`
 //! 3. Playwright's browser cache (`PLAYWRIGHT_BROWSERS_PATH`,
 //!    `~/Library/Caches/ms-playwright`, `~/.cache/ms-playwright`), newest
@@ -12,12 +12,17 @@
 //!    fraction of the time of Chrome for Testing. A headed launch takes
 //!    `chromium-<rev>` first.
 
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use super::BrowserError;
 
 /// Env vars checked for an explicit Chrome path, in order.
-pub const CHROME_ENV_VARS: [&str; 2] = ["ASTROSHOT_CHROME", "CHROME_PATH"];
+pub const CHROME_ENV_VARS: [&str; 3] = [
+    "ASTROSHOT_CHROME",
+    "CHROME_PATH",
+    "PLAYWRIGHT_MCP_EXECUTABLE_PATH",
+];
 
 const MAC_APPS: [&str; 5] = [
     "Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -52,7 +57,7 @@ const PLAYWRIGHT_EXES: [&str; 9] = [
 
 /// Everything discovery reads from the environment, so tests can fake it.
 pub struct Probe<'a> {
-    pub env: &'a dyn Fn(&str) -> Option<String>,
+    pub env: &'a dyn Fn(&str) -> Option<OsString>,
     pub home: Option<PathBuf>,
     pub app_dirs: Vec<PathBuf>,
     /// Looks a command up on `PATH`.
@@ -74,7 +79,7 @@ pub fn find_chrome_for(headed: bool) -> Result<PathBuf, BrowserError> {
     if let Some(home) = &home {
         app_dirs.push(home.join("Applications"));
     }
-    let env = |key: &str| std::env::var(key).ok();
+    let env = |key: &str| std::env::var_os(key);
     let which = |name: &str| which::which(name).ok();
     find_chrome_with(&Probe {
         env: &env,
@@ -89,15 +94,21 @@ pub fn find_chrome_with(probe: &Probe<'_>) -> Result<PathBuf, BrowserError> {
     let mut searched: Vec<String> = Vec::new();
 
     for var in CHROME_ENV_VARS {
-        if let Some(value) = (probe.env)(var).filter(|v| !v.trim().is_empty()) {
-            let path = PathBuf::from(value.trim());
-            if path.is_file() {
-                return Ok(path);
-            }
-            searched.push(format!("${var}={} (not a file)", path.display()));
-        } else {
+        let value = (probe.env)(var).unwrap_or_default();
+        let value = value
+            .to_str()
+            .map(str::trim)
+            .map(OsStr::new)
+            .unwrap_or(&value);
+        if value.is_empty() {
             searched.push(format!("${var} (unset)"));
+            continue;
         }
+        let path = PathBuf::from(value);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(BrowserError::InvalidChromeOverride { var, path });
     }
 
     for dir in &probe.app_dirs {
@@ -128,7 +139,9 @@ pub fn find_chrome_with(probe: &Probe<'_>) -> Result<PathBuf, BrowserError> {
 
 fn playwright_cache_roots(probe: &Probe<'_>) -> Vec<PathBuf> {
     let mut roots = Vec::new();
-    if let Some(custom) = (probe.env)("PLAYWRIGHT_BROWSERS_PATH").filter(|v| v != "0") {
+    if let Some(custom) = (probe.env)("PLAYWRIGHT_BROWSERS_PATH")
+        .filter(|value| value.to_str().is_some_and(|value| value != "0"))
+    {
         roots.push(PathBuf::from(custom));
     }
     if let Some(home) = &probe.home {
@@ -180,7 +193,7 @@ mod tests {
 
     fn probe_in<'a>(
         home: &Path,
-        env: &'a dyn Fn(&str) -> Option<String>,
+        env: &'a dyn Fn(&str) -> Option<OsString>,
         which: &'a dyn Fn(&str) -> Option<PathBuf>,
     ) -> Probe<'a> {
         Probe {
@@ -193,21 +206,111 @@ mod tests {
     }
 
     #[test]
-    fn env_var_wins_and_astroshot_chrome_beats_chrome_path() {
+    fn explicit_overrides_win_in_order() {
         let dir = tempfile::tempdir().unwrap();
-        let a = dir.path().join("a-chrome");
-        let b = dir.path().join("b-chrome");
-        touch(&a);
-        touch(&b);
-        let (a2, b2) = (a.clone(), b.clone());
-        let env = move |k: &str| match k {
-            "ASTROSHOT_CHROME" => Some(a2.display().to_string()),
-            "CHROME_PATH" => Some(b2.display().to_string()),
-            _ => None,
+        let home = dir.path();
+        let overrides = [
+            ("ASTROSHOT_CHROME", home.join("astroshot-chrome")),
+            ("CHROME_PATH", home.join("chrome-path")),
+            (
+                "PLAYWRIGHT_MCP_EXECUTABLE_PATH",
+                home.join("harness-chrome"),
+            ),
+        ];
+        for (_, path) in &overrides {
+            touch(path);
+        }
+        touch(&home.join("Applications").join(MAC_APPS[0]));
+        let which = |_: &str| panic!("explicit override must precede PATH discovery");
+        for (first, (_, expected)) in overrides.iter().enumerate() {
+            let env = |key: &str| {
+                overrides
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, (var, path))| {
+                        (*var == key).then(|| {
+                            if index < first {
+                                "  ".into()
+                            } else {
+                                format!(" {} ", path.display()).into()
+                            }
+                        })
+                    })
+            };
+            let probe = probe_in(home, &env, &which);
+            assert_eq!(&find_chrome_with(&probe).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn invalid_explicit_override_does_not_fall_through() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let harness = home.join("harness-chrome");
+        let app = home.join("Applications").join(MAC_APPS[0]);
+        touch(&app);
+        let which = |_: &str| panic!("invalid override must stop discovery");
+
+        for bad_path in [harness.as_path(), home] {
+            let env = |key: &str| {
+                (key == "PLAYWRIGHT_MCP_EXECUTABLE_PATH").then(|| bad_path.as_os_str().to_owned())
+            };
+            let err = find_chrome_with(&probe_in(home, &env, &which)).unwrap_err();
+            assert!(
+                matches!(err, BrowserError::InvalidChromeOverride { var: "PLAYWRIGHT_MCP_EXECUTABLE_PATH", path } if path == bad_path)
+            );
+        }
+
+        touch(&harness);
+        for legacy_var in ["ASTROSHOT_CHROME", "CHROME_PATH"] {
+            let missing = home.join("missing-chrome");
+            let env = |key: &str| match key {
+                "PLAYWRIGHT_MCP_EXECUTABLE_PATH" => Some(harness.as_os_str().to_owned()),
+                key if key == legacy_var => Some(missing.as_os_str().to_owned()),
+                _ => None,
+            };
+            let err = find_chrome_with(&probe_in(home, &env, &which)).unwrap_err();
+            assert!(
+                matches!(err, BrowserError::InvalidChromeOverride { var, path } if var == legacy_var && path == missing)
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_override_is_not_treated_as_unset() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(OsStr::from_bytes(b"chrome-\xff"));
+        let env = |key: &str| {
+            (key == "PLAYWRIGHT_MCP_EXECUTABLE_PATH").then(|| path.as_os_str().to_owned())
         };
-        let which = |_: &str| None;
-        let found = find_chrome_with(&probe_in(dir.path(), &env, &which)).unwrap();
-        assert_eq!(found, a);
+        let which = |_: &str| panic!("invalid override must stop discovery");
+        let err = find_chrome_with(&probe_in(dir.path(), &env, &which)).unwrap_err();
+        assert!(
+            matches!(err, BrowserError::InvalidChromeOverride { path: invalid, .. } if invalid == path)
+        );
+    }
+
+    #[test]
+    fn without_overrides_apps_then_path_then_cache_are_used() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let app = home.join("Applications").join(MAC_APPS[0]);
+        let path = home.join("bin").join(LINUX_NAMES[0]);
+        let cache = home.join(".cache/ms-playwright/chromium-1248/chrome-linux/chrome");
+        for candidate in [&app, &path, &cache] {
+            touch(candidate);
+        }
+        let env = |_: &str| None;
+        let which = |key: &str| (key == LINUX_NAMES[0] && path.is_file()).then(|| path.clone());
+        let probe = probe_in(home, &env, &which);
+        assert_eq!(find_chrome_with(&probe).unwrap(), app);
+        std::fs::remove_file(app).unwrap();
+        assert_eq!(find_chrome_with(&probe).unwrap(), path);
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(find_chrome_with(&probe).unwrap(), cache);
     }
 
     #[test]
@@ -258,15 +361,13 @@ mod tests {
     #[test]
     fn error_lists_everything_searched() {
         let dir = tempfile::tempdir().unwrap();
-        let env = |k: &str| (k == "CHROME_PATH").then(|| "/nope/chrome".to_string());
+        let env = |_: &str| None;
         let which = |_: &str| None;
         let err = find_chrome_with(&probe_in(dir.path(), &env, &which)).unwrap_err();
         let text = err.to_string();
-        assert!(
-            text.contains("$CHROME_PATH=/nope/chrome (not a file)"),
-            "{text}"
-        );
-        assert!(text.contains("$ASTROSHOT_CHROME (unset)"), "{text}");
+        for var in CHROME_ENV_VARS {
+            assert!(text.contains(&format!("${var} (unset)")), "{text}");
+        }
         assert!(text.contains("PATH: google-chrome"), "{text}");
         assert!(text.contains("ms-playwright/chromium-*"), "{text}");
     }
