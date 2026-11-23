@@ -50,6 +50,18 @@ npx astroshot install-browser
 On Linux CI images that also need Chromium's system libraries, add
 `--with-deps`.
 
+For native capture (including `archdev shots` builds that use this engine),
+Chromium discovery uses the first non-blank variable in this order:
+`ASTROSHOT_CHROME`, `CHROME_PATH`, `PLAYWRIGHT_MCP_EXECUTABLE_PATH`. If that
+path is not a file, capture reports the invalid override instead of launching
+another browser. Without an override, native discovery checks installed
+applications, `PATH`, then the Playwright browser cache.
+
+Native Chromium also reads `PLAYWRIGHT_MCP_SANDBOX`: `true` or `1` keeps the
+browser sandbox enabled (even on Linux as root); `false` or `0` disables it.
+Unset or unrecognized values preserve the default: enabled except on Linux as
+root. Only disable the browser sandbox in a trusted environment.
+
 Capture a React fixture:
 
 ```bash

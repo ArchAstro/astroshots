@@ -17,6 +17,13 @@ The two tracks are versioned independently.
   at launch instead of rebuilding it, and stream rows show cached downsampled
   thumbnails decoded off the main thread instead of full-size PNGs.
 
+### Fixed
+
+- **Native Chromium capture respects Playwright MCP settings:** browser
+  discovery honors `PLAYWRIGHT_MCP_EXECUTABLE_PATH` after Astroshot's explicit
+  overrides, and launch honors `PLAYWRIGHT_MCP_SANDBOX` without changing unset
+  defaults.
+
 ## [0.2.9] (macos) - 2026-10-15
 
 ### Fixed
