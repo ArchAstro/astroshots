@@ -64,6 +64,10 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$CACHE/consumer" \
   "$CACHE/astroshot-$VERSION.tgz"
 cp -RL "$CACHE/consumer" "$OUT/cli"
 cp -RL "$ROOT/skills" "$OUT/skills"
+# License and third-party notices for exactly the npm tree installed above.
+cp "$ROOT/LICENSE" "$OUT/LICENSE"
+node "$ROOT/scripts/third-party-notices.mjs" installed \
+  "$OUT/cli/node_modules" "$OUT/THIRD_PARTY_NOTICES.md" "Astroshots command line tools"
 python3 "$ROOT/macos/scripts/tools-payload.py" launcher "$OUT/bin/astroshot"
 chmod +x "$OUT/bin/astroshot"
 python3 "$ROOT/macos/scripts/tools-payload.py" prune "$OUT"

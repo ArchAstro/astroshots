@@ -148,6 +148,14 @@ APP="$STAGE/Astroshots.app"
 echo "==> Staging app"
 ditto "$APP_SRC" "$APP"
 ln -s /Applications "$STAGE/Applications"
+# License and third-party notices for the Swift packages Xcode resolved for
+# this build. Added before signing so the app signature seals them.
+echo "==> Writing license and third-party notices"
+ditto "$ROOT/../LICENSE" "$APP/Contents/Resources/LICENSE"
+node "$ROOT/../scripts/third-party-notices.mjs" swift \
+  "$ROOT/Astroshots.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" \
+  "$DERIVED/SourcePackages/checkouts" \
+  "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 TOOLS="$APP/Contents/Resources/Tools"
 # Fail before signing anything in the staged application.
 "$ROOT/scripts/verify-tools-payload.sh" "$TOOLS"

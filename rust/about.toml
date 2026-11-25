@@ -1,0 +1,38 @@
+# cargo-about configuration for the third-party notices of the Rust crates.
+# Regenerate with `npm run notices` (scripts/third-party-notices.mjs).
+#
+# Only licenses that appear in the shipped dependency graph are accepted, in
+# preference order: for an `A OR B` crate the first accepted entry wins, so
+# permissive choices sort ahead of MPL-2.0.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "Unicode-3.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "ISC",
+    "Zlib",
+    "CC0-1.0",
+    # option-ext (via dirs -> dirs-sys) is MPL-2.0 only. Its license text must
+    # accompany binaries, which these notices do.
+    "MPL-2.0",
+]
+
+# The release targets the crates are built for (see rust-target-check in
+# .github/workflows/ci.yml). Platform-only dependencies of other targets are
+# excluded.
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+]
+
+# Dev-dependencies never reach a shipped binary; the workspace crates are this
+# repository's own MIT code.
+ignore-dev-dependencies = true
+ignore-build-dependencies = false
+private = { ignore = true }

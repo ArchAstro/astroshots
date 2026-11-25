@@ -126,7 +126,8 @@ def validate(root, write=False):
         raise ValueError('missing file: node/bin/node')
     arch, allowed_archs = node_arch(root)
     entries = inventory(root, allowed_archs, node)
-    required = ['node/bin/node', 'bin/astroshot',
+    required = ['node/bin/node', 'node/LICENSE', 'bin/astroshot',
+                'LICENSE', 'THIRD_PARTY_NOTICES.md',
                 'cli/node_modules/astroshot/bin/astroshot.mjs',
                 'cli/node_modules/astroshot/node_modules/@archastro/astroshot/bin/astroshot.mjs']
     for name in required:

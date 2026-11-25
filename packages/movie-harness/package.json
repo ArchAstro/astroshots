@@ -34,7 +34,8 @@
     "bin",
     "dist",
     "native",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

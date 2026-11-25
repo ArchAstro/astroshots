@@ -27,6 +27,8 @@
     "verify:skills": "bash scripts/verify-skills.sh",
     "verify:preferences": "node scripts/verify-preferences-contract.mjs",
     "pack:check": "node scripts/verify-packages.mjs",
+    "notices": "node scripts/third-party-notices.mjs",
+    "notices:check": "node scripts/third-party-notices.mjs --check",
     "version:packages": "node scripts/set-package-version.mjs",
     "changelog:roll": "node scripts/roll-changelog.mjs",
     "test:changelog": "node --test scripts/roll-changelog.test.mjs",

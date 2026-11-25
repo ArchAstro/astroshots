@@ -56,7 +56,8 @@
     "pty.js",
     "tui.d.ts",
     "tui.js",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "pretest": "npm run build --workspace @archastro/react-shot && npm run build --workspace @archastro/tui-shot && npm run build --workspace @archastro/movie-harness",
