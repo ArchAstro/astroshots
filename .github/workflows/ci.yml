@@ -76,6 +76,42 @@ jobs:
           ASTROSHOTS_VERIFY_PACKAGES_CAPTURE: "1"
         run: npm run pack:check
 
+  third-party-notices:
+    # Regenerate every committed THIRD_PARTY_NOTICES.md and fail when a
+    # dependency change was committed without them. Lockfile-only: nothing is
+    # built, and install scripts stay off.
+    name: Third-party notices are current
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          package-manager-cache: false
+
+      - name: Use the pinned npm release
+        run: npm install --global npm@11.17.0
+
+      - name: Install npm packages (root and Node helper)
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund --prefix rust/node-helper
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      # Must match CARGO_ABOUT_VERSION in scripts/third-party-notices.mjs.
+      - name: Install cargo-about
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+
+      - name: Check notices
+        run: npm run notices:check
+
   pty-portability:
     name: PTY capture on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

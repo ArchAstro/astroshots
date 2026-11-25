@@ -81,7 +81,17 @@ function pack(packageDirectory) {
       `expected one tarball for ${packageDirectory}, found ${created.length}`,
     );
   }
-  return path.join(archiveDir, created[0]);
+  const tarball = path.join(archiveDir, created[0]);
+  // Every published package carries its license and third-party notices.
+  const entries = new Set(
+    run("tar", ["tzf", tarball], { encoding: "utf8" }).split("\n"),
+  );
+  for (const required of ["LICENSE", "THIRD_PARTY_NOTICES.md"]) {
+    if (!entries.has(`package/${required}`)) {
+      throw new Error(`${packageDirectory} tarball is missing ${required}`);
+    }
+  }
+  return tarball;
 }
 
 /**

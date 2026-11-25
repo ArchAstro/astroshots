@@ -29,7 +29,8 @@
   },
   "files": [
     "bin",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "prepack": "node scripts/prepare-bundle.mjs",

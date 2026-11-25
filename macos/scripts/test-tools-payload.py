@@ -31,6 +31,9 @@ with tempfile.TemporaryDirectory(prefix='tools-reject-') as tmp:
     # Restore original mode as well after replacing the file.
     cli.chmod(Path(sys.argv[1], 'cli/node_modules/astroshot/bin/astroshot.mjs').stat().st_mode)
     reject('reject integrity mismatch', lambda: cli.write_bytes(original + b'\n'), lambda: cli.write_bytes(original), 'integrity')
+    notices = root / 'THIRD_PARTY_NOTICES.md'
+    notices_text = notices.read_bytes()
+    reject('reject missing notices', lambda: notices.unlink(), lambda: notices.write_bytes(notices_text), 'missing file')
     launcher = root / 'bin/astroshot'
     reject('reject network launcher', lambda: launcher.write_text('#!/bin/sh\nnpx astroshot "$@"\n'), lambda: launcher.write_text(payload.LAUNCHER), 'launcher')
     native = root / 'host-library'

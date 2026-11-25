@@ -16,6 +16,13 @@ The two tracks are versioned independently.
 - **Faster menu-bar tray open (macOS):** clicking the icon reuses the tray built
   at launch instead of rebuilding it, and stream rows show cached downsampled
   thumbnails decoded off the main thread instead of full-size PNGs.
+- **Third-party license notices ship with every release:** each npm package
+  includes `LICENSE` and `THIRD_PARTY_NOTICES.md` for its production
+  dependencies; the macOS app (DMG and Sparkle zip) carries notices for its
+  Swift packages and for the npm packages in its bundled tools; and
+  `rust/THIRD_PARTY_NOTICES.md` covers the Rust crates, embedded fonts and
+  embedded Node helper. CI fails when the committed notices drift from the
+  lockfiles (`npm run notices:check`).
 
 ### Fixed
 

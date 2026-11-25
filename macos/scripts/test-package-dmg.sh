@@ -52,6 +52,18 @@ cmp \
   "$ROOT/Design/Generated/astroshots-dmg-background.png" \
   "$MOUNT/.background/Astroshots.png"
 codesign --verify --deep --strict "$MOUNT/Astroshots.app"
+# License and third-party notices ship inside the app (and so in the Sparkle zip).
+for notice in \
+  Resources/LICENSE \
+  Resources/THIRD_PARTY_NOTICES.md \
+  Resources/Tools/LICENSE \
+  Resources/Tools/THIRD_PARTY_NOTICES.md \
+  Resources/Tools/node/LICENSE
+do
+  test -s "$MOUNT/Astroshots.app/Contents/$notice"
+done
+grep -q '^| sparkle |' "$MOUNT/Astroshots.app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+echo 'PASS: license and third-party notices'
 
 # Simulate installation into a path with spaces, independent of the build tree.
 ditto "$MOUNT/Astroshots.app" "$PROOF_DIR/Installed Apps/Astroshots.app"
