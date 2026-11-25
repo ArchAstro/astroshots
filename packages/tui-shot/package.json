@@ -1,6 +1,6 @@
 {
   "name": "@archastro/tui-shot",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Deterministic PNG screenshots of Ink fixtures and arbitrary PTY programs",
   "keywords": [
     "ink",

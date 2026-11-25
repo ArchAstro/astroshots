@@ -11,6 +11,8 @@ The two tracks are versioned independently.
 
 ## [Unreleased]
 
+## [0.2.3] (npm) - 2026-11-25
+
 ### Improved
 
 - **Faster menu-bar tray open (macOS):** clicking the icon reuses the tray built
